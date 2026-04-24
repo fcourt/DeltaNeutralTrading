@@ -90,19 +90,42 @@
     "beta": "Bêta"
   },
   "settingKeys": {
-  "title": "Clés API",
-  "description": "Renseignez vos clés d'accès pour connecter votre exchange.",
-  "apiKey": "Clé API",
-  "apiKeyPlaceholder": "Entrez votre clé API",
-  "apiSecret": "Secret API",
-  "apiSecretPlaceholder": "Entrez votre secret API",
-  "passphrase": "Passphrase",
-  "passphrasePlaceholder": "Entrez votre passphrase (si requise)",
-  "show": "Afficher",
-  "hide": "Masquer",
-  "filled": "Renseigné",
-  "save": "Enregistrer",
-  "clear": "Effacer",
-  "savedSuccess": "Clés enregistrées avec succès."
+  "title": "🔑 Wallets & Clés API",
+  "description": "Configurez vos clés d'accès pour chaque plateforme.",
+  "confirmReset": "Effacer toutes les clés sauvegardées ?",
+  "resetAll": "Effacer toutes les clés",
+  "platforms": {
+    "hl":   "Hyperliquid / trade.xyz / HyENA",
+    "ext":  "Extended Exchange",
+    "nado": "Nado Exchange"
+  },
+  "status": {
+    "connected": "connecté",
+    "trading":   "trading"
+  },
+  "hl": {
+    "address":     "Adresse compte principal",
+    "addressHint": "Lecture positions & marge",
+    "agentPk":     "Clé privée Agent Wallet",
+    "agentPkHint": "⚠️ Une seule fois à la création — ne peut que trader",
+    "vault":       "Adresse sous-compte",
+    "vaultHint":   "Optionnel — laisser vide pour compte principal"
+  },
+  "ext": {
+    "apiKey":      "Clé API (lecture)",
+    "apiKeyHint":  "Marge, positions, funding rates",
+    "starkPk":     "Stark Private Key",
+    "starkPkHint": "⚠️ Une seule fois à la création — ne peut que trader",
+    "l2Vault":     "l2Vault (ID position)",
+    "l2VaultHint": "Extended › Account › API Management"
+  },
+  "nado": {
+    "address":        "Adresse compte principal",
+    "addressHint":    "Lecture positions & marge disponible",
+    "agentPk":        "Clé privée Linked Signer",
+    "agentPkHint":    "⚠️ Nado › Settings › 1-Click Trading — ne peut que trader",
+    "subaccount":     "Nom du sous-compte",
+    "subaccountHint": "Laisser \"default\" pour le compte principal"
+  }
 }
 }
