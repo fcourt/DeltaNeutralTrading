@@ -5,6 +5,7 @@ import OpenTrade from './pages/OpenTrade.jsx'
 import ManagePositions from './pages/ManagePositions.jsx'
 import FuturePage from './pages/FuturePage.jsx'
 import Configuration from './pages/Configuration.jsx'
+import SettingKeys from './pages/SettingKeys.jsx'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="manage-positions" element={<ManagePositions />} />
         <Route path="future"           element={<FuturePage />} />
         <Route path="configuration"    element={<Configuration />} />
+        <Route path="setting-keys"     element={<SettingKeys />} />
         <Route path="*"                element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
