@@ -1,20 +1,14 @@
+// src/pages/OpenTrade.jsx
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
-
-// ── Stubs en attendant les hooks ──────────────────────────────────────────────
-const PLATFORMS = [
-  { id: 'hyperliquid', label: 'Hyperliquid' },
-  { id: 'extended',   label: 'Extended' },
-  { id: 'nado',       label: 'Nado' },
-]
-
-const useLivePrices  = () => ({ markets: [], getPrice: () => null, getStepSize: () => null, getAssetMeta: () => null, getExtPrecision: () => null, lastUpdate: null })
-const useMarketFilter = () => ({ filteredMarkets: [], loading: false, errors: {}, isIntersection: false, counts: {} })
-const getMarginForPlatform = () => null
-const fmt    = (v, d = 6) => v != null ? Number(v).toFixed(d) : '—'
-const fmtUSD = (v) => v != null ? '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
-const fmtPct = (v) => v != null ? (v * 100).toFixed(4) + '%' : '—'
+import { useLivePrices, PLATFORMS } from '../hooks/useLivePrices'
+import { useMarketFilter }          from '../hooks/useMarketFilter'
+import { useFundingRates }          from '../hooks/useFundingRates'
+import { usePlaceOrder }            from '../hooks/usePlaceOrder'
+import { useMargins }               from '../hooks/useMargins'
+import { fmt, fmtUSD, fmtPct }     from '../utils/format'
+import { loadFees, saveFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
 
 // ── LegCard ───────────────────────────────────────────────────────────────────
 function LegCard({
@@ -34,8 +28,6 @@ function LegCard({
 
   return (
     <div className={`leg-card ${isLong ? 'leg-card--long' : 'leg-card--short'}`}>
-
-      {/* Header */}
       <div className="leg-card__header">
         <div className="leg-card__header-left">
           <span className={`leg-badge ${isLong ? 'leg-badge--long' : 'leg-badge--short'}`}>{side}</span>
@@ -44,7 +36,6 @@ function LegCard({
         {isSuggested && <span className="leg-card__optimal">⭐ {t('openTrade.optimal')}</span>}
       </div>
 
-      {/* Prix */}
       <div className="leg-grid-2">
         <div className="leg-stat">
           <p className="leg-stat__label">{t('openTrade.marketPrice')}</p>
@@ -56,7 +47,6 @@ function LegCard({
         </div>
       </div>
 
-      {/* Taille */}
       <div className="leg-grid-2">
         <div className="leg-stat">
           <p className="leg-stat__label">{t('openTrade.notionalUSD')}</p>
@@ -70,7 +60,6 @@ function LegCard({
         </div>
       </div>
 
-      {/* Levier + Marge */}
       <div className="leg-grid-2">
         <div className="leg-stat">
           <p className="leg-stat__label">{t('openTrade.minLeverage')}</p>
@@ -86,7 +75,6 @@ function LegCard({
         </div>
       </div>
 
-      {/* Funding */}
       <div className="leg-stat leg-stat--block">
         <p className="leg-stat__label">{t('openTrade.funding1h')}</p>
         <div className="leg-funding-row">
@@ -106,7 +94,6 @@ function LegCard({
         </div>
       </div>
 
-      {/* Fees */}
       <div className="leg-grid-2">
         <div className={`leg-stat ${orderType === 'taker' ? 'leg-stat--taker-active' : ''}`}>
           <p className="leg-stat__label">{t('openTrade.feesTaker')}</p>
@@ -120,29 +107,18 @@ function LegCard({
         </div>
       </div>
 
-      {/* Order type toggle */}
       <div className="leg-order-toggle">
-        <button
-          onClick={() => onOrderTypeChange('taker')}
-          className={`leg-order-btn ${orderType === 'taker' ? 'leg-order-btn--taker-active' : 'leg-order-btn--inactive'}`}
-        >
+        <button onClick={() => onOrderTypeChange('taker')} className={`leg-order-btn ${orderType === 'taker' ? 'leg-order-btn--taker-active' : 'leg-order-btn--inactive'}`}>
           ⚡ Market — Taker
         </button>
-        <button
-          onClick={() => onOrderTypeChange('maker')}
-          className={`leg-order-btn ${orderType === 'maker' ? 'leg-order-btn--maker-active' : 'leg-order-btn--inactive'}`}
-        >
+        <button onClick={() => onOrderTypeChange('maker')} className={`leg-order-btn ${orderType === 'maker' ? 'leg-order-btn--maker-active' : 'leg-order-btn--inactive'}`}>
           📋 Limit — Maker
         </button>
       </div>
 
-      {/* Actions */}
       {sizeDisplay && (
         <div className="leg-actions">
-          <button
-            onClick={() => navigator.clipboard.writeText(sizeDisplay.toFixed(6))}
-            className="leg-copy-btn"
-          >
+          <button onClick={() => navigator.clipboard.writeText(sizeDisplay.toFixed(6))} className="leg-copy-btn">
             📋 {t('openTrade.copySize')} : {fmt(sizeDisplay, 6)}
           </button>
           {canTrade ? (
@@ -156,9 +132,7 @@ function LegCard({
                 : <>{isLong ? '🟢' : '🔴'} {t('openTrade.openSide')} {side} {t('openTrade.on')} {platform?.label}</>}
             </button>
           ) : (
-            <div className="leg-locked">
-              🔒 {t('openTrade.configureKeys')}
-            </div>
+            <div className="leg-locked">🔒 {t('openTrade.configureKeys')}</div>
           )}
         </div>
       )}
@@ -169,43 +143,62 @@ function LegCard({
 // ── OpenTrade page ────────────────────────────────────────────────────────────
 export default function OpenTrade() {
   const { t } = useTranslation()
-  const { canTradeHL, canTradeExt, canTradeNado } = useWallet()
+  const {
+    hlAddress, hlVaultAddress, hlAgentPk,
+    extApiKey, extStarkPk, extL2Vault,
+    nadoAddress, nadoAgentPk, nadoSubaccount,
+    canTradeHL, canTradeExt, canTradeNado,
+  } = useWallet()
 
-  const [platform1,   setPlatform1]   = useState('hyperliquid')
-  const [platform2,   setPlatform2]   = useState('extended')
-  const [marketId,    setMarketId]    = useState('')
-  const [sizeUSD,     setSizeUSD]     = useState('')
-  const [useStepSize, setUseStepSize] = useState(false)
-  const [orderType1,  setOrderType1]  = useState('maker')
-  const [orderType2,  setOrderType2]  = useState('maker')
-  const [placingLeg1, setPlacingLeg1] = useState(false)
-  const [placingLeg2, setPlacingLeg2] = useState(false)
-  const [tradeStatus, setTradeStatus] = useState(null)
+  const [platform1,       setPlatform1]       = useState('hyperliquid')
+  const [platform2,       setPlatform2]       = useState('extended')
+  const [marketId,        setMarketId]        = useState('')
+  const [sizeUSD,         setSizeUSD]         = useState('')
+  const [useStepSize,     setUseStepSize]     = useState(false)
+  const [fees,            setFees]            = useState(loadFees)
+  const [orderType1,      setOrderType1]      = useState('maker')
+  const [orderType2,      setOrderType2]      = useState('maker')
+  const [placingLeg1,     setPlacingLeg1]     = useState(false)
+  const [placingLeg2,     setPlacingLeg2]     = useState(false)
+  const [tradeStatus,     setTradeStatus]     = useState(null)
   const [loadedPosition1, setLoadedPosition1] = useState(null)
   const [loadedPosition2, setLoadedPosition2] = useState(null)
-  const [fees] = useState({
-    hyperliquid: { maker: 0.0002, taker: 0.0005 },
-    extended:    { maker: 0.0002, taker: 0.0005 },
-    nado:        { maker: 0.0002, taker: 0.0005 },
-  })
 
-  // Stubs — remplacés quand les hooks arrivent
-  const { markets, getPrice, getStepSize } = useLivePrices()
+  // ── Credentials (pour les ordres) ─────────────────────────────────────────
+  const credentials = useMemo(() => ({
+    hlAddress, hlVaultAddress, hlAgentPk,
+    extApiKey, extStarkPk, extL2Vault,
+    nadoAddress, nadoAgentPk, nadoSubaccount,
+  }), [hlAddress, hlVaultAddress, hlAgentPk, extApiKey, extStarkPk, extL2Vault, nadoAddress, nadoAgentPk, nadoSubaccount])
+
+  // ── Hooks ──────────────────────────────────────────────────────────────────
+  const { markets, getPrice, getStepSize, getAssetMeta, getExtPrecision, lastUpdate } = useLivePrices(3000)
   const { filteredMarkets, loading, errors, isIntersection, counts } = useMarketFilter(platform1, platform2, markets)
+  const { p1: fundingP1, p2: fundingP2, extBid, extAsk } = useFundingRates(marketId, platform1, platform2, extApiKey, markets)
+  const { margins } = useMargins(credentials)
+  const { placeOrder } = usePlaceOrder(markets)
 
+  // ── Auto-reset marché si hors liste ───────────────────────────────────────
   useEffect(() => {
     if (!loading && filteredMarkets.length > 0 && marketId !== '') {
       if (!filteredMarkets.find(m => m.id === marketId)) setMarketId('')
     }
   }, [filteredMarkets, loading, marketId])
 
-  const price1 = getPrice?.(marketId, platform1) ?? null
-  const price2 = getPrice?.(marketId, platform2) ?? null
+  // ── Dérivés ────────────────────────────────────────────────────────────────
+  const price1 = getPrice(marketId, platform1)
+  const price2 = getPrice(marketId, platform2)
   const plat1  = PLATFORMS.find(p => p.id === platform1)
   const plat2  = PLATFORMS.find(p => p.id === platform2)
+  const market = markets.find(m => m.id === marketId)
 
-  const fundingP1 = null
-  const fundingP2 = null
+  const canTradePlatform = (platformId) => {
+    if (platformId === 'extended') return canTradeExt
+    if (platformId === 'nado')     return canTradeNado
+    return canTradeHL
+  }
+
+  const getMarginForPlatform = (platformId) => margins[platformId] ?? null
 
   const suggestion = useMemo(() => {
     if (fundingP1 == null || fundingP2 == null) return null
@@ -218,257 +211,259 @@ export default function OpenTrade() {
   const calc = useMemo(() => {
     const val = parseFloat(sizeUSD)
     if (!val || val <= 0 || !price1 || !price2) return null
+    const fallback = 0.0005
+    const isExtP1  = platform1 === 'extended'
+    const isExtP2  = platform2 === 'extended'
+    const limitP1  = isExtP1
+      ? (side1 === 'LONG' ? (extAsk ?? price1 * (1 - fallback)) : (extBid ?? price1 * (1 + fallback)))
+      : (side1 === 'LONG' ? price1 * (1 - fallback) : price1 * (1 + fallback))
+    const limitP2  = isExtP2
+      ? (side2 === 'LONG' ? (extAsk ?? price2 * (1 - fallback)) : (extBid ?? price2 * (1 + fallback)))
+      : (side2 === 'LONG' ? price2 * (1 - fallback) : price2 * (1 + fallback))
     return {
       asset1:    val / price1,
       asset2:    val / price2,
       spreadPct: ((price1 - price2) / price2) * 100,
-      limitP1:   side1 === 'LONG' ? price1 * 0.9995 : price1 * 1.0005,
-      limitP2:   side2 === 'LONG' ? price2 * 0.9995 : price2 * 1.0005,
-      leverage1: null,
-      leverage2: null,
+      limitP1:   roundToHLPrice(limitP1),
+      limitP2:   roundToHLPrice(limitP2),
+      leverage1: minLeverageFor(val, getMarginForPlatform(platform1)),
+      leverage2: minLeverageFor(val, getMarginForPlatform(platform2)),
     }
-  }, [sizeUSD, price1, price2, side1, side2])
+  }, [sizeUSD, price1, price2, side1, side2, extBid, extAsk, platform1, platform2, margins])
 
-  const canTradePlatform = (platformId) => {
-    if (platformId === 'extended')    return canTradeExt
-    if (platformId === 'nado')        return canTradeNado
-    return canTradeHL
+  // ── Ordres ─────────────────────────────────────────────────────────────────
+  const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
+    if (!market) throw new Error('Marché non résolu')
+    const stepSize   = getStepSize(marketId)
+    const meta       = getAssetMeta(market.hlKey)
+    const szDecimals = platformId === 'extended'
+      ? (getExtPrecision(market.extKey)?.szDecimals ?? 2)
+      : (meta?.szDecimals ?? (stepSize > 0 ? Math.round(-Math.log10(stepSize)) : 6))
+    const rawSize    = useStepSize && stepSize ? Math.floor(sizeAsset / stepSize) * stepSize : sizeAsset
+    const finalSize  = parseFloat(rawSize.toFixed(szDecimals))
+    return {
+      platformId, marketId, isBuy: side === 'LONG',
+      size: finalSize, limitPrice, orderType,
+      market,
+      ...credentials,
+    }
   }
 
-  // Stubs de trading
   const handlePlaceLeg = async (legNum) => {
-    const setter = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
-    setter(true)
-    setTradeStatus(null)
+    const setter     = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
+    const platformId = legNum === 1 ? platform1 : platform2
+    const side       = legNum === 1 ? side1 : side2
+    const sizeAsset  = legNum === 1 ? calc?.asset1 : calc?.asset2
+    const limitPx    = legNum === 1 ? calc?.limitP1 : calc?.limitP2
+    const orderType  = legNum === 1 ? orderType1 : orderType2
+    setter(true); setTradeStatus(null)
     try {
-      console.log(`[stub] Place leg ${legNum}`)
-      await new Promise(r => setTimeout(r, 500))
-      setTradeStatus({ type: 'success', msg: `✅ [stub] Leg ${legNum} envoyé` })
+      await placeOrder(buildOrderParams(platformId, side, sizeAsset, limitPx, orderType))
+      setTradeStatus({ type: 'success', msg: `✅ Ordre ${side} envoyé sur ${PLATFORMS.find(p => p.id === platformId)?.label}` })
     } catch (e) {
       setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
-    } finally {
-      setter(false)
-    }
+    } finally { setter(false) }
   }
 
   const handlePlaceBothLegs = async () => {
     setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
     try {
-      console.log('[stub] Place both legs')
-      await new Promise(r => setTimeout(r, 500))
-      setTradeStatus({ type: 'success', msg: '✅ [stub] Les 2 legs envoyés' })
+      await Promise.all([
+        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1)),
+        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2)),
+      ])
+      setTradeStatus({ type: 'success', msg: '✅ Les 2 legs envoyés simultanément !' })
     } catch (e) {
       setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
-    } finally {
-      setPlacingLeg1(false); setPlacingLeg2(false)
-    }
+    } finally { setPlacingLeg1(false); setPlacingLeg2(false) }
   }
 
-  const canTrade = canTradeHL || canTradeExt || canTradeNado
+  const fresh = lastUpdate && (Date.now() - lastUpdate.getTime()) < 6000
 
   return (
-    <>
-      <div className="page-header">
-        <h1 className="page-title">{t('openTrade.title')}</h1>
-        <p className="page-desc">{t('openTrade.description')}</p>
+    <div className="open-trade-page">
+
+      {/* Header */}
+      <div className="open-trade-header">
+        <h2 className="open-trade-title">{t('openTrade.title')}</h2>
+        <div className="open-trade-status">
+          <span className={`price-dot ${fresh ? 'price-dot--fresh' : 'price-dot--stale'}`} />
+          {lastUpdate ? `MAJ ${lastUpdate.toLocaleTimeString('fr-FR')}` : t('openTrade.loading')}
+        </div>
       </div>
 
-      {!canTrade && (
-        <div className="card">
-          <div className="alert alert--warning">
-            ⚠️ {t('openTrade.noKeysWarning')}{' '}
-            <a href="/setting-keys" className="wc-alert-link">{t('openTrade.configureKeysLink')} →</a>
+      {/* Sélecteurs */}
+      <div className="selectors-grid">
+
+        {/* Plateforme 1 */}
+        <div className="selector-group">
+          <label className="selector-label">{t('openTrade.platform1')}</label>
+          <select value={platform1} onChange={e => setPlatform1(e.target.value)} className="selector-input">
+            {PLATFORMS.filter(p => p.id !== platform2).map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Plateforme 2 */}
+        <div className="selector-group">
+          <label className="selector-label">{t('openTrade.platform2')}</label>
+          <select value={platform2} onChange={e => setPlatform2(e.target.value)} className="selector-input">
+            <option value="">— {t('openTrade.none')} —</option>
+            {PLATFORMS.filter(p => p.id !== platform1).map(p => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Marché */}
+        <div className="selector-group">
+          <label className="selector-label selector-label--flex">
+            {t('openTrade.market')}
+            {loading && <span className="selector-loading">chargement…</span>}
+            {!loading && isIntersection && (
+              <span className="selector-count">
+                {filteredMarkets.length - 1} communs ({counts[platform1]} ∩ {counts[platform2]})
+              </span>
+            )}
+            {Object.keys(errors).length > 0 && (
+              <span className="selector-error">⚠️ {Object.keys(errors).join(', ')}</span>
+            )}
+          </label>
+          <select
+            value={marketId}
+            onChange={e => setMarketId(e.target.value)}
+            disabled={loading && filteredMarkets.length <= 1}
+            className="selector-input"
+          >
+            <option value="">— {t('openTrade.selectMarket')} —</option>
+            {['Crypto', 'Indices', 'Commodités', 'Equities', 'FX'].map(cat => {
+              const catMarkets = filteredMarkets.filter(m => m.category === cat)
+              if (!catMarkets.length) return null
+              return (
+                <optgroup key={cat} label={`${cat} (${catMarkets.length})`}>
+                  {catMarkets.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </optgroup>
+              )
+            })}
+          </select>
+        </div>
+
+        {/* Taille */}
+        <div className="selector-group">
+          <label className="selector-label">{t('openTrade.sizeUSD')}</label>
+          <input
+            type="number"
+            value={sizeUSD}
+            onChange={e => setSizeUSD(e.target.value)}
+            placeholder="ex: 1000"
+            className="selector-input"
+          />
+        </div>
+      </div>
+
+      {/* Suggestion funding + toggle step size */}
+      {(suggestion || fundingP1 != null || fundingP2 != null) && (
+        <div className="funding-suggestion">
+          <div className="funding-suggestion__text">
+            <p className="funding-suggestion__title">💡 {t('openTrade.optimalDirection')}</p>
+            <p className="funding-suggestion__detail">
+              {suggestion && (
+                <>
+                  <span className="text-green">{plat1?.label} → {suggestion.p1}</span>
+                  {' · '}
+                  <span className="text-red">{plat2?.label} → {suggestion.p2}</span>
+                  {' · '}
+                </>
+              )}
+              {fundingP1 != null && fundingP2 != null && (
+                <span className="text-muted">
+                  Diff : {fmtPct(Math.abs(fundingP1 - fundingP2))} /h
+                  ({fmtPct(Math.abs(fundingP1 - fundingP2) * 24 * 365)} /an)
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="step-toggle" onClick={() => setUseStepSize(s => !s)}>
+            <div className={`step-toggle__track ${useStepSize ? 'step-toggle__track--on' : ''}`}>
+              <div className={`step-toggle__thumb ${useStepSize ? 'step-toggle__thumb--on' : ''}`} />
+            </div>
+            <span className="step-toggle__label">Step size</span>
           </div>
         </div>
       )}
 
-      <div className="card">
-
-        {/* Sélecteurs */}
-        <div className="ot-selectors">
-
-          <div className="ot-select-group">
-            <label className="ot-label">{t('openTrade.platform1')}</label>
-            <select
-              value={platform1}
-              onChange={e => setPlatform1(e.target.value)}
-              className="ot-select"
-            >
-              {PLATFORMS.filter(p => p.id !== platform2).map(p => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="ot-select-group">
-            <label className="ot-label">{t('openTrade.platform2')}</label>
-            <select
-              value={platform2}
-              onChange={e => setPlatform2(e.target.value)}
-              className="ot-select"
-            >
-              <option value="">— {t('openTrade.none')} —</option>
-              {PLATFORMS.filter(p => p.id !== platform1).map(p => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="ot-select-group">
-            <label className="ot-label ot-label--row">
-              {t('openTrade.market')}
-              {loading && <span className="ot-loading">{t('openTrade.loading')}</span>}
-              {!loading && isIntersection && (
-                <span className="ot-count">
-                  {filteredMarkets.length} {t('openTrade.common')} ({counts[platform1]} ∩ {counts[platform2]})
-                </span>
-              )}
-              {Object.keys(errors).length > 0 && (
-                <span className="ot-error-badge">⚠️ {Object.keys(errors).join(', ')} {t('openTrade.unavailable')}</span>
-              )}
-            </label>
-            <select
-              value={marketId}
-              onChange={e => setMarketId(e.target.value)}
-              disabled={loading && filteredMarkets.length === 0}
-              className="ot-select"
-            >
-              <option value="">— {t('openTrade.select')} —</option>
-              {['Crypto', 'Indices', 'Commodités', 'Equities'].map(cat => {
-                const catMarkets = filteredMarkets.filter(m => m.category === cat)
-                if (catMarkets.length === 0) return null
-                return (
-                  <optgroup key={cat} label={`${cat} (${catMarkets.length})`}>
-                    {catMarkets.map(m => (
-                      <option key={m.id} value={m.id}>{m.label}</option>
-                    ))}
-                  </optgroup>
-                )
-              })}
-            </select>
-          </div>
-
-          <div className="ot-select-group">
-            <label className="ot-label">{t('openTrade.sizeUSD')}</label>
-            <input
-              type="number"
-              value={sizeUSD}
-              onChange={e => setSizeUSD(e.target.value)}
-              placeholder="ex: 1000"
-              className="ot-select"
-            />
-          </div>
-
+      {/* Spread */}
+      {calc?.spreadPct != null && (
+        <div className={`spread-bar ${Math.abs(calc.spreadPct) > 0.1 ? 'spread-bar--warn' : ''}`}>
+          <span className="spread-bar__label">Écart {plat1?.label} / {plat2?.label}</span>
+          <span className="spread-bar__value">
+            {calc.spreadPct > 0 ? '+' : ''}{calc.spreadPct.toFixed(4)}%
+          </span>
         </div>
+      )}
 
-        {/* Direction optimale + step size */}
-        {(suggestion || fundingP1 != null || fundingP2 != null) && (
-          <div className="ot-funding-banner">
-            <div className="ot-funding-info">
-              <p className="ot-funding-title">💡 {t('openTrade.optimalDirection')}</p>
-              <p className="ot-funding-detail">
-                {suggestion && (
-                  <>
-                    <span className="ot-funding-long">{plat1?.label} → {suggestion.p1}</span>
-                    {' · '}
-                    <span className="ot-funding-short">{plat2?.label} → {suggestion.p2}</span>
-                    {' · '}
-                  </>
-                )}
-                {fundingP1 != null && fundingP2 != null && (
-                  <span className="ot-funding-diff">
-                    {t('openTrade.diff')} : {fmtPct(Math.abs(fundingP1 - fundingP2))} /h
-                    ({fmtPct(Math.abs(fundingP1 - fundingP2) * 24 * 365)} /an)
-                  </span>
-                )}
-              </p>
-            </div>
-            <div className="ot-stepsize-toggle" onClick={() => setUseStepSize(s => !s)}>
-              <div className={`ot-toggle-track ${useStepSize ? 'ot-toggle-track--on' : ''}`}>
-                <div className={`ot-toggle-thumb ${useStepSize ? 'ot-toggle-thumb--on' : ''}`} />
-              </div>
-              <span className="ot-toggle-label">Step size</span>
-            </div>
-          </div>
-        )}
-
-        {/* Spread */}
-        {calc?.spreadPct != null && (
-          <div className={`ot-spread ${Math.abs(calc.spreadPct) > 0.1 ? 'ot-spread--warning' : ''}`}>
-            <span className="ot-spread__label">{t('openTrade.priceGap')} {plat1?.label} / {plat2?.label}</span>
-            <span className={`ot-spread__value ${Math.abs(calc.spreadPct) > 0.1 ? 'ot-spread__value--warning' : ''}`}>
-              {calc.spreadPct > 0 ? '+' : ''}{calc.spreadPct.toFixed(4)}%
-            </span>
-          </div>
-        )}
-
-        {/* Leg cards */}
-        <div className="ot-legs">
-          <LegCard
-            side={side1} platform={plat1} price={price1} limitPrice={calc?.limitP1} leverage={calc?.leverage1}
-            sizeUSD={parseFloat(sizeUSD) || null} sizeAsset={calc?.asset1}
-            marginAvailable={getMarginForPlatform(platform1)} fundingRate={fundingP1}
-            isSuggested={!!suggestion} feesMaker={fees[platform1]?.maker ?? 0} feesTaker={fees[platform1]?.taker ?? 0}
-            useStepSize={useStepSize} stepSize={getStepSize?.(marketId) ?? null}
-            orderType={orderType1} onOrderTypeChange={setOrderType1}
-            canTrade={canTradePlatform(platform1)} onPlaceOrder={() => handlePlaceLeg(1)} isPlacingOrder={placingLeg1}
-          />
-          <LegCard
-            side={side2} platform={plat2} price={price2} limitPrice={calc?.limitP2} leverage={calc?.leverage2}
-            sizeUSD={parseFloat(sizeUSD) || null} sizeAsset={calc?.asset2}
-            marginAvailable={getMarginForPlatform(platform2)} fundingRate={fundingP2}
-            isSuggested={!!suggestion} feesMaker={fees[platform2]?.maker ?? 0} feesTaker={fees[platform2]?.taker ?? 0}
-            useStepSize={useStepSize} stepSize={getStepSize?.(marketId) ?? null}
-            orderType={orderType2} onOrderTypeChange={setOrderType2}
-            canTrade={canTradePlatform(platform2)} onPlaceOrder={() => handlePlaceLeg(2)} isPlacingOrder={placingLeg2}
-          />
-        </div>
-
-        {/* Feedback */}
-        {tradeStatus && (
-          <div className={`alert ${tradeStatus.type === 'success' ? 'alert--success' : 'alert--error'}`}>
-            {tradeStatus.msg}
-          </div>
-        )}
-
-        {/* Bouton 2 legs */}
-        {calc && !loadedPosition1 && !loadedPosition2 && (
-          <button
-            onClick={handlePlaceBothLegs}
-            disabled={placingLeg1 || placingLeg2 || !calc.limitP1 || !calc.limitP2}
-            className="ot-both-legs-btn"
-          >
-            {(placingLeg1 || placingLeg2)
-              ? <><span className="leg-spin">⟳</span> {t('openTrade.sendingBoth')}</>
-              : <>🚀 {t('openTrade.openBothLegs')} — {plat1?.label} + {plat2?.label}</>}
-          </button>
-        )}
-
-        {/* 1 seul leg manquant */}
-        {calc && (loadedPosition1 || loadedPosition2) && !(loadedPosition1 && loadedPosition2) && (
-          <div className="ot-missing-leg">
-            <p className="ot-missing-leg__info">
-              ⚡ {t('openTrade.positionAlreadyOpen')} {(loadedPosition1 ?? loadedPosition2).side} {t('openTrade.on')} {PLATFORMS.find(p => p.id === (loadedPosition1 ?? loadedPosition2).platform)?.label}
-            </p>
-            <button
-              onClick={() => handlePlaceLeg(loadedPosition1 ? 2 : 1)}
-              disabled={placingLeg1 || placingLeg2}
-              className="ot-missing-leg__btn"
-            >
-              {(placingLeg1 || placingLeg2)
-                ? <><span className="leg-spin">⟳</span> {t('openTrade.sending')}</>
-                : <>🚀 {t('openTrade.openMissingLeg')}</>}
-            </button>
-            <button
-              onClick={() => { setLoadedPosition1(null); setLoadedPosition2(null) }}
-              className="ot-missing-leg__cancel"
-            >
-              ✕ {t('openTrade.cancelOpenBoth')}
-            </button>
-          </div>
-        )}
-
+      {/* LegCards */}
+      <div className="legs-grid">
+        <LegCard
+          side={side1} platform={plat1} price={price1} limitPrice={calc?.limitP1}
+          leverage={calc?.leverage1} sizeUSD={parseFloat(sizeUSD) || null} sizeAsset={calc?.asset1}
+          marginAvailable={getMarginForPlatform(platform1)} fundingRate={fundingP1}
+          isSuggested={!!suggestion} feesMaker={fees[platform1]?.maker ?? 0} feesTaker={fees[platform1]?.taker ?? 0}
+          useStepSize={useStepSize} stepSize={getStepSize(marketId)}
+          orderType={orderType1} onOrderTypeChange={setOrderType1}
+          canTrade={canTradePlatform(platform1)} onPlaceOrder={() => handlePlaceLeg(1)} isPlacingOrder={placingLeg1}
+        />
+        <LegCard
+          side={side2} platform={plat2} price={price2} limitPrice={calc?.limitP2}
+          leverage={calc?.leverage2} sizeUSD={parseFloat(sizeUSD) || null} sizeAsset={calc?.asset2}
+          marginAvailable={getMarginForPlatform(platform2)} fundingRate={fundingP2}
+          isSuggested={!!suggestion} feesMaker={fees[platform2]?.maker ?? 0} feesTaker={fees[platform2]?.taker ?? 0}
+          useStepSize={useStepSize} stepSize={getStepSize(marketId)}
+          orderType={orderType2} onOrderTypeChange={setOrderType2}
+          canTrade={canTradePlatform(platform2)} onPlaceOrder={() => handlePlaceLeg(2)} isPlacingOrder={placingLeg2}
+        />
       </div>
-    </>
+
+      {/* Feedback */}
+      {tradeStatus && (
+        <div className={`trade-status ${tradeStatus.type === 'success' ? 'trade-status--success' : 'trade-status--error'}`}>
+          {tradeStatus.msg}
+        </div>
+      )}
+
+      {/* Bouton 2 legs simultanés */}
+      {calc && !loadedPosition1 && !loadedPosition2 && (
+        <button
+          onClick={handlePlaceBothLegs}
+          disabled={placingLeg1 || placingLeg2 || !calc.limitP1 || !calc.limitP2}
+          className="both-legs-btn"
+        >
+          {(placingLeg1 || placingLeg2)
+            ? <><span className="leg-spin">⟳</span> Envoi des 2 legs…</>
+            : <>🚀 Ouvrir les 2 legs — {plat1?.label} + {plat2?.label}</>}
+        </button>
+      )}
+
+      {/* 1 leg manquant */}
+      {calc && (loadedPosition1 || loadedPosition2) && !(loadedPosition1 && loadedPosition2) && (
+        <div className="missing-leg">
+          <p className="missing-leg__info">
+            ⚡ Position {(loadedPosition1 ?? loadedPosition2).side} déjà ouverte sur{' '}
+            {PLATFORMS.find(p => p.id === (loadedPosition1 ?? loadedPosition2).platform)?.label} — leg manquant uniquement
+          </p>
+          <button
+            onClick={() => handlePlaceLeg(loadedPosition1 ? 2 : 1)}
+            disabled={placingLeg1 || placingLeg2}
+            className="missing-leg__btn"
+          >
+            {placingLeg1 || placingLeg2 ? <><span className="leg-spin">⟳</span> Envoi…</> : <>🚀 Ouvrir le leg manquant</>}
+          </button>
+          <button onClick={() => { setLoadedPosition1(null); setLoadedPosition2(null) }} className="missing-leg__cancel">
+            ✕ Annuler
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
