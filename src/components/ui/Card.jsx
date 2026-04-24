@@ -1,8 +1,6 @@
-import styles from './Card.module.css'
-
-export default function Card({ children, className = '', glass = false }) {
+export default function Card({ children, className = '' }) {
   return (
-    <div className={`${styles.card} ${glass ? styles.glass : ''} ${className}`}>
+    <div className={`card ${className}`}>
       {children}
     </div>
   )
