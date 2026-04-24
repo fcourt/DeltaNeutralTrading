@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Card from '../components/ui/Card.jsx'
+import { useWallet } from '../context/WalletContext'
 
 const ASSETS = ['ETH', 'BTC', 'SOL', 'ARB', 'OP', 'AVAX']
 
 export default function OpenTrade() {
+
+  const { canTradeHL, canTradeExt, canTradeNado } = useWallet()
+  const canTrade = canTradeHL || canTradeExt || canTradeNado
+  
   const { t } = useTranslation()
   const [form, setForm] = useState({ asset: 'ETH', size: '', leverage: '', deltaTarget: '0' })
   const [showConfirm, setShowConfirm] = useState(false)
@@ -25,6 +30,18 @@ export default function OpenTrade() {
         <p className="page-desc">{t('openTrade.description')}</p>
       </div>
 
+      {/* ── Bannière si aucune clé configurée ── */}
+      {!canTrade && (
+        <div className="card">
+          <div className="alert alert--warning">
+            ⚠️ Aucune clé de trading configurée.{' '}
+            <a href="/setting-keys" className="wc-alert-link">
+              Configurer mes clés →
+            </a>
+          </div>
+        </div>
+      )}
+      
       <Card>
         {submitted && (
           <div className="alert alert--success" role="alert">
