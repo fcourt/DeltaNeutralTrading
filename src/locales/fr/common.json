@@ -11,7 +11,8 @@
     "openTrade": "Ouvrir un trade",
     "managePositions": "Gérer les positions",
     "future": "Page future",
-    "configuration": "Configuration"
+    "configuration": "Configuration",
+    "settingKeys": "Clés API"
   },
   "openTrade": {
     "title": "Ouvrir un trade",
@@ -88,4 +89,20 @@
     "back": "Retour",
     "beta": "Bêta"
   }
+  "settingKeys": {
+  "title": "Clés API",
+  "description": "Renseignez vos clés d'accès pour connecter votre exchange.",
+  "apiKey": "Clé API",
+  "apiKeyPlaceholder": "Entrez votre clé API",
+  "apiSecret": "Secret API",
+  "apiSecretPlaceholder": "Entrez votre secret API",
+  "passphrase": "Passphrase",
+  "passphrasePlaceholder": "Entrez votre passphrase (si requise)",
+  "show": "Afficher",
+  "hide": "Masquer",
+  "filled": "Renseigné",
+  "save": "Enregistrer",
+  "clear": "Effacer",
+  "savedSuccess": "Clés enregistrées avec succès."
+}
 }
