@@ -1,37 +1,36 @@
 // src/hooks/usePlaceOrder.js
-import { useWallet } from '../context/WalletContext'
 import { placeOrder as servicePlaceOrder, canTrade } from '../services/orderService.js'
 
 /**
  * Hook de placement d'ordre.
- * Les credentials sont lus depuis WalletContext au moment du clic.
- * @param {Market[]} markets
+ * Les credentials sont passés explicitement depuis DeltaNeutralPage.
  */
 export function usePlaceOrder(markets = []) {
-  const wallet = useWallet()
-
-  // Credentials extraits du context au moment de l'appel
-  const getCredentials = () => ({
-    hlAddress:      wallet.hlAddress,
-    hlVaultAddress: wallet.hlVaultAddress,
-    hlAgentPk:      wallet.hlAgentPk,
-    extApiKey:      wallet.extApiKey,
-    extStarkPk:     wallet.extStarkPk,
-    extL2Vault:     wallet.extL2Vault,
-    nadoAddress:    wallet.nadoAddress,
-    nadoAgentPk:    wallet.nadoAgentPk,
-    nadoSubaccount: wallet.nadoSubaccount,
-  })
+  // DeltaNeutralPage gère les credentials en state local (pas de WalletContext)
+  // → on expose une factory qui reçoit les params au moment du call
 
   const placeOrder = async (params) => {
     const market = markets.find(m => m.id === params.marketId)
     if (!market) throw new Error(`Marché inconnu : ${params.marketId}`)
 
-    const credentials = getCredentials()
-    return servicePlaceOrder({ ...params, market }, credentials)
+    // Les credentials sont embarqués dans params par buildOrderParams via handlePlaceLeg
+    const { platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly,
+            hlAddress, hlVaultAddress, hlAgentPk,
+            extApiKey, extStarkPk, extL2Vault,
+            nadoAddress, nadoAgentPk, nadoSubaccount } = params
+
+    const credentials = {
+      hlAddress, hlVaultAddress, hlAgentPk,
+      extApiKey, extStarkPk, extL2Vault,
+      nadoAddress, nadoAgentPk, nadoSubaccount,
+    }
+
+    return servicePlaceOrder({ platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly, market }, credentials)
   }
 
-  const canTradePlatform = (platformId) => canTrade(platformId, getCredentials())
+  const canTradeHL   = (creds) => canTrade('hyperliquid', creds)
+  const canTradeExt  = (creds) => canTrade('extended', creds)
+  const canTradeNado = (creds) => canTrade('nado', creds)
 
-  return { placeOrder, canTradePlatform }
+  return { placeOrder, canTradeHL, canTradeExt, canTradeNado }
 }
