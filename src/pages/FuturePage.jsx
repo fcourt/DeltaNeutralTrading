@@ -1,22 +1,21 @@
 import { useTranslation } from 'react-i18next'
-import styles from './FuturePage.module.css'
+import Card from '../components/ui/Card.jsx'
 
 export default function FuturePage() {
   const { t } = useTranslation()
-
   return (
-    <div className={styles.root}>
-      <div className={styles.header}>
-        <h1 className={styles.title}>{t('future.title')}</h1>
-        <p className={styles.desc}>{t('future.description')}</p>
+    <>
+      <div className="page-header">
+        <h1 className="page-title">{t('future.title')}</h1>
+        <p className="page-desc">{t('future.description')}</p>
       </div>
-
-      <div className={styles.comingSoon}>
-        <div className={styles.orb} aria-hidden="true" />
-        <div className={styles.icon} aria-hidden="true">◎</div>
-        <p className={styles.message}>{t('future.comingSoon')}</p>
-        <button className="btn-ghost">{t('future.notifyMe')}</button>
-      </div>
-    </div>
+      <Card>
+        <div className="future-card">
+          <div className="future-card__orb" aria-hidden="true" />
+          <div className="future-card__icon" aria-hidden="true">◈</div>
+          <p className="future-card__msg">{t('future.comingSoon')}</p>
+        </div>
+      </Card>
+    </>
   )
 }
