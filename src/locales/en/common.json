@@ -1,0 +1,90 @@
+{
+  "home": {
+    "title": "Delta Neutral Trading",
+    "subtitle": "Hedge your positions with precision. Stay neutral, stay profitable.",
+    "enterApp": "Launch App",
+    "selectLanguage": "Language",
+    "tagline": "Professional-grade delta neutral strategies for DeFi traders."
+  },
+  "nav": {
+    "openTrade": "Open Trade",
+    "managePositions": "Manage Positions",
+    "future": "Future Page",
+    "configuration": "Configuration"
+  },
+  "openTrade": {
+    "title": "Open a Trade",
+    "description": "Set up a new delta neutral position.",
+    "asset": "Asset",
+    "assetPlaceholder": "Select an asset (e.g. ETH)",
+    "size": "Position Size",
+    "sizePlaceholder": "Enter amount in USD",
+    "leverage": "Leverage",
+    "leveragePlaceholder": "e.g. 2x",
+    "deltaTarget": "Delta Target",
+    "deltaTargetPlaceholder": "0 for neutral",
+    "submit": "Open Position",
+    "reset": "Reset",
+    "confirmTitle": "Confirm Trade",
+    "confirmBody": "You are about to open a delta neutral position. Verify all parameters before confirming.",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "managePositions": {
+    "title": "Manage Positions",
+    "description": "Monitor and adjust your open delta neutral positions.",
+    "noPositions": "No open positions yet.",
+    "noPositionsHint": "Open your first trade to see it here.",
+    "columns": {
+      "asset": "Asset",
+      "size": "Size",
+      "delta": "Delta",
+      "pnl": "PnL",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "close": "Close",
+    "rebalance": "Rebalance",
+    "statusNeutral": "Neutral",
+    "statusDrift": "Drifting",
+    "statusClosed": "Closed"
+  },
+  "future": {
+    "title": "Future Page",
+    "description": "This section is under construction.",
+    "comingSoon": "Coming soon — exciting features are on the way.",
+    "notifyMe": "Notify Me"
+  },
+  "configuration": {
+    "title": "Configuration",
+    "description": "Customize your trading environment.",
+    "sections": {
+      "general": "General",
+      "risk": "Risk Management",
+      "notifications": "Notifications",
+      "api": "API & Integrations"
+    },
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "slippageTolerance": "Slippage Tolerance (%)",
+    "maxDrawdown": "Max Drawdown (%)",
+    "autoRebalance": "Auto-Rebalance",
+    "rebalanceThreshold": "Rebalance Threshold (Δ)",
+    "emailNotifications": "Email Notifications",
+    "telegramNotifications": "Telegram Notifications",
+    "apiKey": "API Key",
+    "apiSecret": "API Secret",
+    "saveSettings": "Save Settings",
+    "resetDefaults": "Reset to Defaults",
+    "saved": "Settings saved successfully!"
+  },
+  "common": {
+    "loading": "Loading…",
+    "error": "An error occurred.",
+    "retry": "Retry",
+    "back": "Back",
+    "beta": "Beta"
+  }
+}
