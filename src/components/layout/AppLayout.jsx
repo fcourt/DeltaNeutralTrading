@@ -1,41 +1,41 @@
-import { Outlet, NavLink } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import AppHeader from './AppHeader.jsx'
-import styles from './AppLayout.module.css'
-
-const TABS = [
-  { key: 'open-trade',       icon: '◈', translationKey: 'nav.openTrade' },
-  { key: 'manage-positions', icon: '⊞', translationKey: 'nav.managePositions' },
-  { key: 'future',           icon: '◎', translationKey: 'nav.future' },
-  { key: 'configuration',    icon: '⚙', translationKey: 'nav.configuration' },
-]
 
 export default function AppLayout() {
   const { t } = useTranslation()
 
+  const tabs = [
+    { to: '/app/open-trade',        label: t('nav.openTrade'),        icon: '↗' },
+    { to: '/app/manage-positions',  label: t('nav.managePositions'),  icon: '⊞' },
+    { to: '/app/future',            label: t('nav.future'),           icon: '◈' },
+    { to: '/app/configuration',     label: t('nav.configuration'),    icon: '⚙' },
+  ]
+
   return (
-    <div className={styles.root}>
+    <div className="app-root">
       <AppHeader />
 
-      <nav className={styles.tabNav} role="navigation" aria-label="Main navigation">
-        <div className={styles.tabList}>
-          {TABS.map((tab) => (
+      <nav className="tab-nav" aria-label="Main navigation">
+        <div className="tab-nav__list" role="tablist">
+          {tabs.map((tab) => (
             <NavLink
-              key={tab.key}
-              to={`/app/${tab.key}`}
+              key={tab.to}
+              to={tab.to}
               className={({ isActive }) =>
-                `${styles.tab} ${isActive ? styles.tabActive : ''}`
+                `tab-nav__item${isActive ? ' tab-nav__item--active' : ''}`
               }
+              role="tab"
             >
-              <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>
-              <span className={styles.tabLabel}>{t(tab.translationKey)}</span>
+              <span className="tab-nav__icon" aria-hidden="true">{tab.icon}</span>
+              {tab.label}
             </NavLink>
           ))}
         </div>
       </nav>
 
-      <main className={styles.main} id="main-content">
-        <div className={styles.contentWrapper}>
+      <main className="page-main">
+        <div className="page-content">
           <Outlet />
         </div>
       </main>
