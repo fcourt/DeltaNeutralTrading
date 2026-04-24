@@ -60,9 +60,9 @@
   --shadow-glow: 0 0 20px rgba(180, 176, 240, 0.2);
 
   /* ── Widths ── */
-  --content-narrow:  640px;
-  --content-default: 960px;
-  --content-wide:    1200px;
+  --content-narrow:  85vw;;
+  --content-default: 95vw;;
+  --content-wide:    95vw;
 
   /* ── Type scale ── */
   --text-xs:   clamp(0.75rem,  0.7rem + 0.25vw, 0.875rem);
