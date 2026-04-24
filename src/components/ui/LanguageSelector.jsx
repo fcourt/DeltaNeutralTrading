@@ -1,30 +1,26 @@
 import { useTranslation } from 'react-i18next'
-import styles from './LanguageSelector.module.css'
 
 const LANGUAGES = [
-  { code: 'en', label: 'English', flag: '🇬🇧' },
-  { code: 'fr', label: 'Français', flag: '🇫🇷' },
+  { code: 'en', label: 'EN', flag: '🇬🇧' },
+  { code: 'fr', label: 'FR', flag: '🇫🇷' },
 ]
 
 export default function LanguageSelector() {
-  const { i18n, t } = useTranslation()
-
-  const handleChange = (code) => {
-    i18n.changeLanguage(code)
-    document.documentElement.lang = code
-  }
+  const { i18n } = useTranslation()
+  const current = i18n.language?.slice(0, 2)
 
   return (
-    <div className={styles.wrapper} role="group" aria-label={t('home.selectLanguage')}>
+    <div className="lang-selector" role="group" aria-label="Language selector">
       {LANGUAGES.map((lang) => (
         <button
           key={lang.code}
-          className={`${styles.btn} ${i18n.language === lang.code ? styles.active : ''}`}
-          onClick={() => handleChange(lang.code)}
-          aria-pressed={i18n.language === lang.code}
+          onClick={() => i18n.changeLanguage(lang.code)}
+          className={`lang-selector__btn${current === lang.code ? ' lang-selector__btn--active' : ''}`}
+          aria-pressed={current === lang.code}
+          aria-label={`Switch to ${lang.label}`}
         >
           <span aria-hidden="true">{lang.flag}</span>
-          <span>{lang.label}</span>
+          {lang.label}
         </button>
       ))}
     </div>
