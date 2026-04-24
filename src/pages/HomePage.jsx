@@ -3,68 +3,53 @@ import { useTranslation } from 'react-i18next'
 import Logo from '../components/ui/Logo.jsx'
 import LanguageSelector from '../components/ui/LanguageSelector.jsx'
 import ThemeToggle from '../components/ui/ThemeToggle.jsx'
-import styles from './HomePage.module.css'
 
 export default function HomePage() {
   const { t } = useTranslation()
-
   return (
-    <div className={styles.root}>
-      <div className={styles.glowTop} aria-hidden="true" />
-      <div className={styles.glowBottom} aria-hidden="true" />
-
-      <header className={styles.topBar}>
-        <div className={styles.topBarInner}>
-          <div className={styles.logoRow}>
-            <Logo size={32} />
-            <span className={styles.brandName}>Delta Neutral</span>
+    <div className="home">
+      {/* Top bar */}
+      <header className="home__topbar">
+        <div className="home__topbar-inner">
+          <div className="home__logo-row">
+            <Logo size={26} />
+            <span className="home__brand">Delta Neutral</span>
           </div>
-          <div className={styles.topBarActions}>
+          <div className="home__topbar-actions">
             <LanguageSelector />
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <main className={styles.hero} id="main-content">
-        <div className={styles.heroContent}>
-          <div className={styles.heroBadge}>
+      {/* Hero */}
+      <section className="home__hero">
+        <div className="home__hero-content">
+          <div className="home__hero-badge" aria-hidden="true">
             <Logo size={56} />
           </div>
-
-          <h1 className={styles.heroTitle}>
-            {t('home.title')}
-          </h1>
-
-          <p className={styles.heroSubtitle}>
-            {t('home.subtitle')}
-          </p>
-
-          <p className={styles.heroTagline}>
-            {t('home.tagline')}
-          </p>
-
-          <Link to="/app" className="btn-primary">
-            {t('home.enterApp')}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-              <path d="M5 12h14M12 5l7 7-7 7"/>
-            </svg>
+          <h1 className="home__hero-title">{t('home.title')}</h1>
+          <p className="home__hero-subtitle">{t('home.subtitle')}</p>
+          <p className="home__hero-tagline">{t('home.tagline')}</p>
+          <Link to="/app/open-trade" className="btn-primary">
+            {t('home.cta')} →
           </Link>
         </div>
 
-        <div className={styles.statsRow}>
+        {/* Stats */}
+        <div className="home__stats">
           {[
-            { label: 'Delta', value: '≈ 0.00' },
-            { label: 'Strategies', value: '3' },
-            { label: 'Status', value: 'Live' },
-          ].map((stat) => (
-            <div key={stat.label} className={styles.statCard}>
-              <span className={styles.statValue}>{stat.value}</span>
-              <span className={styles.statLabel}>{stat.label}</span>
+            { value: '$2.4M', label: t('home.stats.tvl') },
+            { value: '142',   label: t('home.stats.positions') },
+            { value: '0.02',  label: t('home.stats.avgDelta') },
+          ].map((s) => (
+            <div key={s.label} className="home__stat-card">
+              <span className="home__stat-value">{s.value}</span>
+              <span className="home__stat-label">{s.label}</span>
             </div>
           ))}
         </div>
-      </main>
+      </section>
     </div>
   )
 }
