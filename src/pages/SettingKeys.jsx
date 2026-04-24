@@ -1,93 +1,119 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useWallet } from '../context/WalletContext'
 
-const KEY_FIELDS = [
-  { id: 'apiKey',     type: 'text',     labelKey: 'settingKeys.apiKey',     placeholderKey: 'settingKeys.apiKeyPlaceholder' },
-  { id: 'apiSecret',  type: 'password', labelKey: 'settingKeys.apiSecret',  placeholderKey: 'settingKeys.apiSecretPlaceholder' },
-  { id: 'passphrase', type: 'password', labelKey: 'settingKeys.passphrase', placeholderKey: 'settingKeys.passphrasePlaceholder' },
-]
+function FieldGroup({ fields, accentColor }) {
+  return fields.map(({ label, val, setter, type, hint }) => (
+    <div key={label} className="wc-field-group">
+      <label className="wc-field-label">{label}</label>
+      <div className="wc-field-row">
+        <input
+          type={type}
+          value={val || ''}
+          onChange={e => setter(e.target.value)}
+          placeholder={type === 'text' ? '0x...' : '••••••'}
+          className={`wc-input wc-input--${accentColor}`}
+        />
+        {val && <span className="wc-field-check">✓</span>}
+      </div>
+      <p className="wc-field-hint">{hint}</p>
+    </div>
+  ))
+}
 
 export default function SettingKeys() {
-  const { t } = useTranslation()
-  const [form, setForm] = useState({ apiKey: '', apiSecret: '', passphrase: '' })
-  const [show, setShow] = useState({ apiSecret: false, passphrase: false })
-  const [saved, setSaved] = useState(false)
+  const {
+    hlAddress,      saveHlAddress,
+    hlVaultAddress, saveHlVaultAddress,
+    hlAgentPk,      saveHlAgentPk,
+    extApiKey,      saveExtApiKey,
+    extStarkPk,     saveExtStarkPk,
+    extL2Vault,     saveExtL2Vault,
+    nadoAddress,    saveNadoAddress,
+    nadoAgentPk,    saveNadoAgentPk,
+    nadoSubaccount, saveNadoSubaccount,
+    canTradeHL, canTradeExt, canTradeNado,
+    resetAll,
+  } = useWallet()
 
-  const handle = (e) => {
-    setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
-    setSaved(false)
-  }
+  const [open, setOpen] = useState(!hlAddress && !extApiKey && !nadoAddress)
 
-  const toggleShow = (field) => setShow((s) => ({ ...s, [field]: !s[field] }))
+  const hlFields = [
+    { label: 'Adresse compte principal', val: hlAddress,      setter: saveHlAddress,      type: 'text',     hint: 'Lecture positions & marge' },
+    { label: 'Clé privée Agent Wallet',  val: hlAgentPk,      setter: saveHlAgentPk,      type: 'password', hint: '⚠️ Une seule fois à la création — ne peut que trader' },
+    { label: 'Adresse sous-compte',      val: hlVaultAddress, setter: saveHlVaultAddress, type: 'text',     hint: 'Optionnel — laisser vide pour compte principal' },
+  ]
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    setSaved(true)
+  const extFields = [
+    { label: 'Clé API (lecture)',     val: extApiKey,  setter: saveExtApiKey,  type: 'password', hint: 'Marge, positions, funding rates' },
+    { label: 'Stark Private Key',     val: extStarkPk, setter: saveExtStarkPk, type: 'password', hint: '⚠️ Une seule fois à la création — ne peut que trader' },
+    { label: 'l2Vault (ID position)', val: extL2Vault, setter: saveExtL2Vault, type: 'text',     hint: 'Extended › Account › API Management' },
+  ]
+
+  const nadoFields = [
+    { label: 'Adresse compte principal', val: nadoAddress,    setter: saveNadoAddress,    type: 'text',     hint: 'Lecture positions & marge disponible' },
+    { label: 'Clé privée Linked Signer', val: nadoAgentPk,    setter: saveNadoAgentPk,    type: 'password', hint: '⚠️ Nado › Settings › 1-Click Trading — ne peut que trader' },
+    { label: 'Nom du sous-compte',       val: nadoSubaccount, setter: saveNadoSubaccount, type: 'text',     hint: 'Laisser "default" pour le compte principal' },
+  ]
+
+  const handleReset = () => {
+    if (!confirm('Effacer toutes les clés sauvegardées ?')) return
+    resetAll()
   }
 
   return (
-    <>
-      <div className="page-header">
-        <h1 className="page-title">{t('settingKeys.title')}</h1>
-        <p className="page-desc">{t('settingKeys.description')}</p>
-      </div>
+    <div className="wc-wrapper">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="wc-toggle"
+      >
+        <span className="wc-toggle-left">
+          🔑 Wallets &amp; API Keys
+          <span className={hlAddress    ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--red'}>● HL connecté</span>
+          <span className={canTradeHL   ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--yellow'}>● HL trading</span>
+          <span className={extApiKey    ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--yellow'}>● EXT connecté</span>
+          <span className={canTradeExt  ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--yellow'}>● EXT trading</span>
+          <span className={nadoAddress  ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--gray'}>● Nado connecté</span>
+          <span className={canTradeNado ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--gray'}>● Nado trading</span>
+        </span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
 
-      <div className="card">
-        {saved && (
-          <div className="alert alert--success" role="alert">
-            ✓ {t('settingKeys.savedSuccess')}
+      {open && (
+        <div className="wc-body">
+
+          {/* Hyperliquid */}
+          <div className="wc-section">
+            <p className="wc-section-title wc-section-title--blue">
+              Hyperliquid / trade.xyz / HyENA
+            </p>
+            <FieldGroup fields={hlFields} accentColor="blue" />
           </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="keys-form" noValidate>
-          {KEY_FIELDS.map(({ id, type, labelKey, placeholderKey }) => (
-            <div key={id} className="trade-input-block">
-              <span className="trade-label">{t(labelKey)}</span>
-              <div className="trade-input-row">
-                <input
-                  id={id}
-                  name={id}
-                  type={show[id] === false ? 'password' : (show[id] ? 'text' : type)}
-                  placeholder={t(placeholderKey)}
-                  value={form[id]}
-                  onChange={handle}
-                  className="trade-input"
-                  autoComplete="off"
-                  spellCheck="false"
-                />
-                {type === 'password' && (
-                  <button
-                    type="button"
-                    className="keys-toggle-btn"
-                    onClick={() => toggleShow(id)}
-                    aria-label={show[id] ? t('settingKeys.hide') : t('settingKeys.show')}
-                  >
-                    {show[id] ? '🙈' : '👁'}
-                  </button>
-                )}
-              </div>
-              {form[id] && (
-                <span className="trade-sub keys-filled">
-                  ✓ {t('settingKeys.filled')}
-                </span>
-              )}
-            </div>
-          ))}
+          {/* Extended */}
+          <div className="wc-section">
+            <p className="wc-section-title wc-section-title--purple">
+              Extended Exchange
+            </p>
+            <FieldGroup fields={extFields} accentColor="purple" />
+          </div>
 
-          <div className="keys-actions">
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() => { setForm({ apiKey: '', apiSecret: '', passphrase: '' }); setSaved(false) }}
-            >
-              {t('settingKeys.clear')}
-            </button>
-            <button type="submit" className="trade-cta" style={{ width: 'auto', padding: '0.75rem 2rem', marginTop: 0 }}>
-              {t('settingKeys.save')}
+          {/* Nado */}
+          <div className="wc-section">
+            <p className="wc-section-title wc-section-title--green">
+              Nado Exchange
+            </p>
+            <FieldGroup fields={nadoFields} accentColor="green" />
+          </div>
+
+          {/* Reset */}
+          <div className="wc-reset-zone">
+            <button onClick={handleReset} className="wc-reset-btn">
+              🗑️ Effacer toutes les clés
             </button>
           </div>
-        </form>
-      </div>
-    </>
+
+        </div>
+      )}
+    </div>
   )
 }
