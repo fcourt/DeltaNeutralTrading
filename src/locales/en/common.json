@@ -11,6 +11,7 @@
     "openTrade": "Open Trade",
     "managePositions": "Manage Positions",
     "future": "Future Page",
+    "settingKeys": "API Keys",
     "configuration": "Configuration"
   },
   "openTrade": {
@@ -88,4 +89,20 @@
     "back": "Back",
     "beta": "Beta"
   }
+  "settingKeys": {
+  "title": "API Keys",
+  "description": "Enter your exchange credentials to connect your account.",
+  "apiKey": "API Key",
+  "apiKeyPlaceholder": "Enter your API key",
+  "apiSecret": "API Secret",
+  "apiSecretPlaceholder": "Enter your API secret",
+  "passphrase": "Passphrase",
+  "passphrasePlaceholder": "Enter your passphrase (if required)",
+  "show": "Show",
+  "hide": "Hide",
+  "filled": "Filled",
+  "save": "Save",
+  "clear": "Clear",
+  "savedSuccess": "Keys saved successfully."
+}
 }
