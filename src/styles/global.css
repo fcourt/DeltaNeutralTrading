@@ -813,9 +813,7 @@ a, button, [role="button"], input, select {
    ════════════════════════════════════ */
 
 .wc-wrapper {
-  max-width: var(--content-wide);
-  margin-inline: auto;
-  margin-bottom: var(--space-6);
+  /* retirer : margin-bottom: var(--space-6); */
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-surface);
@@ -863,6 +861,16 @@ a, button, [role="button"], input, select {
   gap: var(--space-5);
   padding: var(--space-3) var(--space-4) var(--space-4);
   border-top: 1px solid rgba(74, 79, 90, 0.6);
+}
+
+.wc-platforms {
+  max-width: var(--content-wide);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-inline: var(--space-6);
+  padding-bottom: var(--space-8);
 }
 
 /* Section (HL / Extended / Nado) */
