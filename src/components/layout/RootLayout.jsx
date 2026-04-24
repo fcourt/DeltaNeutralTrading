@@ -13,6 +13,7 @@ export default function RootLayout() {
     { to: '/open-trade',       labelKey: 'nav.openTrade' },
     { to: '/manage-positions', labelKey: 'nav.managePositions' },
     { to: '/future',           labelKey: 'nav.future' },
+    { to: '/setting-keys',     labelKey: 'nav.settingKeys' }, 
   ]
 
   return (
