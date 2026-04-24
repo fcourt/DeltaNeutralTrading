@@ -10,7 +10,7 @@ export default function App() {
   return (
     <Routes>
       <Route element={<RootLayout />}>
-        <Route index element={<HomePage />} />
+        <Route index                   element={<HomePage />} />
         <Route path="open-trade"       element={<OpenTrade />} />
         <Route path="manage-positions" element={<ManagePositions />} />
         <Route path="future"           element={<FuturePage />} />
