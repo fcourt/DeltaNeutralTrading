@@ -20,6 +20,32 @@ function FieldGroup({ fields, accentColor }) {
   ))
 }
 
+function PlatformBlock({ title, accentColor, statusDots, fields, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className="wc-wrapper">
+      <button onClick={() => setOpen(o => !o)} className="wc-toggle">
+        <span className="wc-toggle-left">
+          {title}
+          {statusDots.map((dot, i) => (
+            <span key={i} className={`wc-dot wc-dot--${dot.color}`}>● {dot.label}</span>
+          ))}
+        </span>
+        <span>{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="wc-body">
+          <div className="wc-section">
+            <FieldGroup fields={fields} accentColor={accentColor} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SettingKeys() {
   const {
     hlAddress,      saveHlAddress,
@@ -34,8 +60,6 @@ export default function SettingKeys() {
     canTradeHL, canTradeExt, canTradeNado,
     resetAll,
   } = useWallet()
-
-  const [open, setOpen] = useState(!hlAddress && !extApiKey && !nadoAddress)
 
   const hlFields = [
     { label: 'Adresse compte principal', val: hlAddress,      setter: saveHlAddress,      type: 'text',     hint: 'Lecture positions & marge' },
@@ -61,59 +85,52 @@ export default function SettingKeys() {
   }
 
   return (
-    <div className="wc-wrapper">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="wc-toggle"
-      >
-        <span className="wc-toggle-left">
-          🔑 Wallets &amp; API Keys
-          <span className={hlAddress    ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--red'}>● HL connecté</span>
-          <span className={canTradeHL   ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--yellow'}>● HL trading</span>
-          <span className={extApiKey    ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--yellow'}>● EXT connecté</span>
-          <span className={canTradeExt  ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--yellow'}>● EXT trading</span>
-          <span className={nadoAddress  ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--gray'}>● Nado connecté</span>
-          <span className={canTradeNado ? 'wc-dot wc-dot--green' : 'wc-dot wc-dot--gray'}>● Nado trading</span>
-        </span>
-        <span>{open ? '▲' : '▼'}</span>
-      </button>
+    <>
+      <div className="page-header">
+        <h1 className="page-title">🔑 Wallets &amp; API Keys</h1>
+        <p className="page-desc">Configurez vos clés d'accès pour chaque plateforme.</p>
+      </div>
 
-      {open && (
-        <div className="wc-body">
+      <div className="wc-platforms">
 
-          {/* Hyperliquid */}
-          <div className="wc-section">
-            <p className="wc-section-title wc-section-title--blue">
-              Hyperliquid / trade.xyz / HyENA
-            </p>
-            <FieldGroup fields={hlFields} accentColor="blue" />
-          </div>
+        <PlatformBlock
+          title="Hyperliquid / trade.xyz / HyENA"
+          accentColor="blue"
+          fields={hlFields}
+          statusDots={[
+            { label: 'connecté',  color: hlAddress   ? 'green' : 'red'    },
+            { label: 'trading',   color: canTradeHL  ? 'green' : 'yellow' },
+          ]}
+        />
 
-          {/* Extended */}
-          <div className="wc-section">
-            <p className="wc-section-title wc-section-title--purple">
-              Extended Exchange
-            </p>
-            <FieldGroup fields={extFields} accentColor="purple" />
-          </div>
+        <PlatformBlock
+          title="Extended Exchange"
+          accentColor="purple"
+          fields={extFields}
+          statusDots={[
+            { label: 'connecté', color: extApiKey   ? 'green' : 'yellow' },
+            { label: 'trading',  color: canTradeExt ? 'green' : 'yellow' },
+          ]}
+        />
 
-          {/* Nado */}
-          <div className="wc-section">
-            <p className="wc-section-title wc-section-title--green">
-              Nado Exchange
-            </p>
-            <FieldGroup fields={nadoFields} accentColor="green" />
-          </div>
+        <PlatformBlock
+          title="Nado Exchange"
+          accentColor="green"
+          fields={nadoFields}
+          statusDots={[
+            { label: 'connecté', color: nadoAddress  ? 'green' : 'gray' },
+            { label: 'trading',  color: canTradeNado ? 'green' : 'gray' },
+          ]}
+        />
 
-          {/* Reset */}
-          <div className="wc-reset-zone">
-            <button onClick={handleReset} className="wc-reset-btn">
-              🗑️ Effacer toutes les clés
-            </button>
-          </div>
-
+        {/* Reset global */}
+        <div className="wc-reset-zone">
+          <button onClick={handleReset} className="wc-reset-btn">
+            🗑️ Effacer toutes les clés
+          </button>
         </div>
-      )}
-    </div>
+
+      </div>
+    </>
   )
 }
