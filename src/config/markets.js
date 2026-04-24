@@ -1,0 +1,62 @@
+// src/config/markets.js
+// Renommé depuis config/marketsConfig.js — contenu identique
+
+export const EMPTY_MARKET = {
+  id: '', label: '— Sélectionner un marché —',
+  category: null, hlKey: null, extKey: null,
+  nadoKey: null, assetIndex: null, nadoProductId: null,
+}
+
+export const HL_KEY_OVERRIDES = {
+  'xyz:XYZ100':   { id: 'NASDAQ' },
+  'xyz:CL':       { id: 'OIL'    },
+  'xyz:BRENTOIL': { id: 'BRENT'  },
+  'xyz:PLATINUM': { id: 'PLAT'   },
+  'xyz:NATGAS':   { id: 'NGAS'   },
+}
+
+export const MARKET_LABELS = {
+  NASDAQ: 'Nasdaq',   OIL: 'WTI Oil',    BRENT: 'Brent',
+  PLAT: 'Platinum',   NGAS: 'Nat. Gas',  SP500: 'S&P 500',
+  JP225: 'Nikkei 225',GOLD: 'Gold',      SILVER: 'Silver',
+  COPPER: 'Copper',   PALLADIUM: 'Palladium', URANIUM: 'Uranium',
+  COIN: 'Coinbase',   PLTR: 'Palantir',  MSTR: 'MicroStrategy',
+  GOOGL: 'Google',    META: 'Meta',      LLY: 'Eli Lilly',
+  TSM: 'TSMC',        HOOD: 'Robinhood', CRCL: 'Circle',
+  SNDK: 'SanDisk',    NFLX: 'Netflix',   ORCL: 'Oracle',
+}
+
+const INDICES = new Set(['SP500','NASDAQ','JP225','VIX','DXY'])
+const COMMOS  = new Set(['GOLD','SILVER','OIL','BRENT','COPPER','PLAT','PALLADIUM','NGAS','URANIUM'])
+
+export function inferCategory(id) {
+  if (INDICES.has(id)) return 'Indices'
+  if (COMMOS.has(id))  return 'Commodités'
+  return 'Equities'
+}
+
+export const EXT_KEY_OVERRIDES = {
+  GOLD: 'XAU-USD',  SILVER: 'XAG-USD',  OIL: 'WTI-USD',
+  BRENT: 'XBR-USD', COPPER: 'XCU-USD',  PLAT: 'XPT-USD',
+  NGAS: 'XNG-USD',  SP500: 'SPX500m-USD', NASDAQ: 'TECH100m-USD',
+}
+
+export const NADO_KEY_OVERRIDES = {
+  SILVER: 'XAG',
+  OIL:    'WTI',
+}
+
+export const NADO_ONLY_MARKETS = [
+  { id: 'XRP',    label: 'XRP',      nadoKey: 'XRP',    category: 'Crypto'  },
+  { id: 'BNB',    label: 'BNB',      nadoKey: 'BNB',    category: 'Crypto'  },
+  { id: 'HYPE',   label: 'HYPE',     nadoKey: 'HYPE',   category: 'Crypto'  },
+  { id: 'SUI',    label: 'SUI',      nadoKey: 'SUI',    category: 'Crypto'  },
+  { id: 'DOGE',   label: 'DOGE',     nadoKey: 'DOGE',   category: 'Crypto'  },
+  { id: 'AAVE',   label: 'AAVE',     nadoKey: 'AAVE',   category: 'Crypto'  },
+  { id: 'LINK',   label: 'LINK',     nadoKey: 'LINK',   category: 'Crypto'  },
+  { id: 'EURUSD', label: 'EUR/USD',  nadoKey: 'EURUSD', category: 'FX'      },
+  { id: 'GBPUSD', label: 'GBP/USD',  nadoKey: 'GBPUSD', category: 'FX'      },
+  { id: 'USDJPY', label: 'USD/JPY',  nadoKey: 'USDJPY', category: 'FX'      },
+  { id: 'SPY',    label: 'SPY ETF',  nadoKey: 'SPY',    category: 'Indices' },
+  { id: 'QQQ',    label: 'QQQ ETF',  nadoKey: 'QQQ',    category: 'Indices' },
+]
