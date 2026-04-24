@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
 
 function FieldGroup({ fields, accentColor }) {
@@ -20,8 +21,8 @@ function FieldGroup({ fields, accentColor }) {
   ))
 }
 
-function PlatformBlock({ title, accentColor, statusDots, fields, defaultOpen = false }) {
-  const [open, setOpen] = useState(defaultOpen)
+function PlatformBlock({ title, accentColor, statusDots, fields }) {
+  const [open, setOpen] = useState(false)
 
   return (
     <div className="wc-wrapper">
@@ -47,6 +48,7 @@ function PlatformBlock({ title, accentColor, statusDots, fields, defaultOpen = f
 }
 
 export default function SettingKeys() {
+  const { t } = useTranslation()
   const {
     hlAddress,      saveHlAddress,
     hlVaultAddress, saveHlVaultAddress,
@@ -62,71 +64,70 @@ export default function SettingKeys() {
   } = useWallet()
 
   const hlFields = [
-    { label: 'Adresse compte principal', val: hlAddress,      setter: saveHlAddress,      type: 'text',     hint: 'Lecture positions & marge' },
-    { label: 'Clé privée Agent Wallet',  val: hlAgentPk,      setter: saveHlAgentPk,      type: 'password', hint: '⚠️ Une seule fois à la création — ne peut que trader' },
-    { label: 'Adresse sous-compte',      val: hlVaultAddress, setter: saveHlVaultAddress, type: 'text',     hint: 'Optionnel — laisser vide pour compte principal' },
+    { label: t('settingKeys.hl.address'),    val: hlAddress,      setter: saveHlAddress,      type: 'text',     hint: t('settingKeys.hl.addressHint') },
+    { label: t('settingKeys.hl.agentPk'),    val: hlAgentPk,      setter: saveHlAgentPk,      type: 'password', hint: t('settingKeys.hl.agentPkHint') },
+    { label: t('settingKeys.hl.vault'),      val: hlVaultAddress, setter: saveHlVaultAddress, type: 'text',     hint: t('settingKeys.hl.vaultHint') },
   ]
 
   const extFields = [
-    { label: 'Clé API (lecture)',     val: extApiKey,  setter: saveExtApiKey,  type: 'password', hint: 'Marge, positions, funding rates' },
-    { label: 'Stark Private Key',     val: extStarkPk, setter: saveExtStarkPk, type: 'password', hint: '⚠️ Une seule fois à la création — ne peut que trader' },
-    { label: 'l2Vault (ID position)', val: extL2Vault, setter: saveExtL2Vault, type: 'text',     hint: 'Extended › Account › API Management' },
+    { label: t('settingKeys.ext.apiKey'),    val: extApiKey,  setter: saveExtApiKey,  type: 'password', hint: t('settingKeys.ext.apiKeyHint') },
+    { label: t('settingKeys.ext.starkPk'),   val: extStarkPk, setter: saveExtStarkPk, type: 'password', hint: t('settingKeys.ext.starkPkHint') },
+    { label: t('settingKeys.ext.l2Vault'),   val: extL2Vault, setter: saveExtL2Vault, type: 'text',     hint: t('settingKeys.ext.l2VaultHint') },
   ]
 
   const nadoFields = [
-    { label: 'Adresse compte principal', val: nadoAddress,    setter: saveNadoAddress,    type: 'text',     hint: 'Lecture positions & marge disponible' },
-    { label: 'Clé privée Linked Signer', val: nadoAgentPk,    setter: saveNadoAgentPk,    type: 'password', hint: '⚠️ Nado › Settings › 1-Click Trading — ne peut que trader' },
-    { label: 'Nom du sous-compte',       val: nadoSubaccount, setter: saveNadoSubaccount, type: 'text',     hint: 'Laisser "default" pour le compte principal' },
+    { label: t('settingKeys.nado.address'),     val: nadoAddress,    setter: saveNadoAddress,    type: 'text',     hint: t('settingKeys.nado.addressHint') },
+    { label: t('settingKeys.nado.agentPk'),     val: nadoAgentPk,    setter: saveNadoAgentPk,    type: 'password', hint: t('settingKeys.nado.agentPkHint') },
+    { label: t('settingKeys.nado.subaccount'),  val: nadoSubaccount, setter: saveNadoSubaccount, type: 'text',     hint: t('settingKeys.nado.subaccountHint') },
   ]
 
   const handleReset = () => {
-    if (!confirm('Effacer toutes les clés sauvegardées ?')) return
+    if (!confirm(t('settingKeys.confirmReset'))) return
     resetAll()
   }
 
   return (
     <>
       <div className="page-header">
-        <h1 className="page-title">🔑 Wallets &amp; API Keys</h1>
-        <p className="page-desc">Configurez vos clés d'accès pour chaque plateforme.</p>
+        <h1 className="page-title">{t('settingKeys.title')}</h1>
+        <p className="page-desc">{t('settingKeys.description')}</p>
       </div>
 
       <div className="wc-platforms">
 
         <PlatformBlock
-          title="Hyperliquid / trade.xyz / HyENA"
+          title={t('settingKeys.platforms.hl')}
           accentColor="blue"
           fields={hlFields}
           statusDots={[
-            { label: 'connecté',  color: hlAddress   ? 'green' : 'red'    },
-            { label: 'trading',   color: canTradeHL  ? 'green' : 'yellow' },
+            { label: t('settingKeys.status.connected'),  color: hlAddress   ? 'green' : 'red'    },
+            { label: t('settingKeys.status.trading'),    color: canTradeHL  ? 'green' : 'yellow' },
           ]}
         />
 
         <PlatformBlock
-          title="Extended Exchange"
+          title={t('settingKeys.platforms.ext')}
           accentColor="purple"
           fields={extFields}
           statusDots={[
-            { label: 'connecté', color: extApiKey   ? 'green' : 'yellow' },
-            { label: 'trading',  color: canTradeExt ? 'green' : 'yellow' },
+            { label: t('settingKeys.status.connected'),  color: extApiKey   ? 'green' : 'yellow' },
+            { label: t('settingKeys.status.trading'),    color: canTradeExt ? 'green' : 'yellow' },
           ]}
         />
 
         <PlatformBlock
-          title="Nado Exchange"
+          title={t('settingKeys.platforms.nado')}
           accentColor="green"
           fields={nadoFields}
           statusDots={[
-            { label: 'connecté', color: nadoAddress  ? 'green' : 'gray' },
-            { label: 'trading',  color: canTradeNado ? 'green' : 'gray' },
+            { label: t('settingKeys.status.connected'),  color: nadoAddress  ? 'green' : 'gray' },
+            { label: t('settingKeys.status.trading'),    color: canTradeNado ? 'green' : 'gray' },
           ]}
         />
 
-        {/* Reset global */}
         <div className="wc-reset-zone">
           <button onClick={handleReset} className="wc-reset-btn">
-            🗑️ Effacer toutes les clés
+            🗑️ {t('settingKeys.resetAll')}
           </button>
         </div>
 
