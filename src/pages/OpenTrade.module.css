@@ -1,0 +1,85 @@
+.root { display: flex; flex-direction: column; gap: var(--space-8); }
+
+.header { display: flex; flex-direction: column; gap: var(--space-2); }
+.title { font-size: var(--text-xl); font-weight: 700; letter-spacing: -0.02em; }
+.desc  { color: var(--color-text-muted); font-size: var(--text-sm); }
+
+.formCard { max-width: 520px; }
+
+.form { display: flex; flex-direction: column; gap: var(--space-5); }
+
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+.label { font-size: var(--text-sm); font-weight: 500; color: var(--color-text-muted); }
+
+.input, .select {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-offset);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  color: var(--color-text);
+  outline: none;
+  appearance: none;
+}
+.input:focus, .select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+.input::placeholder { color: var(--color-text-faint); }
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.successBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-4);
+}
+
+.modalOverlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  padding: var(--space-4);
+}
+.modal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-8);
+  max-width: 420px;
+  width: 100%;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: var(--space-5);
+}
+.modalTitle { font-size: var(--text-lg); font-weight: 700; }
+.modalBody  { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+.modalSummary {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  background: var(--color-surface-offset);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  font-size: var(--text-sm);
+}
+.summaryRow {
+  display: flex; justify-content: space-between;
+  color: var(--color-text-muted);
+}
+.summaryRow strong { color: var(--color-text); }
+
+.modalActions { display: flex; gap: var(--space-3); justify-content: flex-end; }
