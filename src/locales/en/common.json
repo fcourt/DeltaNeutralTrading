@@ -89,20 +89,43 @@
     "back": "Back",
     "beta": "Beta"
   },
-  "settingKeys": {
-    "title": "API Keys",
-    "description": "Enter your exchange credentials to connect your account.",
-    "apiKey": "API Key",
-    "apiKeyPlaceholder": "Enter your API key",
-    "apiSecret": "API Secret",
-    "apiSecretPlaceholder": "Enter your API secret",
-    "passphrase": "Passphrase",
-    "passphrasePlaceholder": "Enter your passphrase (if required)",
-    "show": "Show",
-    "hide": "Hide",
-    "filled": "Filled",
-    "save": "Save",
-    "clear": "Clear",
-    "savedSuccess": "Keys saved successfully."
+ "settingKeys": {
+  "title": "🔑 Wallets & API Keys",
+  "description": "Configure your access credentials for each platform.",
+  "confirmReset": "Clear all saved keys?",
+  "resetAll": "Clear all keys",
+  "platforms": {
+    "hl":   "Hyperliquid / trade.xyz / HyENA",
+    "ext":  "Extended Exchange",
+    "nado": "Nado Exchange"
+  },
+  "status": {
+    "connected": "connected",
+    "trading":   "trading"
+  },
+  "hl": {
+    "address":     "Main account address",
+    "addressHint": "Read positions & margin",
+    "agentPk":     "Agent Wallet private key",
+    "agentPkHint": "⚠️ Set once at creation — can only trade",
+    "vault":       "Sub-account address",
+    "vaultHint":   "Optional — leave empty for main account"
+  },
+  "ext": {
+    "apiKey":      "API Key (read)",
+    "apiKeyHint":  "Margin, positions, funding rates",
+    "starkPk":     "Stark Private Key",
+    "starkPkHint": "⚠️ Set once at creation — can only trade",
+    "l2Vault":     "l2Vault (position ID)",
+    "l2VaultHint": "Extended › Account › API Management"
+  },
+  "nado": {
+    "address":        "Main account address",
+    "addressHint":    "Read positions & available margin",
+    "agentPk":        "Linked Signer private key",
+    "agentPkHint":    "⚠️ Nado › Settings › 1-Click Trading — can only trade",
+    "subaccount":     "Sub-account name",
+    "subaccountHint": "Leave \"default\" for main account"
   }
+}
 }
