@@ -1,0 +1,90 @@
+{
+  "home": {
+    "title": "Trading Delta Neutre",
+    "subtitle": "Couvrez vos positions avec précision. Restez neutre, restez rentable.",
+    "enterApp": "Lancer l'app",
+    "selectLanguage": "Langue",
+    "tagline": "Stratégies delta neutres de niveau professionnel pour les traders DeFi."
+  },
+  "nav": {
+    "openTrade": "Ouvrir un trade",
+    "managePositions": "Gérer les positions",
+    "future": "Page future",
+    "configuration": "Configuration"
+  },
+  "openTrade": {
+    "title": "Ouvrir un trade",
+    "description": "Configurez une nouvelle position delta neutre.",
+    "asset": "Actif",
+    "assetPlaceholder": "Sélectionnez un actif (ex. ETH)",
+    "size": "Taille de la position",
+    "sizePlaceholder": "Montant en USD",
+    "leverage": "Levier",
+    "leveragePlaceholder": "ex. 2x",
+    "deltaTarget": "Delta cible",
+    "deltaTargetPlaceholder": "0 pour neutre",
+    "submit": "Ouvrir la position",
+    "reset": "Réinitialiser",
+    "confirmTitle": "Confirmer le trade",
+    "confirmBody": "Vous êtes sur le point d'ouvrir une position delta neutre. Vérifiez tous les paramètres avant de confirmer.",
+    "confirm": "Confirmer",
+    "cancel": "Annuler"
+  },
+  "managePositions": {
+    "title": "Gérer les positions",
+    "description": "Surveillez et ajustez vos positions delta neutres ouvertes.",
+    "noPositions": "Aucune position ouverte pour l'instant.",
+    "noPositionsHint": "Ouvrez votre premier trade pour le voir ici.",
+    "columns": {
+      "asset": "Actif",
+      "size": "Taille",
+      "delta": "Delta",
+      "pnl": "PnL",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "close": "Fermer",
+    "rebalance": "Rééquilibrer",
+    "statusNeutral": "Neutre",
+    "statusDrift": "Dérive",
+    "statusClosed": "Fermé"
+  },
+  "future": {
+    "title": "Page future",
+    "description": "Cette section est en cours de construction.",
+    "comingSoon": "Bientôt disponible — des fonctionnalités passionnantes arrivent.",
+    "notifyMe": "Me notifier"
+  },
+  "configuration": {
+    "title": "Configuration",
+    "description": "Personnalisez votre environnement de trading.",
+    "sections": {
+      "general": "Général",
+      "risk": "Gestion du risque",
+      "notifications": "Notifications",
+      "api": "API & Intégrations"
+    },
+    "theme": "Thème",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "themeSystem": "Système",
+    "slippageTolerance": "Tolérance au slippage (%)",
+    "maxDrawdown": "Drawdown maximal (%)",
+    "autoRebalance": "Rééquilibrage automatique",
+    "rebalanceThreshold": "Seuil de rééquilibrage (Δ)",
+    "emailNotifications": "Notifications par e-mail",
+    "telegramNotifications": "Notifications Telegram",
+    "apiKey": "Clé API",
+    "apiSecret": "Secret API",
+    "saveSettings": "Enregistrer",
+    "resetDefaults": "Réinitialiser",
+    "saved": "Paramètres enregistrés avec succès !"
+  },
+  "common": {
+    "loading": "Chargement…",
+    "error": "Une erreur est survenue.",
+    "retry": "Réessayer",
+    "back": "Retour",
+    "beta": "Bêta"
+  }
+}
