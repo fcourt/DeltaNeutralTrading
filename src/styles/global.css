@@ -315,7 +315,7 @@ a, button, [role="button"], input, select {
    ════════════════════════════════════ */
 
 .card {
-  max-width: var(--content-default);
+  max-width: var(--content-wide); 
   margin-inline: auto;
   padding: var(--space-6);
   margin-bottom: var(--space-6);
@@ -400,7 +400,7 @@ a, button, [role="button"], input, select {
    ════════════════════════════════════ */
 
 .page-header {
-  max-width: var(--content-default);
+  max-width: var(--content-wide); 
   margin-inline: auto;
   padding: var(--space-10) var(--space-6) var(--space-6);
 }
