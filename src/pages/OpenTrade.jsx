@@ -224,6 +224,8 @@ export default function OpenTrade() {
     const f  = 0.0005
     const lp1 = platform1 === 'extended'
       ? (side1 === 'LONG' ? (extAsk ?? price1 * (1 - f)) : (extBid ?? price1 * (1 + f)))
+      : platform1 === 'nado'
+      ? Math.round((side1 === 'LONG' ? price1 * (1 - f) : price1 * (1 + f)))  // arrondi entier, nado.js s'occupe du reste
       : roundToHLPrice(side1 === 'LONG' ? price1 * (1 - f) : price1 * (1 + f))
     const lp2 = platform2 === 'extended'
       ? (side2 === 'LONG' ? (extAsk ?? price2 * (1 - f)) : (extBid ?? price2 * (1 + f)))
@@ -245,7 +247,9 @@ export default function OpenTrade() {
     const meta       = getAssetMeta(market.hlKey)
     const szDecimals = platformId === 'extended'
       ? (getExtPrecision(market.extKey)?.szDecimals ?? 2)
-      : (meta?.szDecimals ?? (stepSize > 0 ? Math.round(-Math.log10(stepSize)) : 6))
+      : platformId === 'nado'
+      ? (market.nadoSzDecimals ?? 6)   // stocker dans fetchNadoSymbols
+      : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize)))
     const raw      = useStepSize && stepSize ? Math.floor(sizeAsset / stepSize) * stepSize : sizeAsset
     const finalSize = parseFloat(raw.toFixed(szDecimals))
     //return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, market, ...credentials }
