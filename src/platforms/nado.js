@@ -5,8 +5,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 const GATEWAY_PROXY = '/api/nado'
 const ARCHIVE       = 'https://archive.prod.nado.xyz'
-//const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
-const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
+const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
+//const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
 
