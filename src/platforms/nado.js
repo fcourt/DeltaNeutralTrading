@@ -6,7 +6,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 const GATEWAY_PROXY = '/api/nado'
 const ARCHIVE       = 'https://archive.prod.nado.xyz'
 //const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
-const NADOEXECUTE   = 'api/nado?action=execute'; // ← passe par le proxy
+const NADOEXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
 
@@ -58,7 +58,7 @@ function roundToTick(value, increment) {
   const half     = tickX18 / 2n
   return rem >= half ? valueX18 - rem + tickX18 : valueX18 - rem
 }
-*/
+
 
 function roundToTick(value, increment) {
   const tickX18  = BigInt(increment);
@@ -68,6 +68,19 @@ function roundToTick(value, increment) {
   const rem  = valueX18 % tickX18;
   const half = tickX18 / 2n;
   return rem >= half ? valueX18 - rem + tickX18 : valueX18 - rem;
+}
+*/
+
+function roundToTick(value, increment) {
+  const isNeg   = value < 0
+  const abs     = Math.abs(value)
+  const tickX18 = BigInt(increment)
+  const [intPart, decPart = ''] = abs.toFixed(18).split('.')
+  let absX18 = BigInt(intPart) * BigInt(1e18) + BigInt(decPart.padEnd(18, '0').slice(0, 18))
+  const rem  = absX18 % tickX18
+  const half = tickX18 / 2n
+  absX18 = rem >= half ? absX18 - rem + tickX18 : absX18 - rem
+  return isNeg ? -absX18 : absX18   // ← signe restauré
 }
 
 function buildNonce() {
@@ -241,8 +254,7 @@ if (notional < minSize) {
   
   const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
   const nonce      = buildNonce()
-  //const appendix   = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
-  const appendix = buildAppendix(reduceOnly, isMaker ? 'DEFAULT' : 'IOC');
+  const appendix   = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
 
   const domain = { name: 'Nado', version: '0.0.1', chainId: CHAIN_ID, verifyingContract: productIdToAddress(market.nadoProductId) }
   const types  = {
