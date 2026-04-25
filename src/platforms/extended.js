@@ -228,6 +228,7 @@ export async function placeOrder(order, credentials) {
     { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Api-Key': extApiKey, 'User-Agent': 'TrekApp/1.0' }, body: JSON.stringify(payload) }
   )
   const rawText = await res.text()
+  console.log('[Extended] status:', res.status, '| response:', rawText)
   let data = {}
   try { data = JSON.parse(rawText) } catch { /* non-JSON */ }
   if (!res.ok || data?.status === 'ERROR')
