@@ -25,7 +25,11 @@ export function usePlaceOrder(markets = []) {
       nadoAddress, nadoAgentPk, nadoSubaccount,
     }
 
-    return servicePlaceOrder({ platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly, market }, credentials)
+    //return servicePlaceOrder({ platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly, market }, credentials)
+    return servicePlaceOrder(
+  { platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly, market },
+  credentials
+)
   }
 
   const canTradeHL   = (creds) => canTrade('hyperliquid', creds)
