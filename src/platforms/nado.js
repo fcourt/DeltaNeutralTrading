@@ -41,8 +41,8 @@ let _clockOffset = 0
 async function syncClock() {
   try {
     const t0  = Date.now()
-    //const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'server_time' }) })
-    const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'time' }) })
+    const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'server_time' }) })
+    //const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'time' }) })
     const t1  = Date.now()
     const data = await res.json()
     if (data?.data?.server_time) _clockOffset = data.data.server_time - t1 + (t1 - t0) / 2
