@@ -229,6 +229,16 @@ export async function placeOrder(order, credentials) {
 
   const priceX18  = roundToTick(adjPrice,    market.nadoPriceIncrementX18 ?? '1000000000000000000')
   const amountX18 = roundToTick(signedSize,  market.nadoSizeIncrement     ?? '1000000000000000')
+
+  // Après roundToTick(...)
+const notional = (amountX18 < 0n ? -amountX18 : amountX18) * priceX18 / BigInt(1e18);
+const minSize  = BigInt(market.nadoMinSize ?? '100000000000000000000');
+if (notional < minSize) {
+  const cur = Number(notional) / 1e18;
+  const min = Number(minSize) / 1e18;
+  throw new Error(`Notionnel trop faible : $${cur.toFixed(2)} < minimum $${min.toFixed(2)}`);
+}
+  
   const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
   const nonce      = buildNonce()
   //const appendix   = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
@@ -285,7 +295,7 @@ export async function cancelOrders({ nadoAgentPk, nadoAddress, nadoSubaccount, p
   const signature = await signTyped(nadoAgentPk, domain, types, value)
   const res = await fetch(NADO_EXECUTE, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' },
-    body: JSON.stringify({ cancel_orders: { sender, productIds, digests, nonce: String(nonce), signature } }),
+    body: JSON.stringify({ cancel_orders: { sender, product_ids: productIds, digests, nonce: String(nonce), signature } }),
   })
   const data = await res.json()
   if (data.status !== 'success') throw new Error(`[Nado] ${data.error ?? 'cancel failed'}`)
