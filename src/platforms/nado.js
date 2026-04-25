@@ -5,7 +5,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 
 const GATEWAY_PROXY = '/api/nado'
 const ARCHIVE       = 'https://archive.prod.nado.xyz'
-const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
+//const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
+const NADOEXECUTE   = 'api/nado?action=execute'; // ← passe par le proxy
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
 
@@ -40,7 +41,8 @@ let _clockOffset = 0
 async function syncClock() {
   try {
     const t0  = Date.now()
-    const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'server_time' }) })
+    //const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'server_time' }) })
+    const res = await fetch(GATEWAY_PROXY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'time' }) })
     const t1  = Date.now()
     const data = await res.json()
     if (data?.data?.server_time) _clockOffset = data.data.server_time - t1 + (t1 - t0) / 2
@@ -48,12 +50,24 @@ async function syncClock() {
 }
 const serverNow = () => Date.now() + _clockOffset
 
+/*
 function roundToTick(value, increment) {
   const tickX18  = BigInt(increment)
   const valueX18 = BigInt(Math.round(value * 1e18))
   const rem      = valueX18 % tickX18
   const half     = tickX18 / 2n
   return rem >= half ? valueX18 - rem + tickX18 : valueX18 - rem
+}
+*/
+
+function roundToTick(value, increment) {
+  const tickX18  = BigInt(increment);
+  // Convertit via string pour éviter la perte de précision des floats
+  const [intPart, decPart = ''] = value.toFixed(18).split('.');
+  const valueX18 = BigInt(intPart) * BigInt(1e18) + BigInt(decPart.padEnd(18, '0').slice(0, 18));
+  const rem  = valueX18 % tickX18;
+  const half = tickX18 / 2n;
+  return rem >= half ? valueX18 - rem + tickX18 : valueX18 - rem;
 }
 
 function buildNonce() {
@@ -217,7 +231,8 @@ export async function placeOrder(order, credentials) {
   const amountX18 = roundToTick(signedSize,  market.nadoSizeIncrement     ?? '1000000000000000')
   const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
   const nonce      = buildNonce()
-  const appendix   = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
+  //const appendix   = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
+  const appendix = buildAppendix(reduceOnly, isMaker ? 'DEFAULT' : 'IOC');
 
   const domain = { name: 'Nado', version: '0.0.1', chainId: CHAIN_ID, verifyingContract: productIdToAddress(market.nadoProductId) }
   const types  = {
