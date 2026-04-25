@@ -5,9 +5,7 @@ import { ec, hash, shortString } from 'starknet'
 
 const EXT_PROXY    = '/api/extended'
 const CACHE_TTL_MS = 60 * 60 * 1000
-//const SERVER_CLOCK_OFFSET_S = 14 * 24 * 3600
-const SERVER_CLOCK_OFFSET_S = 0
-// OU la valeur exacte de l'ancien projet de référence (souvent 0 ou quelques secondes)
+const SERVER_CLOCK_OFFSET_S = 14 * 24 * 3600
 const ORDER_SELECTOR  = '0x36da8d51815527cabfaa9c982f564c80fa7429616739306036f1f9b608dd112'
 const DOMAIN_SELECTOR = '0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210'
 const STARK_PRIME = BigInt('0x800000000000011000000000000000000000000000000000000000000000001')
