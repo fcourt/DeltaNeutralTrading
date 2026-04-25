@@ -30,7 +30,8 @@ export function filterMarkets(p1Id, p2Id, allMarkets) {
     if (!p2Id) return true
     if (['hyperliquid', 'xyz', 'hyena'].includes(p2Id)) return !!m.hlKey
     if (p2Id === 'extended') return !!m.extKey
-    if (p2Id === 'nado')     return !!m.nadoProductId
+    //if (p2Id === 'nado')     return !!m.nadoProductId
+    if (p1Id === 'nado') return !!m.nadoProductId || !!m.nadoKey
     return false
   }
   const real      = allMarkets.filter(m => m.id !== '')
