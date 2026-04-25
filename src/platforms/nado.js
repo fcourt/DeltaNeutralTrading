@@ -286,6 +286,7 @@ if (notional < minSize) {
     }),
   })
   const data = await res.json()
+  console.log('[Nado] status:', res.status, '| response:', JSON.stringify(data))
   if (data.status !== 'success') throw new Error(`[Nado] ${data.error ?? 'place_order failed'}`)
   return data
 }
