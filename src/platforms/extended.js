@@ -179,7 +179,9 @@ export async function placeOrder(order, credentials) {
   const { syntheticId, syntheticResolution, collateralResolution, szDecimals, pxDecimals } = l2Config
   const nonce             = generateNonce()
   const expiryEpochMillis = Date.now() + 3600 * 1000
-  const expirationSecs    = Math.ceil(expiryEpochMillis / 1000) + SERVER_CLOCK_OFFSET_S
+  //const expirationSecs    = Math.ceil(expiryEpochMillis / 1000) + SERVER_CLOCK_OFFSET_S
+  const CLOCK_BUFFER_SECS = 30; // marge côté serveur
+  const expirationSecs = Math.ceil(expiryEpochMillis / 1000) + CLOCK_BUFFER_SECS;
   const isMarket          = (orderType ?? 'maker') === 'taker'
   const timeInForce       = isMarket ? 'IOC' : 'GTT'
   const aggressivePrice   = isMarket ? (isBuy ? limitPrice * 1.0075 : limitPrice * 0.9925) : limitPrice
