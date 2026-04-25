@@ -248,7 +248,8 @@ export default function OpenTrade() {
       : (meta?.szDecimals ?? (stepSize > 0 ? Math.round(-Math.log10(stepSize)) : 6))
     const raw      = useStepSize && stepSize ? Math.floor(sizeAsset / stepSize) * stepSize : sizeAsset
     const finalSize = parseFloat(raw.toFixed(szDecimals))
-    return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, market, ...credentials }
+    //return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, market, ...credentials }
+    return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, reduceOnly: false, market, ...credentials }
   }
 
   const handlePlaceLeg = async (legNum) => {
