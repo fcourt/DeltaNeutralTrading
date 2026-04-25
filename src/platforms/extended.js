@@ -224,7 +224,7 @@ export async function placeOrder(order, credentials) {
 
   const res = await fetch(
     //`${EXT_PROXY}?endpoint=${encodeURIComponent('/api/v1/user/order')}`,
-    `${EXT_PROXY}?endpoint=${encodeURIComponent('user/order')}`
+    `${EXT_PROXY}?endpoint=${encodeURIComponent('user/order')}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Api-Key': extApiKey, 'User-Agent': 'TrekApp/1.0' }, body: JSON.stringify(payload) }
   )
   const rawText = await res.text()
