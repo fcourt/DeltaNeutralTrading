@@ -90,6 +90,26 @@ export async function getMarkets() {
 
 export const getPrices = getMarkets
 
+const _bidAskCache = new Map()
+
+export async function getBidAsk(hlKey, isXyz = false) {
+  const cacheKey = `bidask_${hlKey}`
+  const cached   = _bidAskCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < 3000) return cached.d
+  try {
+    const body = { type: 'l2Book', coin: hlKey, nSigFigs: 1 }
+    if (isXyz) body.dex = 'xyz'
+    const res  = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) return { bid: null, ask: null }
+    const data   = await res.json()
+    const bid    = data?.levels?.[0]?.[0]?.px ? parseFloat(data.levels[0][0].px) : null
+    const ask    = data?.levels?.[1]?.[0]?.px ? parseFloat(data.levels[1][0].px) : null
+    const result = { bid, ask }
+    _bidAskCache.set(cacheKey, { d: result, ts: Date.now() })
+    return result
+  } catch { return { bid: null, ask: null } }
+}
+
 export async function getFunding() {
   const [resNat, resXyz] = await Promise.all([
     fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }) }),
