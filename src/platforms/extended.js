@@ -155,6 +155,9 @@ export async function getPositions(credentials, markets = []) {
 }
 
 export async function loadL2Configs() {
+  // Dans loadL2Configs(), temporairement :
+  localStorage.removeItem('ext_l2configs_cache')  // force re-fetch
+  
   const cached = getCached('ext_l2configs')
   if (cached) return cached
   try {
@@ -297,6 +300,18 @@ export async function placeOrder(order, credentials) {
   const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
 
   const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
+
+  console.log('[Extended] parseCollateral inputs:', {
+  market: market.extKey,
+  sizeStr,
+  priceStr,
+  syntheticResolution,
+  collateralResolution,
+  syntheticAmountAbs,
+  collateralAmountAbs,
+  ratio: collateralResolution / syntheticResolution,
+})
+  
   const orderHash  = computeOrderHash(
     vaultIdBig,      // ← BigInt directement, uintToFelt252(BigInt) fonctionne
     syntheticId, baseAmount,
