@@ -266,7 +266,8 @@ export async function placeOrder(order, credentials) {
 
   const nonce             = generateNonce()
   const expiryEpochMillis = Date.now() + 14 * 24 * 3600 * 1000
-  const expirationSecs    = Math.ceil(expiryEpochMillis / 1000)
+  //const expirationSecs    = Math.ceil(expiryEpochMillis / 1000)
+  const expirationSecs    = Math.ceil(expiryEpochMillis / 1000) + SERVER_CLOCK_OFFSET_S
 
   const isMarket        = (orderType ?? 'maker') === 'taker'
   const timeInForce     = isMarket ? 'IOC' : 'GTT'
