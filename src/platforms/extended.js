@@ -56,6 +56,7 @@ function parseQuantum(valueStr, resolution) {
   return parseInt(intPart, 10) * resolution + (dec ? parseInt(dec, 10) : 0)
 }
 
+/*
 function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
   const ratio    = collatRes / synthRes
   const extraDec = ratio > 1 ? Math.round(Math.log10(ratio)) : 0
@@ -63,6 +64,18 @@ function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
   const pDecPadded = pDec.padEnd(extraDec, '0').slice(0, extraDec)
   const priceInt   = parseInt(pInt, 10) * ratio + (extraDec > 0 && pDecPadded ? parseInt(pDecPadded, 10) : 0)
   return syntheticAbs * priceInt
+}
+*/
+
+function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
+  // On travaille en big integer pour éviter tout flottant
+  const [pInt, pDec = ''] = String(priceStr).split('.')
+  const collatResBig = BigInt(collatRes)
+  const synthResBig  = BigInt(synthRes)
+  // prix * collatRes / synthRes, en conservant les decimales
+  const decimalsNeeded = Math.max(0, String(synthRes).length - String(collatRes).length)
+  const priceFull = BigInt(pInt) * collatResBig / synthResBig
+  return Number(BigInt(syntheticAbs) * priceFull)
 }
 
 function generateNonce()   { return Math.floor(Math.random() * (2 ** 31 - 1)) + 1 }
