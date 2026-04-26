@@ -191,7 +191,9 @@ export default function OpenTrade() {
 
   const { markets, getPrice, getStepSize, getAssetMeta, getExtPrecision, lastUpdate } = useLivePrices(3000)
   const { filteredMarkets, loading, errors, isIntersection, counts } = useMarketFilter(platform1, platform2, markets)
-  const { p1: fundingP1, p2: fundingP2, extBid, extAsk } = useFundingRates(marketId, platform1, platform2, extApiKey, markets)
+  //const { p1: fundingP1, p2: fundingP2, extBid, extAsk } = useFundingRates(marketId, platform1, platform2, extApiKey, markets)
+  const { p1: fundingP1, p2: fundingP2, p1Bid, p1Ask, p2Bid, p2Ask, extBid, extAsk } =
+  useFundingRates(marketId, platform1, platform2, extApiKey, markets)
   const { margins } = useMargins(credentials)
   const { placeOrder } = usePlaceOrder(markets)
 
@@ -207,6 +209,19 @@ export default function OpenTrade() {
   const plat2  = PLATFORMS.find(p => p.id === platform2)
   const market = markets.find(m => m.id === marketId)
 
+  const [priceMode1, setPriceMode1] = useState('market')
+  const [priceMode2, setPriceMode2] = useState('market')
+  const [customPrice1, setCustomPrice1] = useState('')
+  const [customPrice2, setCustomPrice2] = useState('')
+
+  // Reset quand le marché change
+  useEffect(() => {
+    setPriceMode1('market')
+    setPriceMode2('market')
+    setCustomPrice1('')
+    setCustomPrice2('')
+  }, [marketId])
+
   const canTradePlatform    = (id) => id === 'extended' ? canTradeExt : id === 'nado' ? canTradeNado : canTradeHL
   const getMarginForPlatform = (id) => margins[id] ?? null
 
@@ -218,6 +233,27 @@ export default function OpenTrade() {
   const side1 = suggestion?.p1 ?? 'LONG'
   const side2 = suggestion?.p2 ?? 'SHORT'
 
+  const f = 0.0005
+
+const getDefaultLimitPrice = useCallback((platformId, side, price, bid, ask) => {
+  if (platformId === 'extended')
+    return side === 'LONG' ? (bid ?? price * (1 - f)) : (ask ?? price * (1 + f))
+  if (platformId === 'nado')
+    return Math.round(side === 'LONG' ? price * (1 - f) : price * (1 + f))
+  return roundToHLPrice(side === 'LONG' ? price * (1 - f) : price * (1 + f))
+}, [])
+
+const getLimitPrice = useCallback((platformId, side, price, mode, customPx, bid, ask) => {
+  if (!price) return null
+  switch (mode) {
+    case 'manual': return customPx ? parseFloat(customPx) : getDefaultLimitPrice(platformId, side, price, bid, ask)
+    case 'mid':    return price
+    case 'best':   return side === 'LONG' ? (bid ?? price * (1 - f)) : (ask ?? price * (1 + f))
+    default:       return getDefaultLimitPrice(platformId, side, price, bid, ask)
+  }
+}, [getDefaultLimitPrice])
+  
+  /*
   const calc = useMemo(() => {
     const val = parseFloat(sizeUSD)
     if (!val || val <= 0 || !price1 || !price2) return null
@@ -240,7 +276,26 @@ export default function OpenTrade() {
       leverage2: minLeverageFor(val, getMarginForPlatform(platform2)),
     }
   }, [sizeUSD, price1, price2, side1, side2, extBid, extAsk, platform1, platform2, margins])
+*/
 
+const calc = useMemo(() => {
+  const val = parseFloat(sizeUSD)
+  if (!val || val <= 0 || !price1 || !price2) return null
+  const lp1 = getLimitPrice(platform1, side1, price1, priceMode1, customPrice1, p1Bid, p1Ask)
+  const lp2 = getLimitPrice(platform2, side2, price2, priceMode2, customPrice2, p2Bid, p2Ask)
+  return {
+    asset1:    val / price1,
+    asset2:    val / price2,
+    spreadPct: ((price1 - price2) / price2) * 100,
+    limitP1:   lp1,
+    limitP2:   lp2,
+    leverage1: minLeverageFor(val, getMarginForPlatform(platform1)),
+    leverage2: minLeverageFor(val, getMarginForPlatform(platform2)),
+  }
+}, [sizeUSD, price1, price2, side1, side2, platform1, platform2, margins,
+    priceMode1, priceMode2, customPrice1, customPrice2, p1Bid, p1Ask, p2Bid, p2Ask,
+    getLimitPrice])
+  
   /*
   const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
     if (!market) throw new Error('Marché non résolu')
@@ -446,6 +501,9 @@ export default function OpenTrade() {
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
           orderType={orderType1} onOrderTypeChange={setOrderType1}
           canTrade={canTradePlatform(platform1)} onPlaceOrder={() => handlePlaceLeg(1)} isPlacingOrder={placingLeg1}
+          bid={p1Bid} ask={p1Ask}
+          priceMode={priceMode1} onPriceModeChange={setPriceMode1}
+          customPrice={customPrice1} onCustomPriceChange={setCustomPrice1}
         />
         <LegCard
           side={side2} platform={plat2} price={price2} limitPrice={calc?.limitP2}
@@ -455,6 +513,9 @@ export default function OpenTrade() {
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
           orderType={orderType2} onOrderTypeChange={setOrderType2}
           canTrade={canTradePlatform(platform2)} onPlaceOrder={() => handlePlaceLeg(2)} isPlacingOrder={placingLeg2}
+          bid={p2Bid} ask={p2Ask}
+          priceMode={priceMode2} onPriceModeChange={setPriceMode2}
+          customPrice={customPrice2} onCustomPriceChange={setCustomPrice2}
         />
       </div>
 
