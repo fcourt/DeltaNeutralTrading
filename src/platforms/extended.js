@@ -65,7 +65,7 @@ function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
   const priceInt   = parseInt(pInt, 10) * ratio + (extraDec > 0 && pDecPadded ? parseInt(pDecPadded, 10) : 0)
   return syntheticAbs * priceInt
 }
-*/
+
 
 function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
   // On travaille en big integer pour éviter tout flottant
@@ -76,6 +76,32 @@ function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
   const decimalsNeeded = Math.max(0, String(synthRes).length - String(collatRes).length)
   const priceFull = BigInt(pInt) * collatResBig / synthResBig
   return Number(BigInt(syntheticAbs) * priceFull)
+}
+*/
+
+function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
+  // Nombre de décimales du prix à conserver = log10(collatRes/synthRes)
+  const extraDec = Math.round(Math.log10(collatRes / synthRes))
+
+  const [pInt, pDec = ''] = String(priceStr).split('.')
+
+  // Normalise la partie décimale à exactement `extraDec` chiffres
+  const pDecNorm = pDec.padEnd(extraDec, '0').slice(0, extraDec)
+
+  // Prix entier = partie entière × ratio + partie décimale normalisée
+  const ratio       = collatRes / synthRes  // ex: 100 pour ETH
+  const priceScaled = parseInt(pInt, 10) * ratio
+                    + (extraDec > 0 ? parseInt(pDecNorm || '0', 10) : 0)
+
+  const result = syntheticAbs * priceScaled
+
+  // ✅ DEBUG TEMPORAIRE — vérifie l'alignement avec le serveur
+  console.log('[parseCollateral]', {
+    priceStr, extraDec, pDecNorm,
+    priceScaled, syntheticAbs, result
+  })
+
+  return result
 }
 
 function generateNonce()   { return Math.floor(Math.random() * (2 ** 31 - 1)) + 1 }
