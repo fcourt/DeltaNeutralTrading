@@ -322,7 +322,7 @@ export async function placeOrder(order, credentials) {
     id: generateOrderId(), market: market.extKey, type: 'LIMIT',
     side: isBuy ? 'BUY' : 'SELL', qty: sizeStr, price: priceStr,
     timeInForce, expiryEpochMillis, fee: '0.0005',
-    nonce: nonce.toString(), selfTradeProtectionLevel: 'ACCOUNT',
+    nonce: nonce.toString(), selfTradeProtectionLevel: 'ACCOUNT', postOnly: !isMarket, 
     ...(reduceOnly && { reduceOnly: true }),
     settlement: {
       signature: {
