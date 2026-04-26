@@ -223,12 +223,12 @@ export default function OpenTrade() {
     if (!val || val <= 0 || !price1 || !price2) return null
     const f  = 0.0005
     const lp1 = platform1 === 'extended'
-      ? (side1 === 'LONG' ? (extAsk ?? price1 * (1 - f)) : (extBid ?? price1 * (1 + f)))
+      ? (side1 === 'LONG' ? (extBid ?? price1 * (1 - f)) : (extAsk ?? price1 * (1 + f)))
       : platform1 === 'nado'
       ? Math.round((side1 === 'LONG' ? price1 * (1 - f) : price1 * (1 + f)))  // arrondi entier, nado.js s'occupe du reste
       : roundToHLPrice(side1 === 'LONG' ? price1 * (1 - f) : price1 * (1 + f))
     const lp2 = platform2 === 'extended'
-      ? (side2 === 'LONG' ? (extAsk ?? price2 * (1 - f)) : (extBid ?? price2 * (1 + f)))
+      ? (side2 === 'LONG' ? (extBid ?? price2 * (1 - f)) : (extAsk ?? price2 * (1 + f)))
       : roundToHLPrice(side2 === 'LONG' ? price2 * (1 - f) : price2 * (1 + f))
     return {
       asset1:    val / price1,
