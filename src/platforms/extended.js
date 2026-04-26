@@ -172,6 +172,8 @@ export async function placeOrder(order, credentials) {
   const { extStarkPk, extL2Vault, extApiKey } = credentials
   if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
 
+  const vaultId = Number(BigInt(extL2Vault))
+
   const L2_CONFIGS = await loadL2Configs()
   const l2Config   = L2_CONFIGS[market.extKey]
   if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.extKey}`)
@@ -199,11 +201,12 @@ export async function placeOrder(order, credentials) {
   const quoteAmount         = isBuy ? -collateralAmountAbs :  collateralAmountAbs
 
   const pubKeyBytes = ec.starkCurve.getPublicKey(extStarkPk, true)
-  const starkKey    = '0x' + Array.from(pubKeyBytes.slice(1)).map(b => b.toString(16).padStart(2, '0')).join('')
-
+  //const starkKey    = '0x' + Array.from(pubKeyBytes.slice(1)).map(b => b.toString(16).padStart(2, '0')).join('')
+  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
+  
   const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
   const orderHash  = computeOrderHash(
-    parseInt(extL2Vault, 10), syntheticId, baseAmount,
+    vaultId, syntheticId, baseAmount,
     '0x1', quoteAmount, '0x1', feeAmount, expirationSecs, nonce,
   )
   const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
@@ -221,7 +224,7 @@ export async function placeOrder(order, credentials) {
         s: '0x' + sig.s.toString(16).padStart(64, '0'),
       },
       starkKey,
-      collateralPosition: extL2Vault.toString(),
+      collateralPosition: vaultId.toString(),
     },
   }
 
