@@ -238,7 +238,10 @@ export async function placeOrder(order, credentials) {
 
   const sender    = buildSubaccount(nadoAddress, nadoSubaccount || 'default')
   const isMaker   = orderType !== 'taker'
-  const adjPrice  = isMaker ? (isBuy ? limitPrice * 0.9995 : limitPrice * 1.0005) : limitPrice
+  //const adjPrice  = isMaker ? (isBuy ? limitPrice * 0.9995 : limitPrice * 1.0005) : limitPrice
+  const adjPrice = isMaker
+  ? (isBuy ? limitPrice * 0.9995 : limitPrice * 1.0005)   // maker : en dessous/au-dessus du mid
+  : (isBuy ? limitPrice * 1.005  : limitPrice * 0.995)    // taker IOC : +/- 0.5% pour croiser
   const signedSize = isBuy ? Math.abs(order.size) : -Math.abs(order.size)
 
   const priceX18  = roundToTick(adjPrice,    market.nadoPriceIncrementX18 ?? '1000000000000000000')
