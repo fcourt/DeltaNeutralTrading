@@ -181,6 +181,8 @@ export async function loadL2Configs() {
 }
 
 export async function placeOrder(order, credentials) {
+
+  /*
   const { isBuy, limitPrice, orderType, reduceOnly, market } = order
   const { extStarkPk, extL2Vault, extApiKey } = credentials
   if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
@@ -240,6 +242,84 @@ export async function placeOrder(order, credentials) {
       collateralPosition: vaultId.toString(),
     },
   }
+  */
+
+  const { isBuy, limitPrice, orderType, reduceOnly, market } = order
+  const { extStarkPk, extL2Vault, extApiKey } = credentials
+  if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
+
+  const L2_CONFIGS = await loadL2Configs()
+  const l2Config   = L2_CONFIGS[market.extKey]
+  if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.extKey}`)
+
+  const { syntheticId, syntheticResolution, collateralResolution, szDecimals, pxDecimals } = l2Config
+
+  // ✅ FIX — BigInt natif, pas de Number() → pas de perte de précision
+  const vaultIdBig = BigInt(extL2Vault)
+
+  const nonce             = generateNonce()
+  const expiryEpochMillis = Date.now() + 14 * 24 * 3600 * 1000
+  const expirationSecs    = Math.ceil(expiryEpochMillis / 1000)
+
+  const isMarket        = (orderType ?? 'maker') === 'taker'
+  const timeInForce     = isMarket ? 'IOC' : 'GTT'
+  const aggressivePrice = isMarket ? (isBuy ? limitPrice * 1.0075 : limitPrice * 0.9925) : limitPrice
+
+  const sizeStr  = order.size.toFixed(szDecimals)
+  const priceStr = aggressivePrice.toFixed(pxDecimals)
+
+  const syntheticAmountAbs  = parseQuantum(sizeStr, syntheticResolution)
+  const collateralAmountAbs = parseCollateral(syntheticAmountAbs, priceStr, collateralResolution, syntheticResolution)
+
+  // ✅ FIX — division entière pour éviter float sur feeAmount
+  const feeAmount  = Math.ceil(collateralAmountAbs / 2000) // = * 0.0005, sans float
+  const baseAmount = isBuy ?  syntheticAmountAbs  : -syntheticAmountAbs
+  const quoteAmount = isBuy ? -collateralAmountAbs :  collateralAmountAbs
+
+  // ✅ FIX — API canonique
+  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
+
+  const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
+  const orderHash  = computeOrderHash(
+    vaultIdBig,      // ← BigInt directement, uintToFelt252(BigInt) fonctionne
+    syntheticId, baseAmount,
+    '0x1', quoteAmount, '0x1', feeAmount, expirationSecs, nonce,
+  )
+  const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
+  const sig     = ec.starkCurve.sign(msgHash, extStarkPk)
+
+  // DEBUG — à retirer après validation
+  console.log('[Extended] Signing debug:', {
+    vaultIdBig: vaultIdBig.toString(),
+    starkKey,
+    syntheticId,
+    baseAmount,
+    quoteAmount,
+    feeAmount,
+    expirationSecs,
+    nonce,
+    orderHash,
+    msgHash,
+  })
+
+  const payload = {
+    id: generateOrderId(), market: market.extKey, type: 'LIMIT',
+    side: isBuy ? 'BUY' : 'SELL', qty: sizeStr, price: priceStr,
+    timeInForce, expiryEpochMillis, fee: '0.0005',
+    nonce: nonce.toString(), selfTradeProtectionLevel: 'ACCOUNT',
+    ...(reduceOnly && { reduceOnly: true }),
+    settlement: {
+      signature: {
+        r: '0x' + sig.r.toString(16).padStart(64, '0'),
+        s: '0x' + sig.s.toString(16).padStart(64, '0'),
+      },
+      starkKey,
+      // ✅ FIX — BigInt.toString() donne le decimal exact, pas de perte de précision
+      collateralPosition: vaultIdBig.toString(),
+    },
+  }
+
+  console.log('[Extended] Payload:', JSON.stringify(payload, null, 2))
 
   const res = await fetch(
     //`${EXT_PROXY}?endpoint=${encodeURIComponent('/api/v1/user/order')}`,
