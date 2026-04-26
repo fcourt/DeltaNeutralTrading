@@ -3,12 +3,12 @@
 
 import { ec, hash, shortString } from 'starknet'
 
-const EXT_PROXY    = '/api/extended'
-const CACHE_TTL_MS = 60 * 60 * 1000
+const EXT_PROXY           = '/api/extended'
+const CACHE_TTL_MS        = 60 * 60 * 1000
 const SERVER_CLOCK_OFFSET_S = 14 * 24 * 3600
-const ORDER_SELECTOR  = '0x36da8d51815527cabfaa9c982f564c80fa7429616739306036f1f9b608dd112'
-const DOMAIN_SELECTOR = '0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210'
-const STARK_PRIME = BigInt('0x800000000000011000000000000000000000000000000000000000000000001')
+const ORDER_SELECTOR      = '0x36da8d51815527cabfaa9c982f564c80fa7429616739306036f1f9b608dd112'
+const DOMAIN_SELECTOR     = '0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210'
+const STARK_PRIME         = BigInt('0x800000000000011000000000000000000000000000000000000000000000001')
 
 const _cache = new Map()
 const _ttls  = { extended_keys: 300_000, ext_l2configs: CACHE_TTL_MS }
@@ -56,52 +56,14 @@ function parseQuantum(valueStr, resolution) {
   return parseInt(intPart, 10) * resolution + (dec ? parseInt(dec, 10) : 0)
 }
 
-/*
 function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
-  const ratio    = collatRes / synthRes
-  const extraDec = ratio > 1 ? Math.round(Math.log10(ratio)) : 0
-  const [pInt, pDec = ''] = String(priceStr).split('.')
-  const pDecPadded = pDec.padEnd(extraDec, '0').slice(0, extraDec)
-  const priceInt   = parseInt(pInt, 10) * ratio + (extraDec > 0 && pDecPadded ? parseInt(pDecPadded, 10) : 0)
-  return syntheticAbs * priceInt
-}
-
-
-function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
-  // On travaille en big integer pour éviter tout flottant
-  const [pInt, pDec = ''] = String(priceStr).split('.')
-  const collatResBig = BigInt(collatRes)
-  const synthResBig  = BigInt(synthRes)
-  // prix * collatRes / synthRes, en conservant les decimales
-  const decimalsNeeded = Math.max(0, String(synthRes).length - String(collatRes).length)
-  const priceFull = BigInt(pInt) * collatResBig / synthResBig
-  return Number(BigInt(syntheticAbs) * priceFull)
-}
-*/
-
-function parseCollateral(syntheticAbs, priceStr, collatRes, synthRes) {
-  // Nombre de décimales du prix à conserver = log10(collatRes/synthRes)
   const extraDec = Math.round(Math.log10(collatRes / synthRes))
-
   const [pInt, pDec = ''] = String(priceStr).split('.')
-
-  // Normalise la partie décimale à exactement `extraDec` chiffres
-  const pDecNorm = pDec.padEnd(extraDec, '0').slice(0, extraDec)
-
-  // Prix entier = partie entière × ratio + partie décimale normalisée
-  const ratio       = collatRes / synthRes  // ex: 100 pour ETH
+  const pDecNorm    = pDec.padEnd(extraDec, '0').slice(0, extraDec)
+  const ratio       = collatRes / synthRes
   const priceScaled = parseInt(pInt, 10) * ratio
                     + (extraDec > 0 ? parseInt(pDecNorm || '0', 10) : 0)
-
-  const result = syntheticAbs * priceScaled
-
-  // ✅ DEBUG TEMPORAIRE — vérifie l'alignement avec le serveur
-  console.log('[parseCollateral]', {
-    priceStr, extraDec, pDecNorm,
-    priceScaled, syntheticAbs, result
-  })
-
-  return result
+  return syntheticAbs * priceScaled
 }
 
 function generateNonce()   { return Math.floor(Math.random() * (2 ** 31 - 1)) + 1 }
@@ -111,6 +73,10 @@ function generateOrderId() {
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
   })
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 export async function getMarkets() {
   const cached = getCached('extended_keys')
@@ -131,9 +97,10 @@ export async function getPrices() {
     if (!m.name) return
     const price = parseFloat(m.marketStats?.lastPrice || 0)
     if (price) priceMap[m.name] = price
-    //precisionMap[m.name] = { szDecimals: m.quantityPrecision ?? m.qtyPrecision ?? 2, pxDecimals: m.pricePrecision ?? 2 }
-    precisionMap[m.name] = { szDecimals: m.assetPrecision ?? m.quantityPrecision ?? 5,
-                            pxDecimals: m.pricePrecision ?? pxDecimalsFromMinPrice(m.tradingConfig?.minPriceChange) ?? 2 }
+    precisionMap[m.name] = {
+      szDecimals: m.assetPrecision ?? m.quantityPrecision ?? 5,
+      pxDecimals: m.pricePrecision ?? pxDecimalsFromMinPrice(m.tradingConfig?.minPriceChange) ?? 2,
+    }
   })
   return { priceMap, precisionMap }
 }
@@ -181,11 +148,9 @@ export async function getPositions(credentials, markets = []) {
 }
 
 export async function loadL2Configs() {
-  // Dans loadL2Configs(), temporairement :
-  localStorage.removeItem('ext_l2configs_cache')  // force re-fetch
-  
   const cached = getCached('ext_l2configs')
   if (cached) return cached
+
   try {
     const stored = JSON.parse(localStorage.getItem('ext_l2configs_cache') || 'null')
     if (stored && Date.now() - stored.ts < CACHE_TTL_MS) {
@@ -200,10 +165,11 @@ export async function loadL2Configs() {
   for (const m of (data?.data || [])) {
     const l2 = m.l2Config || {}, tc = m.tradingConfig || {}
     configs[m.name] = {
-      syntheticId: l2.syntheticId, syntheticResolution: l2.syntheticResolution,
+      syntheticId:          l2.syntheticId,
+      syntheticResolution:  l2.syntheticResolution,
       collateralResolution: l2.collateralResolution,
-      szDecimals: m.assetPrecision ?? 0,
-      pxDecimals: pxDecimalsFromMinPrice(tc.minPriceChange),
+      szDecimals:           m.assetPrecision ?? 0,
+      pxDecimals:           pxDecimalsFromMinPrice(tc.minPriceChange),
     }
   }
   setCached('ext_l2configs', configs)
@@ -211,71 +177,37 @@ export async function loadL2Configs() {
   return configs
 }
 
-export async function placeOrder(order, credentials) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Leverage — PATCH /api/v1/user/leverage
+// ─────────────────────────────────────────────────────────────────────────────
 
-  /*
-  const { isBuy, limitPrice, orderType, reduceOnly, market } = order
-  const { extStarkPk, extL2Vault, extApiKey } = credentials
-  if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
-
-  const vaultId = Number(BigInt(extL2Vault))
-
-  const L2_CONFIGS = await loadL2Configs()
-  const l2Config   = L2_CONFIGS[market.extKey]
-  if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.extKey}`)
-
-  const { syntheticId, syntheticResolution, collateralResolution, szDecimals, pxDecimals } = l2Config
-  const nonce             = generateNonce()
-   // const expiryEpochMillis = Date.now() + 3600 * 1000
-  //const expirationSecs    = Math.ceil(expiryEpochMillis / 1000) + SERVER_CLOCK_OFFSET_S
-  const expiryEpochMillis = Date.now() + 14 * 24 * 3600 * 1000       // 14 jours (ms pour le payload)
-  const expirationSecs    = Math.ceil(expiryEpochMillis / 1000)       // même valeur en secondes pour la signature
-
-  const CLOCK_BUFFER_SECS = 30; // marge côté serveur
-  //const expirationSecs = Math.ceil(expiryEpochMillis / 1000) + CLOCK_BUFFER_SECS;
-  const isMarket          = (orderType ?? 'maker') === 'taker'
-  const timeInForce       = isMarket ? 'IOC' : 'GTT'
-  const aggressivePrice   = isMarket ? (isBuy ? limitPrice * 1.0075 : limitPrice * 0.9925) : limitPrice
-
-  const sizeStr  = order.size.toFixed(szDecimals)
-  const priceStr = aggressivePrice.toFixed(pxDecimals)
-
-  const syntheticAmountAbs  = parseQuantum(sizeStr, syntheticResolution)
-  const collateralAmountAbs = parseCollateral(syntheticAmountAbs, priceStr, collateralResolution, syntheticResolution)
-  const feeAmount           = Math.ceil(collateralAmountAbs * 0.0005)
-  const baseAmount          = isBuy ?  syntheticAmountAbs  : -syntheticAmountAbs
-  const quoteAmount         = isBuy ? -collateralAmountAbs :  collateralAmountAbs
-
-  const pubKeyBytes = ec.starkCurve.getPublicKey(extStarkPk, true)
-  //const starkKey    = '0x' + Array.from(pubKeyBytes.slice(1)).map(b => b.toString(16).padStart(2, '0')).join('')
-  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
-  
-  const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
-  const orderHash  = computeOrderHash(
-    vaultId, syntheticId, baseAmount,
-    '0x1', quoteAmount, '0x1', feeAmount, expirationSecs, nonce,
-  )
-  const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
-  const sig     = ec.starkCurve.sign(msgHash, extStarkPk)
-
-  const payload = {
-    id: generateOrderId(), market: market.extKey, type: 'LIMIT',
-    side: isBuy ? 'BUY' : 'SELL', qty: sizeStr, price: priceStr,
-    timeInForce, expiryEpochMillis, fee: '0.0005',
-    nonce: nonce.toString(), selfTradeProtectionLevel: 'ACCOUNT',
-    ...(reduceOnly && { reduceOnly: true }),
-    settlement: {
-      signature: {
-        r: '0x' + sig.r.toString(16).padStart(64, '0'),
-        s: '0x' + sig.s.toString(16).padStart(64, '0'),
+export async function setLeverage(marketKey, leverage, apiKey) {
+  if (!leverage || leverage <= 0 || !marketKey || !apiKey) return
+  const res = await fetch(
+    `${EXT_PROXY}?endpoint=${encodeURIComponent('/user/leverage')}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+        'User-Agent': 'TrekApp/1.0',
       },
-      starkKey,
-      collateralPosition: vaultId.toString(),
-    },
-  }
-  */
+      body: JSON.stringify({ market: marketKey, leverage: Math.round(leverage) }),
+    }
+  )
+  const data = await res.json()
+  if (!res.ok || data?.status === 'ERROR')
+    throw new Error(data?.error?.message || `Extended setLeverage HTTP ${res.status}`)
+  console.log('[Extended] Leverage set:', data?.data)
+  return data?.data
+}
 
-  const { isBuy, limitPrice, orderType, reduceOnly, market } = order
+// ─────────────────────────────────────────────────────────────────────────────
+// Place order
+// ─────────────────────────────────────────────────────────────────────────────
+
+export async function placeOrder(order, credentials) {
+  const { isBuy, limitPrice, orderType, reduceOnly, market, leverage } = order
   const { extStarkPk, extL2Vault, extApiKey } = credentials
   if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
 
@@ -283,22 +215,27 @@ export async function placeOrder(order, credentials) {
   const l2Config   = L2_CONFIGS[market.extKey]
   if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.extKey}`)
 
+  // ── Levier : applique sur la plateforme avant de signer ───────────────────
+  if (leverage != null && leverage > 0) {
+    await setLeverage(market.extKey, leverage, extApiKey)
+  }
+
   const { syntheticId, syntheticResolution, collateralResolution, szDecimals, pxDecimals } = l2Config
 
-  // ✅ FIX — BigInt natif, pas de Number() → pas de perte de précision
+  // BigInt natif → pas de perte de précision sur vaultId
   const vaultIdBig = BigInt(extL2Vault)
 
   const nonce             = generateNonce()
   const expiryEpochMillis = Date.now() + 14 * 24 * 3600 * 1000
-  //const expirationSecs    = Math.ceil(expiryEpochMillis / 1000)
   const expirationSecs    = Math.ceil(expiryEpochMillis / 1000) + SERVER_CLOCK_OFFSET_S
 
   const isMarket        = (orderType ?? 'maker') === 'taker'
   const timeInForce     = isMarket ? 'IOC' : 'GTT'
-  const aggressivePrice = isMarket ? (isBuy ? limitPrice * 1.0075 : limitPrice * 0.9925) : limitPrice
+  const aggressivePrice = isMarket
+    ? (isBuy ? limitPrice * 1.0075 : limitPrice * 0.9925)
+    : limitPrice
 
-  const sizeStr  = order.size.toFixed(szDecimals)
-
+  const sizeStr = order.size.toFixed(szDecimals)
   if (parseFloat(sizeStr) <= 0) {
     throw new Error(
       `Taille invalide pour Extended après arrondi à ${szDecimals} décimales : ` +
@@ -306,60 +243,52 @@ export async function placeOrder(order, credentials) {
       `Augmente le montant (min. ~${(1 / Math.pow(10, szDecimals - 1)).toFixed(szDecimals)} sur ce marché).`
     )
   }
-  
+
   const priceStr = aggressivePrice.toFixed(pxDecimals)
 
   const syntheticAmountAbs  = parseQuantum(sizeStr, syntheticResolution)
   const collateralAmountAbs = parseCollateral(syntheticAmountAbs, priceStr, collateralResolution, syntheticResolution)
 
-  // ✅ FIX — division entière pour éviter float sur feeAmount
-  const feeAmount  = Math.ceil(collateralAmountAbs / 2000) // = * 0.0005, sans float
-  const baseAmount = isBuy ?  syntheticAmountAbs  : -syntheticAmountAbs
+  // Division entière pour éviter les flottants sur feeAmount
+  const feeAmount   = Math.ceil(collateralAmountAbs / 2000) // × 0.0005
+  const baseAmount  = isBuy ?  syntheticAmountAbs  : -syntheticAmountAbs
   const quoteAmount = isBuy ? -collateralAmountAbs :  collateralAmountAbs
 
-  // ✅ FIX — API canonique
-  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
-
+  const starkKey   = ec.starkCurve.getStarkKey(extStarkPk)
   const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
 
   console.log('[Extended] parseCollateral inputs:', {
-  market: market.extKey,
-  sizeStr,
-  priceStr,
-  syntheticResolution,
-  collateralResolution,
-  syntheticAmountAbs,
-  collateralAmountAbs,
-  ratio: collateralResolution / syntheticResolution,
-})
-  
-  const orderHash  = computeOrderHash(
-    vaultIdBig,      // ← BigInt directement, uintToFelt252(BigInt) fonctionne
-    syntheticId, baseAmount,
+    market: market.extKey, sizeStr, priceStr,
+    syntheticResolution, collateralResolution,
+    syntheticAmountAbs, collateralAmountAbs,
+    ratio: collateralResolution / syntheticResolution,
+  })
+
+  const orderHash = computeOrderHash(
+    vaultIdBig, syntheticId, baseAmount,
     '0x1', quoteAmount, '0x1', feeAmount, expirationSecs, nonce,
   )
   const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
   const sig     = ec.starkCurve.sign(msgHash, extStarkPk)
 
-  // DEBUG — à retirer après validation
   console.log('[Extended] Signing debug:', {
-    vaultIdBig: vaultIdBig.toString(),
-    starkKey,
-    syntheticId,
-    baseAmount,
-    quoteAmount,
-    feeAmount,
-    expirationSecs,
-    nonce,
-    orderHash,
-    msgHash,
+    vaultIdBig: vaultIdBig.toString(), starkKey, syntheticId,
+    baseAmount, quoteAmount, feeAmount, expirationSecs, nonce, orderHash, msgHash,
   })
 
   const payload = {
-    id: generateOrderId(), market: market.extKey, type: 'LIMIT',
-    side: isBuy ? 'BUY' : 'SELL', qty: sizeStr, price: priceStr,
-    timeInForce, expiryEpochMillis, fee: '0.0005',
-    nonce: nonce.toString(), selfTradeProtectionLevel: 'ACCOUNT', postOnly: !isMarket, 
+    id:                       generateOrderId(),
+    market:                   market.extKey,
+    type:                     'LIMIT',
+    side:                     isBuy ? 'BUY' : 'SELL',
+    qty:                      sizeStr,
+    price:                    priceStr,
+    timeInForce,
+    expiryEpochMillis,
+    fee:                      '0.0005',
+    nonce:                    nonce.toString(),
+    selfTradeProtectionLevel: 'ACCOUNT',
+    postOnly:                 !isMarket,
     ...(reduceOnly && { reduceOnly: true }),
     settlement: {
       signature: {
@@ -367,7 +296,6 @@ export async function placeOrder(order, credentials) {
         s: '0x' + sig.s.toString(16).padStart(64, '0'),
       },
       starkKey,
-      // ✅ FIX — BigInt.toString() donne le decimal exact, pas de perte de précision
       collateralPosition: vaultIdBig.toString(),
     },
   }
@@ -375,15 +303,26 @@ export async function placeOrder(order, credentials) {
   console.log('[Extended] Payload:', JSON.stringify(payload, null, 2))
 
   const res = await fetch(
-    //`${EXT_PROXY}?endpoint=${encodeURIComponent('/api/v1/user/order')}`,
     `${EXT_PROXY}?endpoint=${encodeURIComponent('/user/order')}`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Api-Key': extApiKey, 'User-Agent': 'TrekApp/1.0' }, body: JSON.stringify(payload) }
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': extApiKey,
+        'User-Agent': 'TrekApp/1.0',
+      },
+      body: JSON.stringify(payload),
+    }
   )
+
   const rawText = await res.text()
   console.log('[Extended] status:', res.status, '| response:', rawText)
+
   let data = {}
   try { data = JSON.parse(rawText) } catch { /* non-JSON */ }
+
   if (!res.ok || data?.status === 'ERROR')
     throw new Error(data?.error?.message || data?.message || rawText || `Extended HTTP ${res.status}`)
+
   return data
 }
