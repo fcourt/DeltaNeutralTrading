@@ -199,7 +199,7 @@ export async function getAvailableKeys(platformId = 'hyperliquid') {
 }
 
 export async function placeOrder(order, credentials) {
-  const { isBuy, size, limitPrice, orderType, reduceOnly, market } = order
+  const { isBuy, size, limitPrice, orderType, reduceOnly, market, leverage } = order
   const { hlAgentPk, hlVaultAddress } = credentials
   if (!hlAgentPk) throw new Error('Clé agent HL manquante')
   if (market.assetIndex === null) throw new Error(`Index non résolu pour ${market.label}`)
@@ -208,11 +208,32 @@ export async function placeOrder(order, credentials) {
   const roundedSize  = parseFloat(size.toFixed(market.szDecimals ?? 6))
   const wallet       = privateKeyToAccount(hlAgentPk)
   const isMaker      = !orderType || orderType === 'maker'
+  const isXyzMarket  = market.hlKey?.startsWith('xyz:') || market.assetIndex >= XYZ_OFFSET
 
   const client = new ExchangeClient({
     wallet, transport: new HttpTransport(),
     defaultVaultAddress: hlVaultAddress?.trim() || undefined,
   })
+
+  // ── Set leverage before order ─────────────────────────────────────────────
+  // updateLeverage uses the raw asset index (without XYZ_OFFSET).
+  // XYZ markets may require dex:'xyz' — catch silently to not block order placement.
+  if (leverage != null && leverage > 0) {
+    const assetForLev = isXyzMarket
+      ? market.assetIndex - XYZ_OFFSET
+      : market.assetIndex
+    try {
+      await client.updateLeverage({
+        asset:    assetForLev,
+        isCross:  true,
+        leverage: Math.round(leverage),
+        ...(isXyzMarket ? { dex: 'xyz' } : {}),
+      })
+    } catch (e) {
+      console.warn('[HL] updateLeverage failed (non-blocking):', e.message)
+    }
+  }
+
   return client.order({
     orders: [{
       a: market.assetIndex,
