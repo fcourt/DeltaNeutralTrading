@@ -241,6 +241,7 @@ export default function OpenTrade() {
     }
   }, [sizeUSD, price1, price2, side1, side2, extBid, extAsk, platform1, platform2, margins])
 
+  /*
   const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
     if (!market) throw new Error('Marché non résolu')
     const stepSize   = getStepSize(marketId)
@@ -255,6 +256,36 @@ export default function OpenTrade() {
     //return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, market, ...credentials }
     return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, reduceOnly: false, market, ...credentials }
   }
+  */
+
+  const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
+  if (!market) throw new Error('Marché non résolu')
+  const stepSize   = getStepSize(marketId)
+  const meta       = getAssetMeta(market.hlKey)
+
+  const raw = useStepSize && stepSize
+    ? Math.floor(sizeAsset / stepSize) * stepSize
+    : sizeAsset
+
+  let finalSize
+  if (platformId === 'extended') {
+    // ✅ FIX — ne pas quantizer ici, placeOrder() utilise l2Config.szDecimals (source de vérité)
+    finalSize = raw
+  } else {
+    const szDecimals = platformId === 'nado'
+      ? (market.nadoSzDecimals ?? 6)
+      : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01)))
+    finalSize = parseFloat(raw.toFixed(szDecimals))
+  }
+
+  return {
+    platformId, marketId,
+    isBuy: side === 'LONG',
+    size: finalSize,
+    limitPrice, orderType, reduceOnly: false,
+    market, ...credentials
+  }
+}
 
   const handlePlaceLeg = async (legNum) => {
     const setter     = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
