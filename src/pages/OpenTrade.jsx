@@ -1,5 +1,5 @@
 // src/pages/OpenTrade.jsx
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'  // ✅ useCallback ajouté
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
 import { useLivePrices, PLATFORMS } from '../hooks/useLivePrices'
@@ -8,13 +8,16 @@ import { useFundingRates }          from '../hooks/useFundingRates'
 import { usePlaceOrder }            from '../hooks/usePlaceOrder'
 import { useMargins }               from '../hooks/useMargins'
 import { fmt, fmtUSD, fmtPct }     from '../utils/format'
-import { loadFees, saveFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
+import { loadFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
+
+const PRICE_OFFSET = 0.0005  // ✅ Constante module-level, accessible partout
 
 // ── LegCard ───────────────────────────────────────────────────────────────────
 function LegCard({
   side, platform, price, limitPrice, leverage, sizeUSD, sizeAsset, marginAvailable,
   fundingRate, isSuggested, feesMaker, feesTaker, useStepSize, stepSize,
   onPlaceOrder, isPlacingOrder, canTrade, orderType, onOrderTypeChange,
+  bid, ask, priceMode, onPriceModeChange, customPrice, onCustomPriceChange,  // ✅ props ajoutées
 }) {
   const { t } = useTranslation()
   const isLong     = side === 'LONG'
@@ -37,55 +40,55 @@ function LegCard({
         {isSuggested && <span className="leg-card__optimal">⭐ {t('openTrade.optimal')}</span>}
       </div>
 
-      <div className="leg-grid-2">
-        <div className="leg-stat">
-          <p className="leg-stat__label">{t('openTrade.marketPrice')}</p>
-          <p className="leg-stat__value">{price ? fmtUSD(price) : '—'}</p>
+      {/* ✅ Market price seul sur sa ligne */}
+      <div className="leg-stat">
+        <p className="leg-stat__label">{t('openTrade.marketPrice')}</p>
+        <p className="leg-stat__value">{price ? fmtUSD(price) : '—'}</p>
+      </div>
+
+      {/* ✅ Sélecteur de prix — bloc full-width séparé */}
+      <div className="leg-price-selector">
+        <div className="leg-price-header">
+          <p className="leg-stat__label">{t('openTrade.limitMaker')}</p>
+          <div className="leg-price-btns">
+            <button
+              className={`leg-price-btn ${priceMode === 'market' ? 'leg-price-btn--active' : ''}`}
+              onClick={() => onPriceModeChange('market')}
+              title="Prix suggéré ±0.05%"
+            >Market</button>
+            <button
+              className={`leg-price-btn ${priceMode === 'mid' ? 'leg-price-btn--active' : ''}`}
+              onClick={() => onPriceModeChange('mid')}
+              title="Mid du carnet"
+            >Mid</button>
+            <button
+              className={`leg-price-btn ${priceMode === 'best' ? 'leg-price-btn--active' : ''}`}
+              onClick={() => onPriceModeChange('best')}
+              disabled={isLong ? !bid : !ask}
+              title={isLong
+                ? (bid ? `Best Bid : ${fmtUSD(bid)}` : 'Bid indisponible')
+                : (ask ? `Best Ask : ${fmtUSD(ask)}` : 'Ask indisponible')}
+            >
+              {isLong ? 'Best Bid' : 'Best Ask'}
+            </button>
+          </div>
         </div>
-        {/* ── Prix limite avec sélecteur ── */}
-<div className="leg-price-selector">
-  <div className="leg-price-header">
-    <p className="leg-stat__label">{t('openTrade.limitMaker')}</p>
-    <div className="leg-price-btns">
-      <button
-        className={`leg-price-btn ${priceMode === 'market' ? 'leg-price-btn--active' : ''}`}
-        onClick={() => onPriceModeChange('market')}
-        title="Prix suggéré ±0.05%"
-      >Market</button>
-      <button
-        className={`leg-price-btn ${priceMode === 'mid' ? 'leg-price-btn--active' : ''}`}
-        onClick={() => onPriceModeChange('mid')}
-        title="Mid du carnet"
-      >Mid</button>
-      <button
-        className={`leg-price-btn ${priceMode === 'best' ? 'leg-price-btn--active' : ''}`}
-        onClick={() => onPriceModeChange('best')}
-        disabled={isLong ? !bid : !ask}
-        title={isLong
-          ? (bid ? `Best Bid : ${fmtUSD(bid)}` : 'Bid indisponible')
-          : (ask ? `Best Ask : ${fmtUSD(ask)}` : 'Ask indisponible')}
-      >
-        {isLong ? 'Best Bid' : 'Best Ask'}
-      </button>
-    </div>
-  </div>
-  <input
-    type="number"
-    className={`leg-price-input ${priceMode === 'manual' ? 'leg-price-input--manual' : 'leg-price-input--auto'}`}
-    value={priceMode === 'manual' ? customPrice : (limitPrice != null ? limitPrice.toFixed(2) : '')}
-    onChange={e => {
-      onCustomPriceChange(e.target.value)
-      onPriceModeChange(e.target.value ? 'manual' : 'market')
-    }}
-    placeholder={limitPrice != null ? limitPrice.toFixed(2) : '—'}
-  />
-  {priceMode === 'manual' && (
-    <button
-      className="leg-price-reset"
-      onClick={() => { onCustomPriceChange(''); onPriceModeChange('market') }}
-    >↺ Reset</button>
-  )}
-</div>
+        <input
+          type="number"
+          className={`leg-price-input ${priceMode === 'manual' ? 'leg-price-input--manual' : 'leg-price-input--auto'}`}
+          value={priceMode === 'manual' ? customPrice : (limitPrice != null ? limitPrice.toFixed(2) : '')}
+          onChange={e => {
+            onCustomPriceChange(e.target.value)
+            onPriceModeChange(e.target.value ? 'manual' : 'market')
+          }}
+          placeholder={limitPrice != null ? limitPrice.toFixed(2) : '—'}
+        />
+        {priceMode === 'manual' && (
+          <button
+            className="leg-price-reset"
+            onClick={() => { onCustomPriceChange(''); onPriceModeChange('market') }}
+          >↺ Reset</button>
+        )}
       </div>
 
       <div className="leg-grid-2">
@@ -221,6 +224,10 @@ export default function OpenTrade() {
   const [tradeStatus,     setTradeStatus]     = useState(null)
   const [loadedPosition1, setLoadedPosition1] = useState(null)
   const [loadedPosition2, setLoadedPosition2] = useState(null)
+  const [priceMode1,      setPriceMode1]      = useState('market')
+  const [priceMode2,      setPriceMode2]      = useState('market')
+  const [customPrice1,    setCustomPrice1]    = useState('')
+  const [customPrice2,    setCustomPrice2]    = useState('')
 
   const credentials = useMemo(() => ({
     hlAddress, hlVaultAddress, hlAgentPk,
@@ -231,11 +238,18 @@ export default function OpenTrade() {
 
   const { markets, getPrice, getStepSize, getAssetMeta, getExtPrecision, lastUpdate } = useLivePrices(3000)
   const { filteredMarkets, loading, errors, isIntersection, counts } = useMarketFilter(platform1, platform2, markets)
-  //const { p1: fundingP1, p2: fundingP2, extBid, extAsk } = useFundingRates(marketId, platform1, platform2, extApiKey, markets)
-  const { p1: fundingP1, p2: fundingP2, p1Bid, p1Ask, p2Bid, p2Ask, extBid, extAsk } =
-  useFundingRates(marketId, platform1, platform2, extApiKey, markets)
+  const { p1: fundingP1, p2: fundingP2, p1Bid, p1Ask, p2Bid, p2Ask } =
+    useFundingRates(marketId, platform1, platform2, extApiKey, markets)
   const { margins } = useMargins(credentials)
   const { placeOrder } = usePlaceOrder(markets)
+
+  // Reset price mode quand le marché change
+  useEffect(() => {
+    setPriceMode1('market')
+    setPriceMode2('market')
+    setCustomPrice1('')
+    setCustomPrice2('')
+  }, [marketId])
 
   useEffect(() => {
     if (!loading && filteredMarkets.length > 0 && marketId !== '') {
@@ -249,20 +263,7 @@ export default function OpenTrade() {
   const plat2  = PLATFORMS.find(p => p.id === platform2)
   const market = markets.find(m => m.id === marketId)
 
-  const [priceMode1, setPriceMode1] = useState('market')
-  const [priceMode2, setPriceMode2] = useState('market')
-  const [customPrice1, setCustomPrice1] = useState('')
-  const [customPrice2, setCustomPrice2] = useState('')
-
-  // Reset quand le marché change
-  useEffect(() => {
-    setPriceMode1('market')
-    setPriceMode2('market')
-    setCustomPrice1('')
-    setCustomPrice2('')
-  }, [marketId])
-
-  const canTradePlatform    = (id) => id === 'extended' ? canTradeExt : id === 'nado' ? canTradeNado : canTradeHL
+  const canTradePlatform     = (id) => id === 'extended' ? canTradeExt : id === 'nado' ? canTradeNado : canTradeHL
   const getMarginForPlatform = (id) => margins[id] ?? null
 
   const suggestion = useMemo(() => {
@@ -273,39 +274,30 @@ export default function OpenTrade() {
   const side1 = suggestion?.p1 ?? 'LONG'
   const side2 = suggestion?.p2 ?? 'SHORT'
 
-  const f = 0.0005
+  // ✅ PRICE_OFFSET défini au niveau module — pas de dépendance manquante dans useCallback
+  const getDefaultLimitPrice = useCallback((platformId, side, price, bid, ask) => {
+    if (platformId === 'extended')
+      return side === 'LONG' ? (bid ?? price * (1 - PRICE_OFFSET)) : (ask ?? price * (1 + PRICE_OFFSET))
+    if (platformId === 'nado')
+      return Math.round(side === 'LONG' ? price * (1 - PRICE_OFFSET) : price * (1 + PRICE_OFFSET))
+    return roundToHLPrice(side === 'LONG' ? price * (1 - PRICE_OFFSET) : price * (1 + PRICE_OFFSET))
+  }, [])
 
-const getDefaultLimitPrice = useCallback((platformId, side, price, bid, ask) => {
-  if (platformId === 'extended')
-    return side === 'LONG' ? (bid ?? price * (1 - f)) : (ask ?? price * (1 + f))
-  if (platformId === 'nado')
-    return Math.round(side === 'LONG' ? price * (1 - f) : price * (1 + f))
-  return roundToHLPrice(side === 'LONG' ? price * (1 - f) : price * (1 + f))
-}, [])
+  const getLimitPrice = useCallback((platformId, side, price, mode, customPx, bid, ask) => {
+    if (!price) return null
+    switch (mode) {
+      case 'manual': return customPx ? parseFloat(customPx) : getDefaultLimitPrice(platformId, side, price, bid, ask)
+      case 'mid':    return price
+      case 'best':   return side === 'LONG' ? (bid ?? price * (1 - PRICE_OFFSET)) : (ask ?? price * (1 + PRICE_OFFSET))
+      default:       return getDefaultLimitPrice(platformId, side, price, bid, ask)
+    }
+  }, [getDefaultLimitPrice])
 
-const getLimitPrice = useCallback((platformId, side, price, mode, customPx, bid, ask) => {
-  if (!price) return null
-  switch (mode) {
-    case 'manual': return customPx ? parseFloat(customPx) : getDefaultLimitPrice(platformId, side, price, bid, ask)
-    case 'mid':    return price
-    case 'best':   return side === 'LONG' ? (bid ?? price * (1 - f)) : (ask ?? price * (1 + f))
-    default:       return getDefaultLimitPrice(platformId, side, price, bid, ask)
-  }
-}, [getDefaultLimitPrice])
-  
-  /*
   const calc = useMemo(() => {
     const val = parseFloat(sizeUSD)
     if (!val || val <= 0 || !price1 || !price2) return null
-    const f  = 0.0005
-    const lp1 = platform1 === 'extended'
-      ? (side1 === 'LONG' ? (extBid ?? price1 * (1 - f)) : (extAsk ?? price1 * (1 + f)))
-      : platform1 === 'nado'
-      ? Math.round((side1 === 'LONG' ? price1 * (1 - f) : price1 * (1 + f)))  // arrondi entier, nado.js s'occupe du reste
-      : roundToHLPrice(side1 === 'LONG' ? price1 * (1 - f) : price1 * (1 + f))
-    const lp2 = platform2 === 'extended'
-      ? (side2 === 'LONG' ? (extBid ?? price2 * (1 - f)) : (extAsk ?? price2 * (1 + f)))
-      : roundToHLPrice(side2 === 'LONG' ? price2 * (1 - f) : price2 * (1 + f))
+    const lp1 = getLimitPrice(platform1, side1, price1, priceMode1, customPrice1, p1Bid, p1Ask)
+    const lp2 = getLimitPrice(platform2, side2, price2, priceMode2, customPrice2, p2Bid, p2Ask)
     return {
       asset1:    val / price1,
       asset2:    val / price2,
@@ -315,72 +307,28 @@ const getLimitPrice = useCallback((platformId, side, price, mode, customPx, bid,
       leverage1: minLeverageFor(val, getMarginForPlatform(platform1)),
       leverage2: minLeverageFor(val, getMarginForPlatform(platform2)),
     }
-  }, [sizeUSD, price1, price2, side1, side2, extBid, extAsk, platform1, platform2, margins])
-*/
+  }, [sizeUSD, price1, price2, side1, side2, platform1, platform2, margins,
+      priceMode1, priceMode2, customPrice1, customPrice2, p1Bid, p1Ask, p2Bid, p2Ask,
+      getLimitPrice])
 
-const calc = useMemo(() => {
-  const val = parseFloat(sizeUSD)
-  if (!val || val <= 0 || !price1 || !price2) return null
-  const lp1 = getLimitPrice(platform1, side1, price1, priceMode1, customPrice1, p1Bid, p1Ask)
-  const lp2 = getLimitPrice(platform2, side2, price2, priceMode2, customPrice2, p2Bid, p2Ask)
-  return {
-    asset1:    val / price1,
-    asset2:    val / price2,
-    spreadPct: ((price1 - price2) / price2) * 100,
-    limitP1:   lp1,
-    limitP2:   lp2,
-    leverage1: minLeverageFor(val, getMarginForPlatform(platform1)),
-    leverage2: minLeverageFor(val, getMarginForPlatform(platform2)),
-  }
-}, [sizeUSD, price1, price2, side1, side2, platform1, platform2, margins,
-    priceMode1, priceMode2, customPrice1, customPrice2, p1Bid, p1Ask, p2Bid, p2Ask,
-    getLimitPrice])
-  
-  /*
   const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
     if (!market) throw new Error('Marché non résolu')
-    const stepSize   = getStepSize(marketId)
-    const meta       = getAssetMeta(market.hlKey)
-    const szDecimals = platformId === 'extended'
-      ? (getExtPrecision(market.extKey)?.szDecimals ?? 2)
-      : platformId === 'nado'
-      ? (market.nadoSzDecimals ?? 6)   // stocker dans fetchNadoSymbols
-      : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize)))
-    const raw      = useStepSize && stepSize ? Math.floor(sizeAsset / stepSize) * stepSize : sizeAsset
-    const finalSize = parseFloat(raw.toFixed(szDecimals))
-    //return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, market, ...credentials }
+    const stepSize = getStepSize(marketId)
+    const meta     = getAssetMeta(market.hlKey)
+    const raw      = useStepSize && stepSize
+      ? Math.floor(sizeAsset / stepSize) * stepSize
+      : sizeAsset
+    let finalSize
+    if (platformId === 'extended') {
+      finalSize = raw
+    } else {
+      const szDecimals = platformId === 'nado'
+        ? (market.nadoSzDecimals ?? 6)
+        : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01)))
+      finalSize = parseFloat(raw.toFixed(szDecimals))
+    }
     return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, reduceOnly: false, market, ...credentials }
   }
-  */
-
-  const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
-  if (!market) throw new Error('Marché non résolu')
-  const stepSize   = getStepSize(marketId)
-  const meta       = getAssetMeta(market.hlKey)
-
-  const raw = useStepSize && stepSize
-    ? Math.floor(sizeAsset / stepSize) * stepSize
-    : sizeAsset
-
-  let finalSize
-  if (platformId === 'extended') {
-    // ✅ FIX — ne pas quantizer ici, placeOrder() utilise l2Config.szDecimals (source de vérité)
-    finalSize = raw
-  } else {
-    const szDecimals = platformId === 'nado'
-      ? (market.nadoSzDecimals ?? 6)
-      : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01)))
-    finalSize = parseFloat(raw.toFixed(szDecimals))
-  }
-
-  return {
-    platformId, marketId,
-    isBuy: side === 'LONG',
-    size: finalSize,
-    limitPrice, orderType, reduceOnly: false,
-    market, ...credentials
-  }
-}
 
   const handlePlaceLeg = async (legNum) => {
     const setter     = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
