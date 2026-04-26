@@ -208,11 +208,6 @@ export async function loadL2Configs() {
   }
   setCached('ext_l2configs', configs)
   try { localStorage.setItem('ext_l2configs_cache', JSON.stringify({ ts: Date.now(), configs })) } catch { /* ignore */ }
-
-  // Debug à ajouter juste après const l2 = m.l2Config || {}
-  if (m.name === 'BTC-USD') {
-    console.log('[Extended l2Config raw]', JSON.stringify(m, null, 2))
-  }
   return configs
 }
 
