@@ -143,6 +143,7 @@ export async function getSymbols() {
   return index
 }
 
+/*
 export async function getPrices() {
   const cached = getCached('nado_prices')
   if (cached) return cached
@@ -163,6 +164,36 @@ export async function getPrices() {
   })
   if (Object.keys(prices).length > 0) setCached('nado_prices', prices)
   return prices
+}
+*/
+
+export async function getPrices() {
+  const cached = getCached('nado_prices')
+  if (cached) return cached
+  const symbolsRaw = await archiveGet('/v2/symbols')
+  const idToKey = {}, productIds = []
+  Object.values(symbolsRaw).forEach(s => {
+    const pid = s.product_id ?? s.productId ?? null
+    if (pid != null && pid !== 0) {
+      idToKey[pid] = s.symbol.replace(/-PERP$/, '').replace(/-SPOT$/, '')
+      productIds.push(pid)
+    }
+  })
+  const pricesRaw = await gatewayPost({ type: 'market_prices', product_ids: productIds })
+  const prices = {}, bidPrices = {}, askPrices = {}
+  ;(pricesRaw?.data?.market_prices || []).forEach(p => {
+    const key = idToKey[p.product_id]
+    if (!key) return
+    const bid = parseFloat(p.bid_x18), ask = parseFloat(p.ask_x18)
+    if (!bid || !ask || ask > 1e35) return
+    const bidVal = bid / 1e18, askVal = ask / 1e18
+    prices[key]    = (bidVal + askVal) / 2
+    bidPrices[key] = bidVal
+    askPrices[key] = askVal
+  })
+  const result = { prices, bidPrices, askPrices }
+  if (Object.keys(prices).length > 0) setCached('nado_prices', result)
+  return result
 }
 
 let _nadoIdToKey = null
