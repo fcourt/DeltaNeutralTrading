@@ -42,10 +42,50 @@ function LegCard({
           <p className="leg-stat__label">{t('openTrade.marketPrice')}</p>
           <p className="leg-stat__value">{price ? fmtUSD(price) : '—'}</p>
         </div>
-        <div className="leg-stat">
-          <p className="leg-stat__label">{t('openTrade.limitMaker')}</p>
-          <p className="leg-stat__value leg-stat__value--blue">{limitPrice ? fmtUSD(limitPrice) : '—'}</p>
-        </div>
+        {/* ── Prix limite avec sélecteur ── */}
+<div className="leg-price-selector">
+  <div className="leg-price-header">
+    <p className="leg-stat__label">{t('openTrade.limitMaker')}</p>
+    <div className="leg-price-btns">
+      <button
+        className={`leg-price-btn ${priceMode === 'market' ? 'leg-price-btn--active' : ''}`}
+        onClick={() => onPriceModeChange('market')}
+        title="Prix suggéré ±0.05%"
+      >Market</button>
+      <button
+        className={`leg-price-btn ${priceMode === 'mid' ? 'leg-price-btn--active' : ''}`}
+        onClick={() => onPriceModeChange('mid')}
+        title="Mid du carnet"
+      >Mid</button>
+      <button
+        className={`leg-price-btn ${priceMode === 'best' ? 'leg-price-btn--active' : ''}`}
+        onClick={() => onPriceModeChange('best')}
+        disabled={isLong ? !bid : !ask}
+        title={isLong
+          ? (bid ? `Best Bid : ${fmtUSD(bid)}` : 'Bid indisponible')
+          : (ask ? `Best Ask : ${fmtUSD(ask)}` : 'Ask indisponible')}
+      >
+        {isLong ? 'Best Bid' : 'Best Ask'}
+      </button>
+    </div>
+  </div>
+  <input
+    type="number"
+    className={`leg-price-input ${priceMode === 'manual' ? 'leg-price-input--manual' : 'leg-price-input--auto'}`}
+    value={priceMode === 'manual' ? customPrice : (limitPrice != null ? limitPrice.toFixed(2) : '')}
+    onChange={e => {
+      onCustomPriceChange(e.target.value)
+      onPriceModeChange(e.target.value ? 'manual' : 'market')
+    }}
+    placeholder={limitPrice != null ? limitPrice.toFixed(2) : '—'}
+  />
+  {priceMode === 'manual' && (
+    <button
+      className="leg-price-reset"
+      onClick={() => { onCustomPriceChange(''); onPriceModeChange('market') }}
+    >↺ Reset</button>
+  )}
+</div>
       </div>
 
       <div className="leg-grid-2">
