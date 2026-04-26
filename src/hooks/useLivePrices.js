@@ -19,11 +19,12 @@ export function useLivePrices(intervalMs = 3000) {
     try {
       // getAllMarkets() appelle HL.getMarkets() → on récupère discoveredMarkets + prices + stepSizes + assetMeta
       // getAllPrices() ne doit PAS refaire le fetch HL — on le fait en parallèle ici directement
-      const [hlResult, nadoSymbols, extResult, nadoPrices] = await Promise.all([
+      const [hlResult, nadoSymbols, extResult, nadoResult] = await Promise.all([
         HL.getMarkets(),
         Nado.getSymbols().catch(() => ({})),
         Extended.getPrices().catch(() => ({ priceMap: {}, precisionMap: {} })),
-        Nado.getPrices().catch(() => ({})),
+        //Nado.getPrices().catch(() => ({})),
+        Nado.getPrices().catch(() => ({ prices: {}, bidPrices: {}, askPrices: {} })),
       ])
 
       // Construire la liste unifiée des marchés
@@ -44,7 +45,10 @@ export function useLivePrices(intervalMs = 3000) {
         hlMeta:        hlResult.assetMeta     || {},
         extPrices:     extResult.priceMap     || {},
         extPrecisions: extResult.precisionMap || {},
-        nadoPrices,
+        //nadoPrices,
+        nadoPrices:    nadoResult.prices      || {},      
+        nadoBidPrices: nadoResult.bidPrices   || {},      
+        nadoAskPrices: nadoResult.askPrices   || {},
       })
       setLastUpdate(new Date())
     } catch (e) { console.warn('[useLivePrices]', e.message) }
