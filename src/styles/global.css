@@ -1389,3 +1389,37 @@ a, button, [role="button"], input, select {
 }
 
 .ot-missing-leg__cancel:hover { color: var(--color-text-muted); }
+
+.leg-price-selector { display: flex; flex-direction: column; gap: var(--space-2); }
+.leg-price-header   { display: flex; align-items: center; justify-content: space-between; }
+.leg-price-btns     { display: flex; gap: var(--space-1); }
+
+.leg-price-btn {
+  font-size: var(--text-xs); padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm); border: 1px solid var(--color-border);
+  color: var(--color-text-muted); background: var(--color-surface);
+  cursor: pointer; transition: all var(--transition-interactive);
+}
+.leg-price-btn:hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
+.leg-price-btn--active {
+  background: var(--color-primary); color: white;
+  border-color: var(--color-primary);
+}
+.leg-price-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.leg-price-input {
+  width: 100%; padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md); font-size: var(--text-sm);
+  border: 1px solid var(--color-border); background: var(--color-surface);
+  color: var(--color-primary); font-weight: 500;
+  transition: border-color var(--transition-interactive);
+}
+.leg-price-input--manual { border-color: var(--color-gold); color: var(--color-gold); }
+.leg-price-input--auto   { cursor: default; }
+.leg-price-input:focus   { outline: none; border-color: var(--color-primary); }
+
+.leg-price-reset {
+  font-size: var(--text-xs); color: var(--color-text-muted);
+  align-self: flex-end; padding: var(--space-1) var(--space-2);
+}
+.leg-price-reset:hover { color: var(--color-warning); }
