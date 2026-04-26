@@ -105,7 +105,9 @@ export async function getPrices() {
     if (!m.name) return
     const price = parseFloat(m.marketStats?.lastPrice || 0)
     if (price) priceMap[m.name] = price
-    precisionMap[m.name] = { szDecimals: m.quantityPrecision ?? m.qtyPrecision ?? 2, pxDecimals: m.pricePrecision ?? 2 }
+    //precisionMap[m.name] = { szDecimals: m.quantityPrecision ?? m.qtyPrecision ?? 2, pxDecimals: m.pricePrecision ?? 2 }
+    precisionMap[m.name] = { szDecimals: m.assetPrecision ?? m.quantityPrecision ?? 5,
+                            pxDecimals: m.pricePrecision ?? pxDecimalsFromMinPrice(m.tradingConfig?.minPriceChange) ?? 2 }
   })
   return { priceMap, precisionMap }
 }
@@ -266,6 +268,15 @@ export async function placeOrder(order, credentials) {
   const aggressivePrice = isMarket ? (isBuy ? limitPrice * 1.0075 : limitPrice * 0.9925) : limitPrice
 
   const sizeStr  = order.size.toFixed(szDecimals)
+
+  if (parseFloat(sizeStr) <= 0) {
+    throw new Error(
+      `Taille invalide pour Extended après arrondi à ${szDecimals} décimales : ` +
+      `${order.size} → "${sizeStr}". ` +
+      `Augmente le montant (min. ~${(1 / Math.pow(10, szDecimals - 1)).toFixed(szDecimals)} sur ce marché).`
+    )
+  }
+  
   const priceStr = aggressivePrice.toFixed(pxDecimals)
 
   const syntheticAmountAbs  = parseQuantum(sizeStr, syntheticResolution)
