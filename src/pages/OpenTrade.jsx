@@ -1,5 +1,5 @@
 // src/pages/OpenTrade.jsx
-import { useState, useEffect, useMemo, useCallback } from 'react'  // ✅ useCallback ajouté
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
 import { useLivePrices, PLATFORMS } from '../hooks/useLivePrices'
@@ -9,15 +9,20 @@ import { usePlaceOrder }            from '../hooks/usePlaceOrder'
 import { useMargins }               from '../hooks/useMargins'
 import { fmt, fmtUSD, fmtPct }     from '../utils/format'
 import { loadFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
+import {
+  estimateFillPrice, calcDeltaNeutral,
+  deltaScoreColor, deltaScoreLabel,
+} from '../utils/deltaNeutral'
 
-const PRICE_OFFSET = 0.0005  // ✅ Constante module-level, accessible partout
+const PRICE_OFFSET = 0.0005
 
 // ── LegCard ───────────────────────────────────────────────────────────────────
 function LegCard({
   side, platform, price, limitPrice, leverage, sizeUSD, sizeAsset, marginAvailable,
   fundingRate, isSuggested, feesMaker, feesTaker, useStepSize, stepSize,
   onPlaceOrder, isPlacingOrder, canTrade, orderType, onOrderTypeChange,
-  bid, ask, priceMode, onPriceModeChange, customPrice, onCustomPriceChange,  // ✅ props ajoutées
+  bid, ask, priceMode, onPriceModeChange, customPrice, onCustomPriceChange,
+  isAdjustedLeg,
 }) {
   const { t } = useTranslation()
   const isLong     = side === 'LONG'
@@ -36,17 +41,20 @@ function LegCard({
         <div className="leg-card__header-left">
           <span className={`leg-badge ${isLong ? 'leg-badge--long' : 'leg-badge--short'}`}>{side}</span>
           <span className="leg-card__platform">{platform?.label}</span>
+          {isAdjustedLeg && (
+            <span className="leg-card__adjusted" title="Notionnel réduit pour delta neutral">⚡ Δ ajusté</span>
+          )}
         </div>
         {isSuggested && <span className="leg-card__optimal">⭐ {t('openTrade.optimal')}</span>}
       </div>
 
-      {/* ✅ Market price seul sur sa ligne */}
+      {/* Prix marché seul */}
       <div className="leg-stat">
         <p className="leg-stat__label">{t('openTrade.marketPrice')}</p>
         <p className="leg-stat__value">{price ? fmtUSD(price) : '—'}</p>
       </div>
 
-      {/* ✅ Sélecteur de prix — bloc full-width séparé */}
+      {/* Sélecteur de prix — bloc full-width */}
       <div className="leg-price-selector">
         <div className="leg-price-header">
           <p className="leg-stat__label">{t('openTrade.limitMaker')}</p>
@@ -94,7 +102,12 @@ function LegCard({
       <div className="leg-grid-2">
         <div className="leg-stat">
           <p className="leg-stat__label">{t('openTrade.notionalUSD')}</p>
-          <p className="leg-stat__value">{fmtUSD(sizeUSD)}</p>
+          <p className="leg-stat__value">
+            {fmtUSD(sizeUSD)}
+            {isAdjustedLeg && sizeUSD != null && (
+              <span className="leg-stat__sublabel" style={{ color: 'var(--color-gold)' }}> Δ ajusté</span>
+            )}
+          </p>
         </div>
         <div className="leg-stat">
           <p className="leg-stat__label">
@@ -211,23 +224,24 @@ export default function OpenTrade() {
     canTradeHL, canTradeExt, canTradeNado,
   } = useWallet()
 
-  const [platform1,       setPlatform1]       = useState('hyperliquid')
-  const [platform2,       setPlatform2]       = useState('extended')
-  const [marketId,        setMarketId]        = useState('')
-  const [sizeUSD,         setSizeUSD]         = useState('')
-  const [useStepSize,     setUseStepSize]     = useState(false)
-  const [fees,            setFees]            = useState(loadFees)
-  const [orderType1,      setOrderType1]      = useState('maker')
-  const [orderType2,      setOrderType2]      = useState('maker')
-  const [placingLeg1,     setPlacingLeg1]     = useState(false)
-  const [placingLeg2,     setPlacingLeg2]     = useState(false)
-  const [tradeStatus,     setTradeStatus]     = useState(null)
-  const [loadedPosition1, setLoadedPosition1] = useState(null)
-  const [loadedPosition2, setLoadedPosition2] = useState(null)
-  const [priceMode1,      setPriceMode1]      = useState('market')
-  const [priceMode2,      setPriceMode2]      = useState('market')
-  const [customPrice1,    setCustomPrice1]    = useState('')
-  const [customPrice2,    setCustomPrice2]    = useState('')
+  const [platform1,        setPlatform1]        = useState('hyperliquid')
+  const [platform2,        setPlatform2]        = useState('extended')
+  const [marketId,         setMarketId]         = useState('')
+  const [sizeUSD,          setSizeUSD]          = useState('')
+  const [useStepSize,      setUseStepSize]      = useState(false)
+  const [fees,             setFees]             = useState(loadFees)
+  const [orderType1,       setOrderType1]       = useState('maker')
+  const [orderType2,       setOrderType2]       = useState('maker')
+  const [placingLeg1,      setPlacingLeg1]      = useState(false)
+  const [placingLeg2,      setPlacingLeg2]      = useState(false)
+  const [tradeStatus,      setTradeStatus]      = useState(null)
+  const [loadedPosition1,  setLoadedPosition1]  = useState(null)
+  const [loadedPosition2,  setLoadedPosition2]  = useState(null)
+  const [priceMode1,       setPriceMode1]       = useState('market')
+  const [priceMode2,       setPriceMode2]       = useState('market')
+  const [customPrice1,     setCustomPrice1]     = useState('')
+  const [customPrice2,     setCustomPrice2]     = useState('')
+  const [leverageOverride, setLeverageOverride] = useState('')  // '' = auto
 
   const credentials = useMemo(() => ({
     hlAddress, hlVaultAddress, hlAgentPk,
@@ -243,12 +257,13 @@ export default function OpenTrade() {
   const { margins } = useMargins(credentials)
   const { placeOrder } = usePlaceOrder(markets)
 
-  // Reset price mode quand le marché change
+  // Reset controls when market changes
   useEffect(() => {
     setPriceMode1('market')
     setPriceMode2('market')
     setCustomPrice1('')
     setCustomPrice2('')
+    setLeverageOverride('')
   }, [marketId])
 
   useEffect(() => {
@@ -274,7 +289,6 @@ export default function OpenTrade() {
   const side1 = suggestion?.p1 ?? 'LONG'
   const side2 = suggestion?.p2 ?? 'SHORT'
 
-  // ✅ PRICE_OFFSET défini au niveau module — pas de dépendance manquante dans useCallback
   const getDefaultLimitPrice = useCallback((platformId, side, price, bid, ask) => {
     if (platformId === 'extended')
       return side === 'LONG' ? (bid ?? price * (1 - PRICE_OFFSET)) : (ask ?? price * (1 + PRICE_OFFSET))
@@ -296,22 +310,63 @@ export default function OpenTrade() {
   const calc = useMemo(() => {
     const val = parseFloat(sizeUSD)
     if (!val || val <= 0 || !price1 || !price2) return null
+
     const lp1 = getLimitPrice(platform1, side1, price1, priceMode1, customPrice1, p1Bid, p1Ask)
     const lp2 = getLimitPrice(platform2, side2, price2, priceMode2, customPrice2, p2Bid, p2Ask)
+
+    // ── Estimated fill prices (most precise) ──────────────────────────────
+    // Taker → fill at best ask (LONG) or best bid (SHORT)
+    // Maker → fill at computed limit price
+    const fill1 = estimateFillPrice({ orderType: orderType1, side: side1, mid: price1, bid: p1Bid, ask: p1Ask, limitPrice: lp1 })
+    const fill2 = estimateFillPrice({ orderType: orderType2, side: side2, mid: price2, bid: p2Bid, ask: p2Ask, limitPrice: lp2 })
+
+    // ── Delta neutral sizing ───────────────────────────────────────────────
+    const dn = calcDeltaNeutral({ sizeUSD: val, fillPrice1: fill1, fillPrice2: fill2 })
+
+    const notional1 = dn?.notional1 ?? val
+    const notional2 = dn?.notional2 ?? val
+    const qty       = dn?.qty ?? null   // same for both legs
+
+    // ── Leverage ──────────────────────────────────────────────────────────
+    const margin1    = getMarginForPlatform(platform1)
+    const margin2    = getMarginForPlatform(platform2)
+    const autoLev1   = minLeverageFor(notional1, margin1) ?? 1
+    const autoLev2   = minLeverageFor(notional2, margin2) ?? 1
+    const autoLeverage = Math.max(autoLev1, autoLev2)    // align both to highest required
+    const leverage = leverageOverride
+      ? Math.max(parseFloat(leverageOverride), 1)
+      : autoLeverage
+
     return {
-      asset1:    val / price1,
-      asset2:    val / price2,
-      spreadPct: ((price1 - price2) / price2) * 100,
+      // ── Sizes ──────────────────────────────────────────────────────────
+      asset1:    qty ?? val / price1,
+      asset2:    qty ?? val / price2,
+      notional1,
+      notional2,
+      // ── Prices ─────────────────────────────────────────────────────────
       limitP1:   lp1,
       limitP2:   lp2,
-      leverage1: minLeverageFor(val, getMarginForPlatform(platform1)),
-      leverage2: minLeverageFor(val, getMarginForPlatform(platform2)),
+      fillP1:    fill1,
+      fillP2:    fill2,
+      // ── Spread & delta ─────────────────────────────────────────────────
+      spreadPct: ((price1 - price2) / price2) * 100,
+      deltaScore: dn?.deltaScore ?? null,
+      deltaUSD:   dn?.deltaUSD   ?? null,
+      cheaperLeg: dn?.cheaperLeg ?? null,
+      // ── Leverage ───────────────────────────────────────────────────────
+      leverage,
+      autoLeverage,
+      leverageWarning: leverageOverride && parseFloat(leverageOverride) < autoLeverage,
     }
-  }, [sizeUSD, price1, price2, side1, side2, platform1, platform2, margins,
-      priceMode1, priceMode2, customPrice1, customPrice2, p1Bid, p1Ask, p2Bid, p2Ask,
-      getLimitPrice])
+  }, [
+    sizeUSD, price1, price2, side1, side2, platform1, platform2, margins,
+    priceMode1, priceMode2, customPrice1, customPrice2,
+    p1Bid, p1Ask, p2Bid, p2Ask,
+    orderType1, orderType2,
+    leverageOverride, getLimitPrice,
+  ])
 
-  const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType) => {
+  const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, leverage) => {
     if (!market) throw new Error('Marché non résolu')
     const stepSize = getStepSize(marketId)
     const meta     = getAssetMeta(market.hlKey)
@@ -327,7 +382,14 @@ export default function OpenTrade() {
         : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01)))
       finalSize = parseFloat(raw.toFixed(szDecimals))
     }
-    return { platformId, marketId, isBuy: side === 'LONG', size: finalSize, limitPrice, orderType, reduceOnly: false, market, ...credentials }
+    return {
+      platformId, marketId,
+      isBuy: side === 'LONG',
+      size: finalSize,
+      limitPrice, orderType, reduceOnly: false,
+      leverage: leverage ?? null,
+      market, ...credentials,
+    }
   }
 
   const handlePlaceLeg = async (legNum) => {
@@ -339,7 +401,7 @@ export default function OpenTrade() {
     const orderType  = legNum === 1 ? orderType1 : orderType2
     setter(true); setTradeStatus(null)
     try {
-      await placeOrder(buildOrderParams(platformId, side, sizeAsset, limitPx, orderType))
+      await placeOrder(buildOrderParams(platformId, side, sizeAsset, limitPx, orderType, calc?.leverage))
       setTradeStatus({ type: 'success', msg: `✅ Ordre ${side} envoyé sur ${PLATFORMS.find(p => p.id === platformId)?.label}` })
     } catch (e) {
       setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
@@ -350,8 +412,8 @@ export default function OpenTrade() {
     setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
     try {
       await Promise.all([
-        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1)),
-        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2)),
+        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, calc?.leverage)),
+        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, calc?.leverage)),
       ])
       setTradeStatus({ type: 'success', msg: '✅ Les 2 legs envoyés simultanément !' })
     } catch (e) {
@@ -436,6 +498,41 @@ export default function OpenTrade() {
             className="ot-select"
           />
         </div>
+
+        {/* ── Levier ────────────────────────────────────────────────────── */}
+        <div className="ot-select-group">
+          <label className="ot-label ot-label--row">
+            Levier
+            {calc?.autoLeverage != null && (
+              <span className="ot-auto-badge">
+                {leverageOverride ? `auto: ${calc.autoLeverage}×` : `auto: ${calc.autoLeverage}×`}
+              </span>
+            )}
+          </label>
+          <div className="ot-leverage-row">
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={leverageOverride}
+              onChange={e => setLeverageOverride(e.target.value)}
+              placeholder={calc?.autoLeverage ? `${calc.autoLeverage} (auto)` : 'Auto'}
+              className={`ot-select ${calc?.leverageWarning ? 'ot-select--warning' : ''}`}
+            />
+            {leverageOverride && (
+              <button
+                className="ot-reset-btn"
+                onClick={() => setLeverageOverride('')}
+                title="Revenir au levier automatique"
+              >↺</button>
+            )}
+          </div>
+          {calc?.leverageWarning && (
+            <p className="ot-leverage-warning">
+              ⚠ Min requis : {calc.autoLeverage}×
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Funding banner */}
@@ -469,7 +566,7 @@ export default function OpenTrade() {
         </div>
       )}
 
-      {/* Spread */}
+      {/* Spread inter-exchange */}
       {calc?.spreadPct != null && (
         <div className={`ot-spread ${Math.abs(calc.spreadPct) > 0.1 ? 'ot-spread--warning' : ''}`}>
           <span className="ot-spread__label">Écart {plat1?.label} / {plat2?.label}</span>
@@ -479,11 +576,41 @@ export default function OpenTrade() {
         </div>
       )}
 
+      {/* ── Score Δ Neutralité ────────────────────────────────────────────── */}
+      {calc?.deltaScore != null && (
+        <div className="ot-delta-score">
+          <div className="ot-delta-score__left">
+            <span className="ot-delta-score__title">Δ Neutralité</span>
+            <span
+              className="ot-delta-score__value"
+              style={{ color: deltaScoreColor(calc.deltaScore) }}
+            >
+              {deltaScoreLabel(calc.deltaScore)}
+            </span>
+          </div>
+          <div className="ot-delta-score__right">
+            <span className="ot-delta-score__residual">
+              Δ résiduel : {fmtUSD(calc.deltaUSD ?? 0)}
+            </span>
+            {calc.cheaperLeg != null && (
+              <span className="ot-delta-score__adjusted">
+                Leg {calc.cheaperLeg} ajusté →{' '}
+                {fmtUSD(calc.cheaperLeg === 1 ? calc.notional1 : calc.notional2)}
+              </span>
+            )}
+            <span className="ot-delta-score__leverage">
+              Levier : {calc.leverage}×
+              {!leverageOverride && <span className="ot-auto-badge">auto</span>}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Leg cards */}
       <div className="ot-legs">
         <LegCard
           side={side1} platform={plat1} price={price1} limitPrice={calc?.limitP1}
-          leverage={calc?.leverage1} sizeUSD={parseFloat(sizeUSD) || null} sizeAsset={calc?.asset1}
+          leverage={calc?.leverage} sizeUSD={calc?.notional1 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset1}
           marginAvailable={getMarginForPlatform(platform1)} fundingRate={fundingP1}
           isSuggested={!!suggestion} feesMaker={fees[platform1]?.maker ?? 0} feesTaker={fees[platform1]?.taker ?? 0}
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
@@ -492,10 +619,11 @@ export default function OpenTrade() {
           bid={p1Bid} ask={p1Ask}
           priceMode={priceMode1} onPriceModeChange={setPriceMode1}
           customPrice={customPrice1} onCustomPriceChange={setCustomPrice1}
+          isAdjustedLeg={calc?.cheaperLeg === 1}
         />
         <LegCard
           side={side2} platform={plat2} price={price2} limitPrice={calc?.limitP2}
-          leverage={calc?.leverage2} sizeUSD={parseFloat(sizeUSD) || null} sizeAsset={calc?.asset2}
+          leverage={calc?.leverage} sizeUSD={calc?.notional2 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset2}
           marginAvailable={getMarginForPlatform(platform2)} fundingRate={fundingP2}
           isSuggested={!!suggestion} feesMaker={fees[platform2]?.maker ?? 0} feesTaker={fees[platform2]?.taker ?? 0}
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
@@ -504,6 +632,7 @@ export default function OpenTrade() {
           bid={p2Bid} ask={p2Ask}
           priceMode={priceMode2} onPriceModeChange={setPriceMode2}
           customPrice={customPrice2} onCustomPriceChange={setCustomPrice2}
+          isAdjustedLeg={calc?.cheaperLeg === 2}
         />
       </div>
 
