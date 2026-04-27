@@ -5,8 +5,8 @@
 // HL       : POST /exchange { type: 'updateLeverage', asset, isCross, leverage }
 
 import { useState, useCallback } from 'react'
-import { setLeverage as extSetLeverage }      from '../platforms/extended'
-import { updateLeverageByName as hlSetLeverage } from '../platforms/hyperliquid'
+import { setLeverage as extSetLeverage }         from '../../platforms/extended'
+import { updateLeverageByName as hlSetLeverage } from '../../platforms/hyperliquid'
 
 /**
  * @param {object}   props
