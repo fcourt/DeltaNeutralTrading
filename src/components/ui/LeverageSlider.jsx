@@ -1,6 +1,5 @@
-// components/LeverageSlider.jsx
+// src/components/ui/LeverageSlider.jsx
 // Slider de levier par leg card
-// Envoie la requête de mise à jour du levier vers la plateforme correspondante
 // Extended : PATCH /api/v1/user/leverage
 // HL       : POST /exchange { type: 'updateLeverage', asset, isCross, leverage }
 
