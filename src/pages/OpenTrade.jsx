@@ -411,6 +411,7 @@ export default function OpenTrade() {
       size: finalSize,
       limitPrice, orderType, reduceOnly: false,
       leverage: leverage ?? null,
+      tpSlConfig: tpSlConfig ?? null,
       market, ...credentials,
     }
   }
@@ -420,11 +421,12 @@ export default function OpenTrade() {
     const platformId = legNum === 1 ? platform1 : platform2
     const side       = legNum === 1 ? side1 : side2
     const sizeAsset  = legNum === 1 ? calc?.asset1 : calc?.asset2
+    const legLev = legNum === 1 ? effLev1 : effLev2
     const limitPx    = legNum === 1 ? calc?.limitP1 : calc?.limitP2
     const orderType  = legNum === 1 ? orderType1 : orderType2
     setter(true); setTradeStatus(null)
     try {
-      await placeOrder(buildOrderParams(platformId, side, sizeAsset, limitPx, orderType, calc?.leverage))
+      await placeOrder(buildOrderParams(platformId, side, sizeAsset, limitPx, orderType, legLev))
       setTradeStatus({ type: 'success', msg: `✅ Ordre ${side} envoyé sur ${PLATFORMS.find(p => p.id === platformId)?.label}` })
     } catch (e) {
       setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
@@ -435,8 +437,8 @@ export default function OpenTrade() {
     setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
     try {
       await Promise.all([
-        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, calc?.leverage)),
-        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, calc?.leverage)),
+        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, effLev1)),
+        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, effLev2)),
       ])
       setTradeStatus({ type: 'success', msg: '✅ Les 2 legs envoyés simultanément !' })
     } catch (e) {
@@ -633,7 +635,7 @@ export default function OpenTrade() {
       <div className="ot-legs">
         <LegCard
           side={side1} platform={plat1} price={price1} limitPrice={calc?.limitP1}
-          leverage={calc?.leverage} sizeUSD={calc?.notional1 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset1}
+          //leverage={calc?.leverage} sizeUSD={calc?.notional1 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset1}
           marginAvailable={getMarginForPlatform(platform1)} fundingRate={fundingP1}
           isSuggested={!!suggestion} feesMaker={fees[platform1]?.maker ?? 0} feesTaker={fees[platform1]?.taker ?? 0}
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
