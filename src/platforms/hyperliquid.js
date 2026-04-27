@@ -1,8 +1,8 @@
 // src/platforms/hyperliquid.js
 
-import { privateKeyToAccount, signTypedData } from 'viem/accounts'
+import { privateKeyToAccount } from 'viem/accounts'
 import { encodeAbiParameters, keccak256, toBytes } from 'viem'
-import { buildHlTpSlAction }   from '../utils/tpsl.js' // ← nouveau
+import { buildHlTpSlAction }   from '../utils/tpsl.js'
 
 const HL_INFO     = 'https://api.hyperliquid.xyz/info'
 const HL_EXCHANGE = 'https://api.hyperliquid.xyz/exchange'
@@ -59,7 +59,6 @@ function floatToWire(x, szDecimals) {
   const rounded = Number(x.toFixed(szDecimals))
   if (Math.abs(rounded) >= 1e15) throw new Error(`[HL] prix/taille trop grand : ${x}`)
   let s = rounded.toFixed(szDecimals)
-  // Supprime les zéros trailing sauf si nécessaire
   if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '')
   if (s === '-0') s = '0'
   return s
@@ -69,7 +68,7 @@ function orderToAction(coin, isBuy, limitPx, sz, reduceOnly, tif, cloid) {
   return {
     type: 'order',
     orders: [{
-      a:  coin,           // asset index
+      a:  coin,
       b:  isBuy,
       p:  String(limitPx),
       s:  String(sz),
@@ -81,7 +80,7 @@ function orderToAction(coin, isBuy, limitPx, sz, reduceOnly, tif, cloid) {
   }
 }
 
-async function signAction(action, nonce, agentPk, vaultAddress) {
+async function signAction(action, nonce, agentPk) {
   const account = privateKeyToAccount(agentPk)
   const phantomAgent = {
     source:    'a',
@@ -202,8 +201,31 @@ export async function updateLeverage({ hlAgentPk, hlAddress, asset, leverage, is
   return data
 }
 
+// ── getBidAsk : bid/ask estimé depuis le mid ──────────────────────────────────
+// metaAndAssetCtxs ne fournit pas le carnet d'ordres → bid = ask = midPx
+export async function getBidAsk(hlKey) {
+  if (!hlKey) return { bid: null, ask: null }
+  try {
+    const meta = await fetchMetaAndCtx()
+    const idx  = meta[0].universe.findIndex(u => u.name === hlKey)
+    if (idx === -1) return { bid: null, ask: null }
+    const ctx = meta[1][idx]
+    const mid = parseFloat(ctx?.midPx ?? 0)
+    return { bid: mid || null, ask: mid || null }
+  } catch { return { bid: null, ask: null } }
+}
+
+// ── updateLeverageByName : wrapper coin → assetIndex ─────────────────────────
+export async function updateLeverageByName({ hlAgentPk, hlAddress, coin, leverage, isCross = true }) {
+  const meta  = await fetchMetaAndCtx()
+  const asset = getAssetIndex(meta, coin)
+  return updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross })
+}
+
+// ── Place order ───────────────────────────────────────────────────────────────
+
 export async function placeOrder(order, credentials) {
-  const { isBuy, limitPrice, orderType, reduceOnly, market, leverage } = order
+  const { isBuy, limitPrice, orderType, reduceOnly, market, leverage, tpSlConfig } = order
   const { hlAgentPk, hlAddress } = credentials
   if (!hlAgentPk || !hlAddress) throw new Error('Clé agent ou adresse HL manquante')
 
@@ -211,18 +233,13 @@ export async function placeOrder(order, credentials) {
   const assetIndex = getAssetIndex(meta, market.hlKey)
   const { szDecimals } = meta[0].universe[assetIndex]
 
-  // ── Levier ────────────────────────────────────────────────────────
   if (leverage != null && leverage > 0) {
-    await updateLeverage({ hlAgentPk, hlAddress, asset: assetIndex, leverage })
+    await updateLeverage({ hlAgentPk, hlAddress, asset: assetIndex, leverage, isCross: false })
   }
 
-  // ── Type d'ordre ──────────────────────────────────────────────────
-  // FIX : FrontendMarket pour les ordres taker (market)
-  //   → HL gère le slippage côté serveur, pas besoin de limitPx agressif
-  //   → évite "could not immediately match" quand le prix ref est stale
   const isMaker  = orderType !== 'taker'
   const tif      = isMaker ? 'Gtc' : 'FrontendMarket'
-  const pricePx  = limitPrice   // FrontendMarket ignore le prix comme seuil de matching
+  const pricePx  = limitPrice
 
   const szWire = floatToWire(order.size, szDecimals)
   const pxWire = floatToWire(pricePx, 6)
@@ -245,5 +262,36 @@ export async function placeOrder(order, credentials) {
   if (data?.status !== 'ok' || (status && typeof status === 'object' && status.error)) {
     throw new Error(`[HL] ${status?.error ?? JSON.stringify(data)}`)
   }
+
+  // ── TP/SL : requête séparée après l'ordre principal ───────────────────────
+  if (tpSlConfig) {
+    try {
+      const tpSlAction = buildHlTpSlAction({
+        side:       isBuy ? 'long' : 'short',
+        prices:     tpSlConfig.prices,
+        assetIndex,
+        size:       szWire,
+      })
+      const tpSlNonce = Date.now()
+      const tpSlSig   = await signAction(tpSlAction, tpSlNonce, hlAgentPk)
+
+      console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
+
+      const tpSlRes  = await fetch(HL_EXCHANGE, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig, vaultAddress: hlAddress }),
+      })
+      const tpSlData = await tpSlRes.json()
+      console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
+
+      if (tpSlData?.status !== 'ok') {
+        console.warn('[HL] TP/SL placement échoué (ordre principal OK):', JSON.stringify(tpSlData))
+      }
+    } catch (e) {
+      console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
+    }
+  }
+
   return data
 }
