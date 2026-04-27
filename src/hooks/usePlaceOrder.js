@@ -1,16 +1,17 @@
 // src/hooks/usePlaceOrder.js
 import { placeOrder as servicePlaceOrder, canTrade } from '../services/orderService.js'
-import { setLeverage as extSetLeverage }         from '../platforms/extended.js'
-import { updateLeverageByName as hlSetLeverage } from '../platforms/hyperliquid.js'
 
 /**
  * Hook de placement d'ordre.
  * Les credentials sont passés explicitement depuis DeltaNeutralPage.
  *
- * Nouveautés :
- *   - params.leverage    → met à jour le levier sur la plateforme AVANT l'ordre
- *   - params.tpSlConfig  → { tpPct, slPct, prices: { upPrice, downPrice } } | null
- *                          transmis à servicePlaceOrder pour injection TP/SL
+ * params attendus par placeOrder() :
+ *   - platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly
+ *   - hlAddress, hlVaultAddress, hlAgentPk
+ *   - extApiKey, extStarkPk, extL2Vault
+ *   - nadoAddress, nadoAgentPk, nadoSubaccount
+ *   - leverage    {number|null}  → transmis à l'adaptateur (setLeverage avant l'ordre)
+ *   - tpSlConfig  {object|null}  → { tpPct, slPct, prices: { upPrice, downPrice } }
  */
 export function usePlaceOrder(markets = []) {
 
@@ -23,8 +24,8 @@ export function usePlaceOrder(markets = []) {
       hlAddress, hlVaultAddress, hlAgentPk,
       extApiKey, extStarkPk, extL2Vault,
       nadoAddress, nadoAgentPk, nadoSubaccount,
-      leverage,    // ← nouveau : number | null
-      tpSlConfig,  // ← nouveau : { tpPct, slPct, prices } | null
+      leverage,    // transmis à l'adaptateur via orderService
+      tpSlConfig,  // transmis à l'adaptateur via orderService
     } = params
 
     const credentials = {
@@ -33,33 +34,9 @@ export function usePlaceOrder(markets = []) {
       nadoAddress, nadoAgentPk, nadoSubaccount,
     }
 
-    // ── 1. Mise à jour du levier avant l'ordre ──────────────────────────────
-    if (leverage != null && leverage > 0) {
-      try {
-        if (platformId === 'extended' && extApiKey) {
-          await extSetLeverage(market.extKey, leverage, extApiKey)
-        } else if (platformId === 'hyperliquid' && hlAgentPk && hlAddress) {
-          await hlSetLeverage({
-            hlAgentPk,
-            hlAddress,
-            coin:     market.hlKey,
-            leverage,
-            isCross:  false,
-          })
-        }
-        console.log(`[usePlaceOrder] Levier ×${leverage} appliqué sur ${platformId}`)
-      } catch (e) {
-        // On log mais on ne bloque pas le placement de l'ordre
-        console.warn(`[usePlaceOrder] setLeverage échoué sur ${platformId} :`, e.message)
-      }
-    }
-
-    // ── 2. Placement de l'ordre + transmission du tpSlConfig ────────────────
-    // tpSlConfig est transmis à servicePlaceOrder qui gère :
-    //   - Extended  : injection inline dans le body de l'ordre
-    //   - HL        : requête séparée après l'ordre principal
     return servicePlaceOrder(
-      { platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig },
+      { platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly,
+        market, leverage, tpSlConfig },
       credentials
     )
   }
