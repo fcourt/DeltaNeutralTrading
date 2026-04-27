@@ -114,9 +114,35 @@ async function signAction(action, nonce, agentPk) {
 
 export async function getMarkets() {
   const meta = await fetchMetaAndCtx()
-  return new Set(meta[0].universe.map(u => u.name))
+  const discoveredMarkets = new Map()
+  const prices     = {}
+  const stepSizes  = {}
+  const assetMeta  = {}
+
+  meta[0].universe.forEach((u, i) => {
+    const ctx   = meta[1][i]
+    const price = parseFloat(ctx?.midPx ?? ctx?.markPx ?? 0)
+    const step  = Math.pow(10, -(u.szDecimals ?? 2))
+
+    discoveredMarkets.set(u.name, {
+      id:       u.name,
+      hlKey:    u.name,
+      label:    u.name,
+      category: 'Crypto',
+    })
+
+    if (price) prices[u.name] = price
+    stepSizes[u.name] = step
+    assetMeta[u.name] = {
+      szDecimals:   u.szDecimals   ?? 2,
+      maxLeverage:  u.maxLeverage  ?? 50,
+    }
+  })
+
+  return { discoveredMarkets, prices, stepSizes, assetMeta }
 }
 
+/*
 export async function getPrices() {
   const meta = await fetchMetaAndCtx()
   const priceMap = {}
@@ -127,6 +153,7 @@ export async function getPrices() {
   })
   return priceMap   // ← retourne le map plat directement, sans wrapper
 }
+*/
 
 export async function getPrecision() {
   const meta = await fetchMetaAndCtx()
