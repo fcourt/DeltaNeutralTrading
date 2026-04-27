@@ -21,7 +21,7 @@ const PRICE_OFFSET = 0.0005
 
 // ── LegCard ───────────────────────────────────────────────────────────────────
 function LegCard({
-  side, platform, price, limitPrice, leverage, sizeUSD, sizeAsset, marginAvailable,
+  side, platform, price, limitPrice, sizeUSD, sizeAsset, marginAvailable,
   fundingRate, isSuggested, feesMaker, feesTaker, useStepSize, stepSize,
   onPlaceOrder, isPlacingOrder, canTrade, orderType, onOrderTypeChange,
   bid, ask, priceMode, onPriceModeChange, customPrice, onCustomPriceChange,
@@ -347,8 +347,10 @@ export default function OpenTrade() {
     const qty       = dn?.qty ?? null   // same for both legs
 
     // ── Leverage ──────────────────────────────────────────────────────────
-    const margin1    = getMarginForPlatform(platform1)
-    const margin2    = getMarginForPlatform(platform2)
+    //const margin1    = getMarginForPlatform(platform1)
+    //const margin2    = getMarginForPlatform(platform2)
+    const margin1 = margins[platform1] ?? null
+    const margin2 = margins[platform2] ?? null
     const autoLev1   = minLeverageFor(notional1, margin1) ?? 1
     const autoLev2   = minLeverageFor(notional2, margin2) ?? 1
     const autoLeverage = Math.max(autoLev1, autoLev2)    // align both to highest required
@@ -521,6 +523,7 @@ export default function OpenTrade() {
             placeholder="ex: 1000"
             className="ot-select"
           />
+        </div>
         </div>
 
       {/* Funding banner */}
