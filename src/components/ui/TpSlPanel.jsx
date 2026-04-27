@@ -1,21 +1,35 @@
-// components/TpSlPanel.jsx
+// src/components/ui/TpSlPanel.jsx
 // Panel TP/SL delta-neutral avec case à cocher
-// TP/SL sont SYMÉTRIQUES : les deux legs se ferment aux mêmes prix pivot
+// TP/SL SYMÉTRIQUES : les deux legs se ferment aux mêmes prix pivot
 //   upPrice   = entry × (1 + tpPct%)  → TP Long / SL Short
 //   downPrice = entry × (1 - slPct%)  → SL Long / TP Short
-// Exécution : MARKET · Référence : MARK (anti-wick)
+// Exécution : MARKET · Référence trigger : MARK (anti-wick)
+//
+// tpPct et slPct sont librement réglables via slider + input number
+// Valeurs par défaut : props.defaultTpPct (10%) / props.defaultSlPct (10%)
 
 import { useState, useMemo, useEffect } from 'react'
-import { calcDeltaNeutralPrices } from '../utils/tpsl'
+import { calcDeltaNeutralPrices } from '../../utils/tpsl'
 
 /**
- * @param {number}   props.entryPrice   - prix d'entrée estimé du trade
- * @param {Function} props.onTpSlChange - ({ tpPct, slPct, prices } | null) => void
+ * @param {number}   props.entryPrice          - prix d'entrée estimé du trade
+ * @param {Function} props.onTpSlChange        - ({ tpPct, slPct, prices } | null) => void
+ * @param {number}   [props.defaultTpPct=10]   - % TP par défaut (modifiable par l'utilisateur)
+ * @param {number}   [props.defaultSlPct=10]   - % SL par défaut (modifiable par l'utilisateur)
+ * @param {number}   [props.maxTpPct=200]      - % TP maximum autorisé
+ * @param {number}   [props.maxSlPct=50]       - % SL maximum autorisé
  */
-export default function TpSlPanel({ entryPrice, onTpSlChange }) {
+export default function TpSlPanel({
+  entryPrice,
+  onTpSlChange,
+  defaultTpPct = 10,
+  defaultSlPct = 10,
+  maxTpPct     = 200,
+  maxSlPct     = 50,
+}) {
   const [enabled, setEnabled] = useState(false)
-  const [tpPct,   setTpPct]   = useState(10)
-  const [slPct,   setSlPct]   = useState(10)
+  const [tpPct,   setTpPct]   = useState(defaultTpPct)
+  const [slPct,   setSlPct]   = useState(defaultSlPct)
 
   const prices = useMemo(() => {
     if (!enabled || !entryPrice) return null
@@ -29,7 +43,6 @@ export default function TpSlPanel({ entryPrice, onTpSlChange }) {
   return (
     <div className="tpsl-panel">
 
-      {/* Toggle */}
       <label className="tpsl-panel__toggle">
         <input
           type="checkbox"
@@ -43,33 +56,36 @@ export default function TpSlPanel({ entryPrice, onTpSlChange }) {
       {enabled && (
         <div className="tpsl-panel__body">
 
-          {/* Take Profit row */}
           <TpSlRow
             label="Take Profit"
             sign="+"
             pct={tpPct}
             onChange={setTpPct}
-            min={0.5} max={200} step={0.5}
+            min={0.5}
+            max={maxTpPct}
+            step={0.5}
             colorClass="tp"
             priceA={prices?.upPrice}
             priceB={prices?.downPrice}
-            labelA="Long TP" labelB="Short TP"
+            labelA="Long TP"
+            labelB="Short TP"
           />
 
-          {/* Stop Loss row */}
           <TpSlRow
             label="Stop Loss"
             sign="−"
             pct={slPct}
             onChange={setSlPct}
-            min={0.5} max={50} step={0.5}
+            min={0.5}
+            max={maxSlPct}
+            step={0.5}
             colorClass="sl"
             priceA={prices?.downPrice}
             priceB={prices?.upPrice}
-            labelA="Long SL" labelB="Short SL"
+            labelA="Long SL"
+            labelB="Short SL"
           />
 
-          {/* Info */}
           <div className="tpsl-panel__info">
             <span>⚡ Market · Mark price · Les deux legs se ferment ensemble</span>
           </div>
@@ -81,6 +97,8 @@ export default function TpSlPanel({ entryPrice, onTpSlChange }) {
 }
 
 function TpSlRow({ label, sign, pct, onChange, min, max, step, colorClass, priceA, priceB, labelA, labelB }) {
+  const clamp = v => Math.max(min, Math.min(max, Number(v)))
+
   return (
     <div className={`tpsl-row tpsl-row--${colorClass}`}>
       <div className="tpsl-row__header">
@@ -88,23 +106,33 @@ function TpSlRow({ label, sign, pct, onChange, min, max, step, colorClass, price
         <input
           type="number"
           className="tpsl-row__pct-input"
-          min={min} max={max} step={step}
+          min={min}
+          max={max}
+          step={step}
           value={pct}
-          onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value))))}
+          onChange={e => onChange(clamp(e.target.value))}
         />
         <span className="tpsl-row__pct-unit">{sign}%</span>
       </div>
+
       <input
         type="range"
         className="tpsl-row__range"
-        min={min} max={max} step={step}
+        min={min}
+        max={max}
+        step={step}
         value={pct}
         onChange={e => onChange(Number(e.target.value))}
       />
+
       {priceA != null && (
         <div className="tpsl-row__prices">
-          <span>{labelA}: <strong>${priceA.toLocaleString('en-US', { maximumFractionDigits: 1 })}</strong></span>
-          <span>{labelB}: <strong>${priceB.toLocaleString('en-US', { maximumFractionDigits: 1 })}</strong></span>
+          <span>
+            {labelA}: <strong>${priceA.toLocaleString('en-US', { maximumFractionDigits: 1 })}</strong>
+          </span>
+          <span>
+            {labelB}: <strong>${priceB.toLocaleString('en-US', { maximumFractionDigits: 1 })}</strong>
+          </span>
         </div>
       )}
     </div>
