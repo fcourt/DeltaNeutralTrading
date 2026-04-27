@@ -119,14 +119,22 @@ export async function getMarkets() {
 
 export async function getPrices() {
   const meta = await fetchMetaAndCtx()
-  const priceMap = {}, precisionMap = {}
+  const priceMap = {}
   meta[0].universe.forEach((u, i) => {
     const ctx   = meta[1][i]
     const price = parseFloat(ctx?.midPx ?? ctx?.markPx ?? 0)
     if (price) priceMap[u.name] = price
+  })
+  return priceMap   // ← retourne le map plat directement, sans wrapper
+}
+
+export async function getPrecision() {
+  const meta = await fetchMetaAndCtx()
+  const precisionMap = {}
+  meta[0].universe.forEach((u, i) => {
     precisionMap[u.name] = { szDecimals: u.szDecimals, pxDecimals: 6 }
   })
-  return { priceMap, precisionMap }
+  return precisionMap
 }
 
 export async function getFunding(hlKey) {
