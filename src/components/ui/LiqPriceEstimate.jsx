@@ -1,4 +1,4 @@
-// components/LiqPriceEstimate.jsx
+// src/components/ui/LiqPriceEstimate.jsx
 // Affiche le prix de liquidation estimé (côté client uniquement, avant l'ordre)
 // Formule isolated margin : Long  → entry × (1 - 1/lev + MMR)
 //                           Short → entry × (1 + 1/lev - MMR)
@@ -16,11 +16,14 @@ export default function LiqPriceEstimate({ entryPrice, leverage, side, mmr }) {
   if (!liqPrice || liqPrice <= 0) return null
 
   const marginPct = liqMarginPct({ entryPrice, liqPrice, side })
-  const risk = Number(marginPct)
+  const risk      = Number(marginPct)
   const riskClass = risk < 10 ? 'danger' : risk < 25 ? 'warning' : 'safe'
 
   return (
-    <div className={`liq-estimate liq-estimate--${riskClass}`} title="Estimation avant ordre — indicatif uniquement">
+    <div
+      className={`liq-estimate liq-estimate--${riskClass}`}
+      title="Estimation avant ordre — indicatif uniquement"
+    >
       <span className="liq-estimate__icon">
         {riskClass === 'danger' ? '🔴' : riskClass === 'warning' ? '🟡' : '🟢'}
       </span>
