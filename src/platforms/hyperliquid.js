@@ -2,6 +2,7 @@
 
 import { privateKeyToAccount, signTypedData } from 'viem/accounts'
 import { encodeAbiParameters, keccak256, toBytes } from 'viem'
+import { buildHlTpSlAction }   from '../utils/tpsl.js' // ← nouveau
 
 const HL_INFO     = 'https://api.hyperliquid.xyz/info'
 const HL_EXCHANGE = 'https://api.hyperliquid.xyz/exchange'
