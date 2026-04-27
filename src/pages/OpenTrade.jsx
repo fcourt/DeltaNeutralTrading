@@ -148,7 +148,6 @@ function LegCard({
             {marginAvailable != null ? fmtUSD(marginAvailable) : '—'}
           </p>
         </div>
-      </div>
 
       <div className="leg-stat leg-stat--block">
         <p className="leg-stat__label">{t('openTrade.funding1h')}</p>
@@ -523,42 +522,6 @@ export default function OpenTrade() {
             className="ot-select"
           />
         </div>
-
-        {/* ── Levier ────────────────────────────────────────────────────── */}
-        <div className="ot-select-group">
-          <label className="ot-label ot-label--row">
-            Levier
-            {calc?.autoLeverage != null && (
-              <span className="ot-auto-badge">
-                {leverageOverride ? `auto: ${calc.autoLeverage}×` : `auto: ${calc.autoLeverage}×`}
-              </span>
-            )}
-          </label>
-          <div className="ot-leverage-row">
-            <input
-              type="number"
-              min="1"
-              step="1"
-              value={leverageOverride}
-              onChange={e => setLeverageOverride(e.target.value)}
-              placeholder={calc?.autoLeverage ? `${calc.autoLeverage} (auto)` : 'Auto'}
-              className={`ot-select ${calc?.leverageWarning ? 'ot-select--warning' : ''}`}
-            />
-            {leverageOverride && (
-              <button
-                className="ot-reset-btn"
-                onClick={() => setLeverageOverride('')}
-                title="Revenir au levier automatique"
-              >↺</button>
-            )}
-          </div>
-          {calc?.leverageWarning && (
-            <p className="ot-leverage-warning">
-              ⚠ Min requis : {calc.autoLeverage}×
-            </p>
-          )}
-        </div>
-      </div>
 
       {/* Funding banner */}
       {(suggestion || fundingP1 != null || fundingP2 != null) && (
