@@ -9,6 +9,9 @@ import { usePlaceOrder }            from '../hooks/usePlaceOrder'
 import { useMargins }               from '../hooks/useMargins'
 import { fmt, fmtUSD, fmtPct }     from '../utils/format'
 import { loadFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
+import LeverageSlider   from '../components/ui/LeverageSlider'
+import LiqPriceEstimate from '../components/ui/LiqPriceEstimate'
+import TpSlPanel        from '../components/ui/TpSlPanel'
 import {
   estimateFillPrice, calcDeltaNeutral,
   deltaScoreColor, deltaScoreLabel,
@@ -22,7 +25,7 @@ function LegCard({
   fundingRate, isSuggested, feesMaker, feesTaker, useStepSize, stepSize,
   onPlaceOrder, isPlacingOrder, canTrade, orderType, onOrderTypeChange,
   bid, ask, priceMode, onPriceModeChange, customPrice, onCustomPriceChange,
-  isAdjustedLeg,
+  isAdjustedLeg, leverageValue, onLeverageChange, autoLeverage, market, credentials,
 }) {
   const { t } = useTranslation()
   const isLong     = side === 'LONG'
@@ -117,13 +120,24 @@ function LegCard({
         </div>
       </div>
 
-      <div className="leg-grid-2">
-        <div className="leg-stat">
-          <p className="leg-stat__label">{t('openTrade.minLeverage')}</p>
-          <p className="leg-stat__value leg-stat__value--blue leg-stat__value--lg">
-            {leverage != null ? `${leverage}x` : '—'}
-          </p>
-        </div>
+      <div className="leg-stat">
+      <LeverageSlider
+        value={leverageValue}
+        onChange={onLeverageChange}
+        min={1}
+        max={50}
+        side={isLong ? 'long' : 'short'}
+        platform={platform?.id}
+        market={market}
+        credentials={credentials}
+      />
+      <LiqPriceEstimate
+        entryPrice={limitPrice ?? price}
+        leverage={leverageValue}
+        side={isLong ? 'long' : 'short'}
+      />
+      </div>
+      
         <div className="leg-stat">
           <p className="leg-stat__label">{t('openTrade.availableMargin')}</p>
           <p className={`leg-stat__value ${
@@ -241,7 +255,10 @@ export default function OpenTrade() {
   const [priceMode2,       setPriceMode2]       = useState('market')
   const [customPrice1,     setCustomPrice1]     = useState('')
   const [customPrice2,     setCustomPrice2]     = useState('')
-  const [leverageOverride, setLeverageOverride] = useState('')  // '' = auto
+  //const [leverageOverride, setLeverageOverride] = useState('')  // '' = auto
+  const [leverage1,  setLeverage1]  = useState(null) // null = auto
+  const [leverage2,  setLeverage2]  = useState(null) // null = auto
+  const [tpSlConfig, setTpSlConfig] = useState(null)
 
   const credentials = useMemo(() => ({
     hlAddress, hlVaultAddress, hlAgentPk,
@@ -263,7 +280,10 @@ export default function OpenTrade() {
     setPriceMode2('market')
     setCustomPrice1('')
     setCustomPrice2('')
-    setLeverageOverride('')
+    //setLeverageOverride('')
+    setLeverage1(null)
+    setLeverage2(null)
+    setTpSlConfig(null)
   }, [marketId])
 
   useEffect(() => {
@@ -333,9 +353,9 @@ export default function OpenTrade() {
     const autoLev1   = minLeverageFor(notional1, margin1) ?? 1
     const autoLev2   = minLeverageFor(notional2, margin2) ?? 1
     const autoLeverage = Math.max(autoLev1, autoLev2)    // align both to highest required
-    const leverage = leverageOverride
-      ? Math.max(parseFloat(leverageOverride), 1)
-      : autoLeverage
+    //const leverage = leverageOverride
+    //  ? Math.max(parseFloat(leverageOverride), 1)
+    //  : autoLeverage
 
     return {
       // ── Sizes ──────────────────────────────────────────────────────────
@@ -354,17 +374,20 @@ export default function OpenTrade() {
       deltaUSD:   dn?.deltaUSD   ?? null,
       cheaperLeg: dn?.cheaperLeg ?? null,
       // ── Leverage ───────────────────────────────────────────────────────
-      leverage,
+      //leverage,
+      //autoLeverage,
+      //leverageWarning: leverageOverride && parseFloat(leverageOverride) < autoLeverage,
       autoLeverage,
-      leverageWarning: leverageOverride && parseFloat(leverageOverride) < autoLeverage,
     }
   }, [
     sizeUSD, price1, price2, side1, side2, platform1, platform2, margins,
     priceMode1, priceMode2, customPrice1, customPrice2,
     p1Bid, p1Ask, p2Bid, p2Ask,
-    orderType1, orderType2,
-    leverageOverride, getLimitPrice,
+    orderType1, orderType2, getLimitPrice,
   ])
+
+  const effLev1 = leverage1 ?? calc?.autoLeverage ?? 1
+  const effLev2 = leverage2 ?? calc?.autoLeverage ?? 1
 
   const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, leverage) => {
     if (!market) throw new Error('Marché non résolu')
@@ -620,6 +643,11 @@ export default function OpenTrade() {
           priceMode={priceMode1} onPriceModeChange={setPriceMode1}
           customPrice={customPrice1} onCustomPriceChange={setCustomPrice1}
           isAdjustedLeg={calc?.cheaperLeg === 1}
+          leverageValue={effLev1}                  // effLev2 pour le 2e
+          onLeverageChange={v => setLeverage1(v)}  // setLeverage2 pour le 2e
+          autoLeverage={calc?.autoLeverage}
+          market={market}
+          credentials={credentials}
         />
         <LegCard
           side={side2} platform={plat2} price={price2} limitPrice={calc?.limitP2}
@@ -633,8 +661,20 @@ export default function OpenTrade() {
           priceMode={priceMode2} onPriceModeChange={setPriceMode2}
           customPrice={customPrice2} onCustomPriceChange={setCustomPrice2}
           isAdjustedLeg={calc?.cheaperLeg === 2}
+          leverageValue={effLev2}                  // effLev2 pour le 2e
+          onLeverageChange={v => setLeverage2(v)}  // setLeverage2 pour le 2e
+          autoLeverage={calc?.autoLeverage}
+          market={market}
+          credentials={credentials}
         />
       </div>
+
+      {calc && (
+        <TpSlPanel
+          entryPrice={calc.limitP1 ?? price1}
+          onTpSlChange={setTpSlConfig}
+        />
+      )}
 
       {/* Feedback */}
       {tradeStatus && (
