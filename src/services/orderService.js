@@ -13,7 +13,8 @@ export async function placeOrder(params, credentials) {
     orderType:  params.orderType  ?? 'maker',
     reduceOnly: params.reduceOnly ?? false,
     market:     params.market,
-    tpSlConfig: params.tpSlConfig ?? null, // ← nouveau : { tpPct, slPct, prices } | null
+    leverage:   params.leverage   ?? null, // ← transmis à l'adaptateur (setLeverage avant l'ordre)
+    tpSlConfig: params.tpSlConfig ?? null, // ← transmis à l'adaptateur (TP/SL après/inline l'ordre)
   }
 
   return platform.adapter.placeOrder(order, credentials)
