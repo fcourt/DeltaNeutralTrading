@@ -624,8 +624,8 @@ export default function OpenTrade() {
               </span>
             )}
             <span className="ot-delta-score__leverage">
-              Levier : {calc.leverage}×
-              {!leverageOverride && <span className="ot-auto-badge">auto</span>}
+              Levier min requis : {calc.autoLeverage}×
+              <span className="ot-auto-badge">auto</span>
             </span>
           </div>
         </div>
@@ -635,7 +635,8 @@ export default function OpenTrade() {
       <div className="ot-legs">
         <LegCard
           side={side1} platform={plat1} price={price1} limitPrice={calc?.limitP1}
-          //leverage={calc?.leverage} sizeUSD={calc?.notional1 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset1}
+          //leverage={calc?.leverage} 
+          sizeUSD={calc?.notional1 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset1}
           marginAvailable={getMarginForPlatform(platform1)} fundingRate={fundingP1}
           isSuggested={!!suggestion} feesMaker={fees[platform1]?.maker ?? 0} feesTaker={fees[platform1]?.taker ?? 0}
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
@@ -653,7 +654,8 @@ export default function OpenTrade() {
         />
         <LegCard
           side={side2} platform={plat2} price={price2} limitPrice={calc?.limitP2}
-          leverage={calc?.leverage} sizeUSD={calc?.notional2 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset2}
+          //leverage={calc?.leverage} 
+          sizeUSD={calc?.notional2 ?? (parseFloat(sizeUSD) || null)} sizeAsset={calc?.asset2}
           marginAvailable={getMarginForPlatform(platform2)} fundingRate={fundingP2}
           isSuggested={!!suggestion} feesMaker={fees[platform2]?.maker ?? 0} feesTaker={fees[platform2]?.taker ?? 0}
           useStepSize={useStepSize} stepSize={getStepSize(marketId)}
