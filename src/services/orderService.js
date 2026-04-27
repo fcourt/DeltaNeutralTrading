@@ -4,6 +4,7 @@ import { getPlatform } from '../platforms/index.js'
 export async function placeOrder(params, credentials) {
   const platform = getPlatform(params.platformId)
   if (!platform) throw new Error(`Plateforme inconnue : ${params.platformId}`)
+
   const order = {
     marketId:   params.marketId,
     isBuy:      params.isBuy,
@@ -12,7 +13,9 @@ export async function placeOrder(params, credentials) {
     orderType:  params.orderType  ?? 'maker',
     reduceOnly: params.reduceOnly ?? false,
     market:     params.market,
+    tpSlConfig: params.tpSlConfig ?? null, // ← nouveau : { tpPct, slPct, prices } | null
   }
+
   return platform.adapter.placeOrder(order, credentials)
 }
 
