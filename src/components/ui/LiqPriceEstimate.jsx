@@ -3,7 +3,7 @@
 // Formule isolated margin : Long  → entry × (1 - 1/lev + MMR)
 //                           Short → entry × (1 + 1/lev - MMR)
 
-import { estimateLiqPrice, liqMarginPct } from '../utils/liquidationPrice'
+import { estimateLiqPrice, liqMarginPct } from '../../utils/liquidationPrice'
 
 /**
  * @param {number}          props.entryPrice  - prix d'entrée estimé
