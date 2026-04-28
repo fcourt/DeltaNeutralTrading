@@ -227,16 +227,23 @@ export async function getFunding(hlKey) {
 }
 
 export async function getMargin(credentials) {
-  const { hlAddress } = credentials
-  if (!hlAddress?.trim()) return null
+  const { hlAddress, hlVaultAddress } = credentials
+
+  // Priorité au vaultAddress (sous-compte)
+  const target = hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim())
+    ? hlVaultAddress.trim().toLowerCase()
+    : hlAddress?.trim()?.toLowerCase()
+
+  if (!target || !/^0x[0-9a-fA-F]{40}$/i.test(target)) return null
+
   try {
-    const res  = await fetch(HL_INFO, {
+    const res = await fetch(HL_INFO, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ type: 'clearinghouseState', user: hlAddress.trim() }),
+      body:    JSON.stringify({ type: 'clearinghouseState', user: target }),
     })
     const data = await res.json()
-    return parseFloat(data?.crossMarginSummary?.accountValue ?? 0)
+    return parseFloat(data?.withdrawable ?? 0)
   } catch { return null }
 }
 
