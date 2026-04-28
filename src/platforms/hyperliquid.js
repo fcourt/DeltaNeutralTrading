@@ -3,6 +3,10 @@
 import { privateKeyToAccount } from 'viem/accounts'
 import { encodeAbiParameters, keccak256, toBytes } from 'viem'
 import { buildHlTpSlAction }   from '../utils/tpsl.js'
+import {
+  HL_KEY_OVERRIDES, MARKET_LABELS, EXT_KEY_OVERRIDES,
+  NADO_KEY_OVERRIDES, inferCategory,
+} from '../config/markets.js'
 
 const HL_INFO     = 'https://api.hyperliquid.xyz/info'
 const HL_EXCHANGE = 'https://api.hyperliquid.xyz/exchange'
@@ -112,6 +116,7 @@ async function signAction(action, nonce, agentPk) {
 
 // ── Exports publics ───────────────────────────────────────────────────────────
 
+/*
 export async function getMarkets() {
   const meta = await fetchMetaAndCtx()
   const discoveredMarkets = new Map()
@@ -136,6 +141,44 @@ export async function getMarkets() {
     assetMeta[u.name] = {
       szDecimals:   u.szDecimals   ?? 2,
       maxLeverage:  u.maxLeverage  ?? 50,
+    }
+  })
+
+  return { discoveredMarkets, prices, stepSizes, assetMeta }
+}
+*/
+
+export async function getMarkets() {
+  const meta = await fetchMetaAndCtx()
+  const discoveredMarkets = new Map()
+  const prices     = {}
+  const stepSizes  = {}
+  const assetMeta  = {}
+
+  meta[0].universe.forEach((u, i) => {
+    const ctx   = meta[1][i]
+    const price = parseFloat(ctx?.midPx ?? ctx?.markPx ?? 0)
+    const step  = u.szDecimals != null ? Math.pow(10, -u.szDecimals) : 0.01
+
+    // id canonical (ex: 'xyz:CL' → 'OIL', 'BTC' → 'BTC')
+    const id       = HL_KEY_OVERRIDES[u.name]?.id ?? u.name
+    const isCrypto = !u.name.startsWith('xyz:') && !u.name.startsWith('hyna:')
+    const category = isCrypto ? 'Crypto' : inferCategory(id)
+
+    discoveredMarkets.set(id, {
+      id,
+      hlKey:    u.name,
+      extKey:   EXT_KEY_OVERRIDES[id] ?? (isCrypto ? id : null),
+      nadoKey:  NADO_KEY_OVERRIDES[id] ?? id,
+      label:    MARKET_LABELS[id] ?? id,
+      category,
+    })
+
+    if (price) prices[u.name] = price
+    stepSizes[u.name] = step
+    assetMeta[u.name] = {
+      szDecimals:  u.szDecimals  ?? 2,
+      maxLeverage: u.maxLeverage ?? 50,
     }
   })
 
