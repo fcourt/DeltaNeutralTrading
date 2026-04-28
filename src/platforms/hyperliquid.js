@@ -1,7 +1,9 @@
 // src/platforms/hyperliquid.js
 
 import { privateKeyToAccount } from 'viem/accounts'
-import { encodeAbiParameters, keccak256, toBytes } from 'viem'
+// Ajouter l'import en tête
+import { signL1Action } from '@nktkas/hyperliquid/signing'
+//import { encodeAbiParameters, keccak256, toBytes } from 'viem'
 import { buildHlTpSlAction }   from '../utils/tpsl.js'
 import {
   HL_KEY_OVERRIDES, MARKET_LABELS, EXT_KEY_OVERRIDES,
@@ -84,6 +86,7 @@ function orderToAction(coin, isBuy, limitPx, sz, reduceOnly, tif, cloid) {
   }
 }
 
+/*
 async function signAction(action, nonce, agentPk) {
   const account = privateKeyToAccount(agentPk)
   const phantomAgent = {
@@ -113,6 +116,7 @@ async function signAction(action, nonce, agentPk) {
   })
   return signature
 }
+*/
 
 // ── Exports publics ───────────────────────────────────────────────────────────
 
@@ -267,7 +271,9 @@ export async function updateLeverage({ hlAgentPk, hlAddress, asset, leverage, is
   if (!leverage || leverage <= 0) return
   const nonce  = Date.now()
   const action = { type: 'updateLeverage', asset, isCross, leverage: Math.round(leverage) }
-  const sig    = await signAction(action, nonce, hlAgentPk)
+  const wallet = privateKeyToAccount(hlAgentPk)
+  const sig = await signL1Action({ wallet, action, nonce })
+  //const sig    = await signAction(action, nonce, hlAgentPk)
   const res    = await fetch(HL_EXCHANGE, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -307,6 +313,8 @@ export async function placeOrder(order, credentials) {
   const { hlAgentPk, hlAddress } = credentials
   if (!hlAgentPk || !hlAddress) throw new Error('Clé agent ou adresse HL manquante')
 
+  const wallet = privateKeyToAccount(hlAgentPk)
+  
   const meta       = await fetchMetaAndCtx()
   const assetIndex = getAssetIndex(meta, market.hlKey)
   const { szDecimals } = meta[0].universe[assetIndex]
@@ -324,8 +332,9 @@ export async function placeOrder(order, credentials) {
 
   const action = orderToAction(assetIndex, isBuy, pxWire, szWire, reduceOnly, tif)
   const nonce  = Date.now()
-  const sig    = await signAction(action, nonce, hlAgentPk)
-
+  //const sig    = await signAction(action, nonce, hlAgentPk)
+  const sig = await signL1Action({ wallet, action, nonce })
+  
   console.log('[HL] placeOrder payload:', JSON.stringify({ action, nonce }))
 
   const res  = await fetch(HL_EXCHANGE, {
@@ -351,7 +360,8 @@ export async function placeOrder(order, credentials) {
         size:       szWire,
       })
       const tpSlNonce = Date.now()
-      const tpSlSig   = await signAction(tpSlAction, tpSlNonce, hlAgentPk)
+      //const tpSlSig   = await signAction(tpSlAction, tpSlNonce, hlAgentPk)
+      const tpSlSig = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
 
       console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
 
