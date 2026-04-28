@@ -321,14 +321,17 @@ export async function placeOrder(order, credentials) {
   if (!hlAgentPk || !hlAddress) throw new Error('Clé agent ou adresse HL manquante')
 
   const wallet = privateKeyToAccount(hlAgentPk)
+  const isXyz = market.hlKey?.startsWith('xyz:')
   
   const meta       = await fetchMetaAndCtx()
   const assetIndex = getAssetIndex(meta, market.hlKey)
   const { szDecimals } = meta[0].universe[assetIndex]
 
+  /*
   if (leverage != null && leverage > 0) {
     await updateLeverage({ hlAgentPk, hlAddress, asset: assetIndex, leverage, isCross: false })
   }
+  */
 
   const isMaker  = orderType !== 'taker'
   const tif      = isMaker ? 'Gtc' : 'FrontendMarket'
@@ -347,7 +350,8 @@ export async function placeOrder(order, credentials) {
   const res  = await fetch(HL_EXCHANGE, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ action, nonce, signature: sig, vaultAddress: hlAddress }),
+    body:    JSON.stringify({ action, nonce, signature: sig, vaultAddress: hlVaultAddress ?? hlAddress }),
+    ...(isXyz ? { dex: 'xyz' } : {}),
   })
   const data = await res.json()
   console.log('[HL] response:', JSON.stringify(data))
@@ -375,7 +379,8 @@ export async function placeOrder(order, credentials) {
       const tpSlRes  = await fetch(HL_EXCHANGE, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig, vaultAddress: hlAddress }),
+        body:    JSON.stringify({ action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig, vaultAddress: hlVaultAddress ?? hlAddress, 
+                                 ...(isXyz ? { dex: 'xyz' } : {}), }),
       })
       const tpSlData = await tpSlRes.json()
       console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
