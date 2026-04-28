@@ -6,13 +6,14 @@ import { buildExtendedTpSl }     from '../utils/tpsl.js' // ← nouveau
 
 const EXT_PROXY           = '/api/extended'
 const CACHE_TTL_MS        = 60 * 60 * 1000
+const _PRICE_TTL = 5_000 // 5s cache pour les prix
 const SERVER_CLOCK_OFFSET_S = 14 * 24 * 3600
 const ORDER_SELECTOR      = '0x36da8d51815527cabfaa9c982f564c80fa7429616739306036f1f9b608dd112'
 const DOMAIN_SELECTOR     = '0x1ff2f602e42168014d405a94f75e8a93d640751d71d16311266e140d8b0a210'
 const STARK_PRIME         = BigInt('0x800000000000011000000000000000000000000000000000000000000000001')
 
 const _cache = new Map()
-const _ttls  = { extended_keys: 300_000, ext_l2configs: CACHE_TTL_MS }
+const _ttls  = { extended_keys: 300_000, ext_l2configs: CACHE_TTL_MS, ext_prices: 5_000 }
 const _DEF   = 300_000
 function getCached(k)    { const e = _cache.get(k); return e && Date.now() - e.ts < (_ttls[k] ?? _DEF) ? e.d : null }
 function setCached(k, d) { _cache.set(k, { d, ts: Date.now() }) }
@@ -90,6 +91,7 @@ export async function getMarkets() {
   return keys
 }
 
+/*
 export async function getPrices() {
   const res  = await fetch(`${EXT_PROXY}?endpoint=${encodeURIComponent('/info/markets')}`)
   const data = await res.json()
@@ -104,6 +106,40 @@ export async function getPrices() {
     }
   })
   return { priceMap, precisionMap }
+}
+*/
+
+export async function getPrices() {
+  const cached = getCached('ext_prices')
+  if (cached) return cached
+
+  try {
+    // ← même format non-encodé que loadL2Configs
+    const res = await fetch(`${EXT_PROXY}?endpoint=/info/markets`)
+    if (!res.ok) throw new Error(`Extended /info/markets → ${res.status}`)
+
+    const data = await res.json()
+    if (data?.status === 'ERROR') throw new Error(data?.error?.message || 'Extended API error')
+
+    const priceMap = {}, precisionMap = {}
+    ;(data.data || []).forEach(m => {
+      if (!m.name) return
+      const price = parseFloat(m.marketStats?.lastPrice || 0)
+      if (price) priceMap[m.name] = price
+      precisionMap[m.name] = {
+        szDecimals: m.assetPrecision ?? m.quantityPrecision ?? 5,
+        pxDecimals: m.pricePrecision ?? pxDecimalsFromMinPrice(m.tradingConfig?.minPriceChange) ?? 2,
+      }
+    })
+
+    const result = { priceMap, precisionMap }
+    setCached('ext_prices', result)  // ← ajoute 'ext_prices': 5_000 dans _ttls
+    return result
+
+  } catch (e) {
+    console.warn('[Extended] getPrices error:', e.message)
+    return { priceMap: {}, precisionMap: {} }
+  }
 }
 
 export async function getFunding(extKey, apiKey) {
