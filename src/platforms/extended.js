@@ -252,10 +252,12 @@ export async function placeOrder(order, credentials) {
   const l2Config   = L2_CONFIGS[market.extKey]
   if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.extKey}`)
 
+  /*
   // ── Levier : applique sur la plateforme avant de signer ───────────────────
   if (leverage != null && leverage > 0) {
     await setLeverage(market.extKey, leverage, extApiKey)
   }
+  */
 
   const { syntheticId, syntheticResolution, collateralResolution, szDecimals, pxDecimals } = l2Config
 
