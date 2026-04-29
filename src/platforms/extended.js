@@ -239,6 +239,111 @@ export async function setLeverage(marketKey, leverage, apiKey) {
   return data?.data
 }
 
+//------------------------------------------------------------------------------
+// TP/SL
+//------------------------------------------------------------------------------
+// Signe un ordre de fermeture TP ou SL (reduce-only)
+async function signTpSlSettlement({
+  extStarkPk,
+  vaultId,
+  side,           // 'long' | 'short' — la position à FERMER
+  size,           // taille en unités asset (ex: 0.01 BTC)
+  triggerPrice,   // prix du TP ou SL
+  marketL2Config, // { syntheticId, syntheticResolution, collateralId, collateralResolution }
+  feeRate = 0.0005,
+  expiryEpochMs,  // timestamp ms
+  salt,           // nonce unique
+}) {
+  const { syntheticId, syntheticResolution, collateralId, collateralResolution } = marketL2Config
+
+  // Fermer un LONG = SELL synthetic → baseAmount négatif, quoteAmount positif
+  // Fermer un SHORT = BUY synthetic → baseAmount positif, quoteAmount négatif
+  const sign       = side === 'long' ? -1n : 1n
+  const baseAmount = BigInt(Math.round(size * syntheticResolution)) * sign
+  const quoteRaw   = BigInt(Math.round(size * triggerPrice * collateralResolution))
+  const quoteAmount = quoteRaw * -sign
+  const feeAmount  = BigInt(Math.ceil(Number(quoteRaw) * feeRate))
+
+  const expirationHours = Math.ceil(expiryEpochMs / 1000 / 3600)
+
+  const orderHash = computeOrderHash(
+    vaultId,
+    syntheticId,
+    baseAmount,
+    collateralId,
+    quoteAmount,
+    collateralId,
+    feeAmount,
+    expirationHours,
+    salt,
+  )
+
+  const msgHash  = computeMessageHash(orderHash)  // même helper que l'ordre principal
+  const sig      = ec.starkCurve.sign(msgHash, extStarkPk)
+  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
+
+  return {
+    starkKey,
+    collateralPosition: String(vaultId),
+    signature: {
+      r: '0x' + sig.r.toString(16).padStart(64, '0'),
+      s: '0x' + sig.s.toString(16).padStart(64, '0'),
+    },
+  }
+}
+
+
+async function buildExtendedTpSl({
+  side,
+  prices,
+  size,
+  extStarkPk,
+  vaultId,
+  marketL2Config,
+  feeRate    = 0.0005,
+  expiryEpochMs,
+  saltBase,      // nonce de base — +1 pour TP, +2 pour SL
+  pxDecimals = 2,
+}) {
+  const isLong    = side === 'long'
+  const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
+  const slTrigger = isLong ? prices.downPrice : prices.upPrice
+
+  const [tpSettlement, slSettlement] = await Promise.all([
+    signTpSlSettlement({
+      extStarkPk, vaultId, side, size,
+      triggerPrice:  tpTrigger,
+      marketL2Config, feeRate, expiryEpochMs,
+      salt: saltBase + 1,
+    }),
+    signTpSlSettlement({
+      extStarkPk, vaultId, side, size,
+      triggerPrice:  slTrigger,
+      marketL2Config, feeRate, expiryEpochMs,
+      salt: saltBase + 2,
+    }),
+  ])
+
+  return {
+    tpSlType: 'ORDER',
+    takeProfit: {
+      triggerPrice:     String(tpTrigger.toFixed(pxDecimals)),
+      triggerPriceType: 'LAST',
+      price:            String(tpTrigger.toFixed(pxDecimals)),
+      priceType:        'MARKET',
+      settlement:       tpSettlement,
+    },
+    stopLoss: {
+      triggerPrice:     String(slTrigger.toFixed(pxDecimals)),
+      triggerPriceType: 'LAST',
+      price:            String(slTrigger.toFixed(pxDecimals)),
+      priceType:        'MARKET',
+      settlement:       slSettlement,
+    },
+  }
+}
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Place order
 // ─────────────────────────────────────────────────────────────────────────────
@@ -389,54 +494,4 @@ if (tpSlConfig?.prices) {
     throw new Error(data?.error?.message || data?.message || rawText || `Extended HTTP ${res.status}`)
 
   return data
-}
-
-// Signe un ordre de fermeture TP ou SL (reduce-only)
-async function signTpSlSettlement({
-  extStarkPk,
-  vaultId,
-  side,           // 'long' | 'short' — la position à FERMER
-  size,           // taille en unités asset (ex: 0.01 BTC)
-  triggerPrice,   // prix du TP ou SL
-  marketL2Config, // { syntheticId, syntheticResolution, collateralId, collateralResolution }
-  feeRate = 0.0005,
-  expiryEpochMs,  // timestamp ms
-  salt,           // nonce unique
-}) {
-  const { syntheticId, syntheticResolution, collateralId, collateralResolution } = marketL2Config
-
-  // Fermer un LONG = SELL synthetic → baseAmount négatif, quoteAmount positif
-  // Fermer un SHORT = BUY synthetic → baseAmount positif, quoteAmount négatif
-  const sign       = side === 'long' ? -1n : 1n
-  const baseAmount = BigInt(Math.round(size * syntheticResolution)) * sign
-  const quoteRaw   = BigInt(Math.round(size * triggerPrice * collateralResolution))
-  const quoteAmount = quoteRaw * -sign
-  const feeAmount  = BigInt(Math.ceil(Number(quoteRaw) * feeRate))
-
-  const expirationHours = Math.ceil(expiryEpochMs / 1000 / 3600)
-
-  const orderHash = computeOrderHash(
-    vaultId,
-    syntheticId,
-    baseAmount,
-    collateralId,
-    quoteAmount,
-    collateralId,
-    feeAmount,
-    expirationHours,
-    salt,
-  )
-
-  const msgHash  = computeMessageHash(orderHash)  // même helper que l'ordre principal
-  const sig      = ec.starkCurve.sign(msgHash, extStarkPk)
-  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
-
-  return {
-    starkKey,
-    collateralPosition: String(vaultId),
-    signature: {
-      r: '0x' + sig.r.toString(16).padStart(64, '0'),
-      s: '0x' + sig.s.toString(16).padStart(64, '0'),
-    },
-  }
 }
