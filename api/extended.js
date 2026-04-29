@@ -18,8 +18,8 @@ export default async function handler(req, res) {
     if (apiKey) headers['X-Api-Key'] = apiKey;
 
     const fetchOptions = { method: req.method, headers };
-    if (req.method === 'POST' || req.method === 'PUT') {
-      fetchOptions.body = JSON.stringify(req.body);
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+      fetchOptions.body = JSON.stringify(req.body)
     }
 
     // ── URL intelligente : évite le double /api/v1 ──
