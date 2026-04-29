@@ -316,13 +316,19 @@ export async function placeOrder(order, credentials) {
     baseAmount, quoteAmount, feeAmount, expirationSecs, nonce, orderHash, msgHash,
   })
 
-  if (tpSlConfig?.prices) {
-  const tpSlBlock = buildExtendedTpSl({
-    side:               isBuy ? 'long' : 'short',
-    prices:             tpSlConfig.prices,
-    starkKey,
-    collateralPosition: vaultIdBig.toString(),
+  // Après calcul de nonce, vaultIdBig, pxDecimals, size
+
+if (tpSlConfig?.prices) {
+  const tpSlBlock = await buildExtendedTpSl({
+    side:           isBuy ? 'long' : 'short',
+    prices:         tpSlConfig.prices,
+    size:           parseFloat(sizeStr),
     extStarkPk,
+    vaultId:        vaultIdBig,
+    marketL2Config: market.l2Config,   // { syntheticId, syntheticResolution, collateralId, collateralResolution }
+    feeRate:        0.0005,
+    expiryEpochMs:  expiryEpochMillis,
+    saltBase:       nonce,             // TP = nonce+1, SL = nonce+2 → nonces uniques
     pxDecimals,
   })
   Object.assign(payload, tpSlBlock)
