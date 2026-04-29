@@ -16,10 +16,14 @@ export const XYZ_OFFSET = 110_000
 
 const _cache = new Map()
 const _ttls = { hl_all: 300_000, hl_xyz: 300_000 }
+const HL_EXCHANGE = 'https://api.hyperliquid.xyz/exchange'
 const _DEF = 300_000
 function getCached(k) { const e = _cache.get(k); return e && Date.now() - e.ts < (_ttls[k] ?? _DEF) ? e.d : null }
 function setCached(k, d) { _cache.set(k, { d, ts: Date.now() }) }
 
+const META_TTL_MS    = 5 * 60 * 1000
+let _metaCache        = null
+let _metaFetchPromise = null
 
 //helpers //////////////////////////////////////////////////////////////////////////////////////////
 // Ajouter cette fonction en haut du fichier (à côté de roundToHLPrice)
@@ -245,29 +249,54 @@ export async function getAvailableKeys(platformId = 'hyperliquid') {
 }
 
 //update Leverage////////////////////////////////////////////////////////////////////////////////////
-export async function updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross = true }) {
-if (!leverage || leverage <= 0) return
-const nonce = Date.now()
-const action = { type: 'updateLeverage', asset, isCross, leverage: Math.round(leverage) }
-const wallet = privateKeyToAccount(hlAgentPk)
-const sig = await signL1Action({ wallet, action, nonce })
-//const sig = await signAction(action, nonce, hlAgentPk)
-const res = await fetch(HL_EXCHANGE, {
-method: 'POST',
-headers: { 'Content-Type': 'application/json' },
-body: JSON.stringify({ action, nonce, signature: sig, vaultAddress: hlAddress }),
-})
-const data = await res.json()
-if (data?.status !== 'ok') throw new Error(`[HL] updateLeverage: ${JSON.stringify(data)}`)
-console.log('[HL] Leverage set:', data)
-return data
+async function fetchMetaAndCtx() {
+  if (_metaCache && Date.now() - _metaCache.ts < META_TTL_MS) return _metaCache.data
+  if (_metaFetchPromise) return _metaFetchPromise
+  _metaFetchPromise = (async () => {
+    const res  = await fetch(HL_API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+    })
+    if (!res.ok) throw new Error(`/info metaAndAssetCtxs → HTTP ${res.status}`)
+    const data = await res.json()
+    _metaCache = { data, ts: Date.now() }
+    return data
+  })()
+  try     { return await _metaFetchPromise }
+  finally { _metaFetchPromise = null }
+}
+
+function getAssetIndex(meta, coin) {
+  const idx = meta[0].universe.findIndex(u => u.name === coin)
+  if (idx === -1) throw new Error(`[HL] Coin inconnu dans la meta : ${coin}`)
+  return idx
+}
+
+export async function updateLeverage({ hlAgentPk, hlAddress, hlVaultAddress, asset, leverage, isCross = true }) {
+  if (!leverage || leverage <= 0) return
+  const nonce  = Date.now()
+  const action = { type: 'updateLeverage', asset, isCross, leverage: Math.round(leverage) }
+  const wallet = privateKeyToAccount(hlAgentPk)
+  const sig    = await signL1Action({ wallet, action, nonce })
+
+  const target = hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim())
+    ? hlVaultAddress.trim()
+    : hlAddress
+
+  const res = await fetch(HL_EXCHANGE, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, nonce, signature: sig, vaultAddress: target }),
+  })
+  const data = await res.json()
+  if (data?.status !== 'ok') throw new Error(`[HL] updateLeverage: ${JSON.stringify(data)}`)
+  return data
 }
 
 // ── updateLeverageByName : wrapper coin → assetIndex ─────────────────────────
-export async function updateLeverageByName({ hlAgentPk, hlAddress, coin, leverage, isCross = true }) {
-const meta = await fetchMetaAndCtx()
-const asset = getAssetIndex(meta, coin)
-return updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross })
+export async function updateLeverageByName({ hlAgentPk, hlAddress, hlVaultAddress, coin, leverage, isCross = true }) {
+  const meta  = await fetchMetaAndCtx()
+  const asset = getAssetIndex(meta, coin)
+  return updateLeverage({ hlAgentPk, hlAddress, hlVaultAddress, asset, leverage, isCross })
 }
 
 // passage d'ordre///////////////////////////////////////////////////////////////////////////////////
