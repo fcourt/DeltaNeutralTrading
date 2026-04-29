@@ -316,6 +316,18 @@ export async function placeOrder(order, credentials) {
     baseAmount, quoteAmount, feeAmount, expirationSecs, nonce, orderHash, msgHash,
   })
 
+  if (tpSlConfig?.prices) {
+  const tpSlBlock = buildExtendedTpSl({
+    side:               isBuy ? 'long' : 'short',
+    prices:             tpSlConfig.prices,
+    starkKey,
+    collateralPosition: vaultIdBig.toString(),
+    extStarkPk,
+    pxDecimals,
+  })
+  Object.assign(payload, tpSlBlock)
+}
+
   const payload = {
     id:                       generateOrderId(),
     market:                   market.extKey,
@@ -371,4 +383,54 @@ export async function placeOrder(order, credentials) {
     throw new Error(data?.error?.message || data?.message || rawText || `Extended HTTP ${res.status}`)
 
   return data
+}
+
+// Signe un ordre de fermeture TP ou SL (reduce-only)
+async function signTpSlSettlement({
+  extStarkPk,
+  vaultId,
+  side,           // 'long' | 'short' — la position à FERMER
+  size,           // taille en unités asset (ex: 0.01 BTC)
+  triggerPrice,   // prix du TP ou SL
+  marketL2Config, // { syntheticId, syntheticResolution, collateralId, collateralResolution }
+  feeRate = 0.0005,
+  expiryEpochMs,  // timestamp ms
+  salt,           // nonce unique
+}) {
+  const { syntheticId, syntheticResolution, collateralId, collateralResolution } = marketL2Config
+
+  // Fermer un LONG = SELL synthetic → baseAmount négatif, quoteAmount positif
+  // Fermer un SHORT = BUY synthetic → baseAmount positif, quoteAmount négatif
+  const sign       = side === 'long' ? -1n : 1n
+  const baseAmount = BigInt(Math.round(size * syntheticResolution)) * sign
+  const quoteRaw   = BigInt(Math.round(size * triggerPrice * collateralResolution))
+  const quoteAmount = quoteRaw * -sign
+  const feeAmount  = BigInt(Math.ceil(Number(quoteRaw) * feeRate))
+
+  const expirationHours = Math.ceil(expiryEpochMs / 1000 / 3600)
+
+  const orderHash = computeOrderHash(
+    vaultId,
+    syntheticId,
+    baseAmount,
+    collateralId,
+    quoteAmount,
+    collateralId,
+    feeAmount,
+    expirationHours,
+    salt,
+  )
+
+  const msgHash  = computeMessageHash(orderHash)  // même helper que l'ordre principal
+  const sig      = ec.starkCurve.sign(msgHash, extStarkPk)
+  const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
+
+  return {
+    starkKey,
+    collateralPosition: String(vaultId),
+    signature: {
+      r: '0x' + sig.r.toString(16).padStart(64, '0'),
+      s: '0x' + sig.s.toString(16).padStart(64, '0'),
+    },
+  }
 }
