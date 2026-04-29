@@ -44,6 +44,7 @@ export default function LeverageSlider({
         await hlSetLeverage({
           hlAgentPk: credentials.hlAgentPk,
           hlAddress:  credentials.hlAddress,
+          hlVaultAddress: credentials.hlVaultAddress,
           coin:       market.hlKey,
           leverage:   value,
           isCross,
