@@ -108,6 +108,7 @@ export const getPrices = getMarkets
 
 const _bidAskCache = new Map()
 
+/*
 export async function getBidAsk(hlKey, isXyz = false) {
   const cacheKey = `bidask_${hlKey}`
   const cached = _bidAskCache.get(cacheKey)
@@ -124,6 +125,35 @@ export async function getBidAsk(hlKey, isXyz = false) {
     _bidAskCache.set(cacheKey, { d: result, ts: Date.now() })
     return result
   } catch { return { bid: null, ask: null } }
+}
+*/
+
+export async function getBidAsk(hlKey, isXyz = false) {
+  const cacheKey = `bidask_${hlKey}`
+  const cached = _bidAskCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < 3000) return cached.d
+  try {
+    const body = { type: 'l2Book', coin: hlKey, nSigFigs: 5 }  // ← 5 au lieu de 1
+    if (isXyz) body.dex = 'xyz'
+    const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) throw new Error(`l2Book HTTP ${res.status}`)
+    const data = await res.json()
+    const bid = data?.levels?.[0]?.[0]?.px ? parseFloat(data.levels[0][0].px) : null
+    const ask = data?.levels?.[1]?.[0]?.px ? parseFloat(data.levels[1][0].px) : null
+    if (!bid && !ask) throw new Error('l2Book vide')  // ← force le fallback
+    const result = { bid, ask }
+    _bidAskCache.set(cacheKey, { d: result, ts: Date.now() })
+    return result
+  } catch (e) {
+    console.warn('[HL] getBidAsk → fallback midPx pour', hlKey, e.message)
+    // ── Fallback : midPx depuis le cache metaAndAssetCtxs ─────────────────
+    try {
+      const meta = await fetchMetaAndCtx()
+      const idx  = meta[0].universe.findIndex(u => u.name === hlKey)
+      const mid  = idx !== -1 ? parseFloat(meta[1][idx]?.midPx ?? 0) : 0
+      return { bid: mid || null, ask: mid || null }
+    } catch { return { bid: null, ask: null } }
+  }
 }
 
 export async function getFunding() {
