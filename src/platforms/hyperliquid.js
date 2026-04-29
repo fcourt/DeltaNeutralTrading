@@ -20,6 +20,21 @@ const _DEF = 300_000
 function getCached(k) { const e = _cache.get(k); return e && Date.now() - e.ts < (_ttls[k] ?? _DEF) ? e.d : null }
 function setCached(k, d) { _cache.set(k, { d, ts: Date.now() }) }
 
+
+//helpers //////////////////////////////////////////////////////////////////////////////////////////
+// Ajouter cette fonction en haut du fichier (à côté de roundToHLPrice)
+function roundToHLTick(price, szDecimals = 0) {
+  // HL : max 5 chiffres significatifs + max (6 - szDecimals) décimales
+  const maxDecimals  = Math.max(0, 6 - szDecimals)
+  const sigFigDec    = price > 0
+    ? Math.max(0, 5 - Math.floor(Math.log10(Math.abs(price))) - 1)
+    : 0
+  const decimals = Math.min(maxDecimals, sigFigDec)
+  return parseFloat(price.toFixed(decimals))
+}
+
+
+//infos HL //////////////////////////////////////////////////////////////////////////////////////
 async function fetchUniverse(body) {
   const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   if (!res.ok) throw new Error(`HL ${res.status}`)
@@ -238,11 +253,14 @@ export async function placeOrder(order, credentials) {
   const isMaker      = !orderType || orderType === 'maker'
   const tif          = isMaker ? 'Gtc' : 'FrontendMarket'
 
-  const aggressivePrice = isMaker
+  const rawAggressivePrice = isMaker
   ? roundedPrice
   : isBuy
-    ? roundedPrice * 1.05   // +5% pour buy market → traverse l'ask
-    : roundedPrice * 0.95   // -5% pour sell market → traverse le bid
+    ? roundedPrice * 1.05
+    : roundedPrice * 0.95
+
+  // Re-round APRÈS multiplication pour respecter le tick HL
+  const aggressivePrice = roundToHLTick(rawAggressivePrice, market.szDecimals ?? 0)
 
   const client = new ExchangeClient({
     wallet, transport: new HttpTransport(),
