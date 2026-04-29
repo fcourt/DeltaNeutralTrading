@@ -236,6 +236,13 @@ export async function placeOrder(order, credentials) {
   const roundedSize  = parseFloat(size.toFixed(market.szDecimals ?? 6))
   const wallet       = privateKeyToAccount(hlAgentPk)
   const isMaker      = !orderType || orderType === 'maker'
+  const tif          = isMaker ? 'Gtc' : 'FrontendMarket'
+
+  const aggressivePrice = isMaker
+  ? roundedPrice
+  : isBuy
+    ? roundedPrice * 1.05   // +5% pour buy market → traverse l'ask
+    : roundedPrice * 0.95   // -5% pour sell market → traverse le bid
 
   const client = new ExchangeClient({
     wallet, transport: new HttpTransport(),
@@ -243,6 +250,7 @@ export async function placeOrder(order, credentials) {
   })
 
   // ← await ajouté pour enchaîner le TP/SL
+  /*
   const data = await client.order({
     orders: [{
       a: market.assetIndex,
@@ -254,6 +262,19 @@ export async function placeOrder(order, credentials) {
     }],
     grouping: 'na',
   })
+  */
+
+  const data = await client.order({
+  orders: [{
+    a: market.assetIndex,
+    b: isBuy,
+    p: aggressivePrice.toFixed(market.pxDecimals ?? 2),
+    s: roundedSize.toFixed(market.szDecimals ?? 6),
+    r: reduceOnly ?? false,
+    t: { limit: { tif } },
+  }],
+  grouping: 'na',
+})
 
   // ── TP/SL : requête séparée après l'ordre principal ← ajout depuis nouveau fichier
   if (tpSlConfig) {
