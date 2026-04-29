@@ -199,6 +199,33 @@ export async function getAvailableKeys(platformId = 'hyperliquid') {
   return keys
 }
 
+//update Leverage////////////////////////////////////////////////////////////////////////////////////
+export async function updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross = true }) {
+if (!leverage || leverage <= 0) return
+const nonce = Date.now()
+const action = { type: 'updateLeverage', asset, isCross, leverage: Math.round(leverage) }
+const wallet = privateKeyToAccount(hlAgentPk)
+const sig = await signL1Action({ wallet, action, nonce })
+//const sig = await signAction(action, nonce, hlAgentPk)
+const res = await fetch(HL_EXCHANGE, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({ action, nonce, signature: sig, vaultAddress: hlAddress }),
+})
+const data = await res.json()
+if (data?.status !== 'ok') throw new Error(`[HL] updateLeverage: ${JSON.stringify(data)}`)
+console.log('[HL] Leverage set:', data)
+return data
+}
+
+// ── updateLeverageByName : wrapper coin → assetIndex ─────────────────────────
+export async function updateLeverageByName({ hlAgentPk, hlAddress, coin, leverage, isCross = true }) {
+const meta = await fetchMetaAndCtx()
+const asset = getAssetIndex(meta, coin)
+return updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross })
+}
+
+// passage d'ordre///////////////////////////////////////////////////////////////////////////////////
 export async function placeOrder(order, credentials) {
   const { isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig } = order  // ← tpSlConfig ajouté
   const { hlAgentPk, hlVaultAddress } = credentials
