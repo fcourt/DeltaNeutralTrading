@@ -244,7 +244,8 @@ export async function setLeverage(marketKey, leverage, apiKey) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function placeOrder(order, credentials) {
-  const { isBuy, limitPrice, orderType, reduceOnly, market, leverage } = order
+  //const { isBuy, limitPrice, orderType, reduceOnly, market, leverage } = order
+  const { isBuy, limitPrice, orderType, reduceOnly, market, leverage, tpSlConfig } = order
   const { extStarkPk, extL2Vault, extApiKey } = credentials
   if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
 
@@ -329,6 +330,12 @@ export async function placeOrder(order, credentials) {
     selfTradeProtectionLevel: 'ACCOUNT',
     postOnly:                 !isMarket,
     ...(reduceOnly && { reduceOnly: true }),
+    ...(tpSlConfig?.prices
+    ? buildExtendedTpSl({
+        side:   isBuy ? 'long' : 'short',
+        prices: tpSlConfig.prices,
+      })
+    : {}),
     settlement: {
       signature: {
         r: '0x' + sig.r.toString(16).padStart(64, '0'),
