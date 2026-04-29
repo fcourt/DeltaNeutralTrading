@@ -30,6 +30,8 @@ export function calcDeltaNeutralPrices({ entryPrice, tpPct, slPct }) {
  * @param {'long'|'short'} side
  * @param {{ upPrice: number, downPrice: number }} prices
  */
+
+/*
 export function buildExtendedTpSl({ side, prices }) {
   const isLong    = side === 'long'
   const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
@@ -48,6 +50,45 @@ export function buildExtendedTpSl({ side, prices }) {
       triggerPriceType: 'MARK',
       price:            String(slTrigger),
       priceType:        'MARKET',
+    },
+  }
+}
+*/
+
+// src/utils/tpsl.js
+export function buildExtendedTpSl({ side, prices, starkKey, collateralPosition, extStarkPk, pxDecimals = 2 }) {
+  const isLong    = side === 'long'
+  const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
+  const slTrigger = isLong ? prices.downPrice : prices.upPrice
+
+  // Chaque settlement doit être signé séparément
+  const signSettlement = (triggerPx) => {
+    // Extended attend un ordre reduce-only signé pour chaque TP/SL
+    // On réutilise la même structure que l'ordre principal mais sans quoteAmount
+    // → settlement minimal : starkKey + collateralPosition + signature dummy
+    // La signature réelle doit être calculée avec computeMessageHash
+    return {
+      starkKey,
+      collateralPosition: String(collateralPosition),
+      signature: { r: '0x0', s: '0x0' }, // ← à remplacer par vraie sig
+    }
+  }
+
+  return {
+    tpSlType: 'ORDER',
+    takeProfit: {
+      triggerPrice:     String(tpTrigger.toFixed(pxDecimals)),
+      triggerPriceType: 'LAST',
+      price:            String(tpTrigger.toFixed(pxDecimals)),
+      priceType:        'MARKET',
+      settlement:       signSettlement(tpTrigger),
+    },
+    stopLoss: {
+      triggerPrice:     String(slTrigger.toFixed(pxDecimals)),
+      triggerPriceType: 'LAST',
+      price:            String(slTrigger.toFixed(pxDecimals)),
+      priceType:        'MARKET',
+      settlement:       signSettlement(slTrigger),
     },
   }
 }
