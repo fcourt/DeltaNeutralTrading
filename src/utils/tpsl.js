@@ -73,7 +73,8 @@ export function buildHlTpSlOrders({ side, prices, assetIndex, size }) {
   const makeOrder = (tpsl, triggerPx) => ({
     a: assetIndex,
     b: closeSide,
-    p: String(triggerPx),
+    //p: String(triggerPx),
+    p: closeSide ? String((triggerPx * 1.1).toFixed(2)) : String((triggerPx * 0.9).toFixed(2)),
     s: String(size),
     r: true,                 // reduce-only obligatoire
     t: {
@@ -86,6 +87,19 @@ export function buildHlTpSlOrders({ side, prices, assetIndex, size }) {
     isPositionTpsl: true,
   })
 
+const tpSlData = await tpSlRes.json()
+console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
+
+// ← vérification des statuts individuels
+const tpSlStatuses = tpSlData?.response?.data?.statuses ?? []
+tpSlStatuses.forEach((s, i) => {
+  if (s?.error) console.warn(`[HL] TP/SL order ${i} error:`, s.error)
+})
+
+if (tpSlData?.status !== 'ok') {
+  console.warn('[HL] TP/SL placement échoué:', JSON.stringify(tpSlData))
+}
+  
   return [
     makeOrder('tp', tpTrigger),
     makeOrder('sl', slTrigger),
