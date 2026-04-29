@@ -55,24 +55,36 @@ export function buildExtendedTpSl({ side, prices }) {
 }
 */
 
-// src/utils/tpsl.js
-export function buildExtendedTpSl({ side, prices, starkKey, collateralPosition, extStarkPk, pxDecimals = 2 }) {
+export async function buildExtendedTpSl({
+  side,
+  prices,
+  size,
+  extStarkPk,
+  vaultId,
+  marketL2Config,
+  feeRate    = 0.0005,
+  expiryEpochMs,
+  saltBase,      // nonce de base — +1 pour TP, +2 pour SL
+  pxDecimals = 2,
+}) {
   const isLong    = side === 'long'
   const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
   const slTrigger = isLong ? prices.downPrice : prices.upPrice
 
-  // Chaque settlement doit être signé séparément
-  const signSettlement = (triggerPx) => {
-    // Extended attend un ordre reduce-only signé pour chaque TP/SL
-    // On réutilise la même structure que l'ordre principal mais sans quoteAmount
-    // → settlement minimal : starkKey + collateralPosition + signature dummy
-    // La signature réelle doit être calculée avec computeMessageHash
-    return {
-      starkKey,
-      collateralPosition: String(collateralPosition),
-      signature: { r: '0x0', s: '0x0' }, // ← à remplacer par vraie sig
-    }
-  }
+  const [tpSettlement, slSettlement] = await Promise.all([
+    signTpSlSettlement({
+      extStarkPk, vaultId, side, size,
+      triggerPrice:  tpTrigger,
+      marketL2Config, feeRate, expiryEpochMs,
+      salt: saltBase + 1,
+    }),
+    signTpSlSettlement({
+      extStarkPk, vaultId, side, size,
+      triggerPrice:  slTrigger,
+      marketL2Config, feeRate, expiryEpochMs,
+      salt: saltBase + 2,
+    }),
+  ])
 
   return {
     tpSlType: 'ORDER',
@@ -81,14 +93,14 @@ export function buildExtendedTpSl({ side, prices, starkKey, collateralPosition, 
       triggerPriceType: 'LAST',
       price:            String(tpTrigger.toFixed(pxDecimals)),
       priceType:        'MARKET',
-      settlement:       signSettlement(tpTrigger),
+      settlement:       tpSettlement,
     },
     stopLoss: {
       triggerPrice:     String(slTrigger.toFixed(pxDecimals)),
       triggerPriceType: 'LAST',
       price:            String(slTrigger.toFixed(pxDecimals)),
       priceType:        'MARKET',
-      settlement:       signSettlement(slTrigger),
+      settlement:       slSettlement,
     },
   }
 }
