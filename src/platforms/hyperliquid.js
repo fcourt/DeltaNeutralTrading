@@ -272,6 +272,7 @@ function getAssetIndex(meta, coin) {
   return idx
 }
 
+/*
 export async function updateLeverage({ hlAgentPk, hlAddress, hlVaultAddress, asset, leverage, isCross = true }) {
   if (!leverage || leverage <= 0) return
   const nonce  = Date.now()
@@ -297,6 +298,30 @@ export async function updateLeverageByName({ hlAgentPk, hlAddress, hlVaultAddres
   const meta  = await fetchMetaAndCtx()
   const asset = getAssetIndex(meta, coin)
   return updateLeverage({ hlAgentPk, hlAddress, hlVaultAddress, asset, leverage, isCross })
+}
+*/
+
+export async function updateLeverage({ hlAgentPk, hlVaultAddress, asset, leverage, isCross = true }) {
+  if (!leverage || leverage <= 0) return
+
+  const wallet = privateKeyToAccount(hlAgentPk)
+  const client = new ExchangeClient({
+    wallet,
+    transport: new HttpTransport(),
+    defaultVaultAddress: hlVaultAddress?.trim() || undefined,
+  })
+
+  return client.updateLeverage({
+    asset,
+    isCross,
+    leverage: Math.round(leverage),
+  })
+}
+
+export async function updateLeverageByName({ hlAgentPk, hlVaultAddress, coin, leverage, isCross = true }) {
+  const meta  = await fetchMetaAndCtx()
+  const asset = getAssetIndex(meta, coin)
+  return updateLeverage({ hlAgentPk, hlVaultAddress, asset, leverage, isCross })
 }
 
 // passage d'ordre///////////////////////////////////////////////////////////////////////////////////
