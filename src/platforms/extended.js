@@ -2,7 +2,7 @@
 // Absorbe : adapter/extended.js + useExtendedL2Config.js + signing Stark
 
 import { ec, hash, shortString } from 'starknet'
-import { buildExtendedTpSl }     from '../utils/tpsl.js' // ← nouveau
+//import { buildExtendedTpSl }     from '../utils/tpsl.js' // ← nouveau
 
 const EXT_PROXY           = '/api/extended'
 const CACHE_TTL_MS        = 60 * 60 * 1000
