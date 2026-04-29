@@ -1,386 +1,257 @@
 // src/platforms/hyperliquid.js
+// Couvre Hyperliquid, trade.xyz (dex:'xyz') et HyENA
 
-import { privateKeyToAccount } from 'viem/accounts'
-// Ajouter l'import en tête
-import { signL1Action } from '@nktkas/hyperliquid/signing'
-//import { encodeAbiParameters, keccak256, toBytes } from 'viem'
-import { buildHlTpSlAction }   from '../utils/tpsl.js'
 import {
-  HL_KEY_OVERRIDES, MARKET_LABELS, EXT_KEY_OVERRIDES,
-  NADO_KEY_OVERRIDES, inferCategory,
+  HL_KEY_OVERRIDES, MARKET_LABELS, inferCategory,
+  EXT_KEY_OVERRIDES, NADO_KEY_OVERRIDES,
 } from '../config/markets.js'
+import { ExchangeClient, HttpTransport } from '@nktkas/hyperliquid'
+import { signL1Action } from '@nktkas/hyperliquid/signing'
+import { privateKeyToAccount } from 'viem/accounts'
+import { roundToHLPrice } from '../utils/trading.js'
+import { buildHlTpSlAction } from '../utils/tpsl.js'   // ← ajout TP/SL
 
-const HL_INFO     = 'https://api.hyperliquid.xyz/info'
-const HL_EXCHANGE = 'https://api.hyperliquid.xyz/exchange'
+const HL_API = 'https://api.hyperliquid.xyz/info'
+export const XYZ_OFFSET = 110_000
 
-// ── Meta cache + singleton fetch ─────────────────────────────────────────────
+const _cache = new Map()
+const _ttls = { hl_all: 300_000, hl_xyz: 300_000 }
+const _DEF = 300_000
+function getCached(k) { const e = _cache.get(k); return e && Date.now() - e.ts < (_ttls[k] ?? _DEF) ? e.d : null }
+function setCached(k, d) { _cache.set(k, { d, ts: Date.now() }) }
 
-const META_TTL_MS    = 5 * 60 * 1000
-const META_RETRY_MS  = 300
-const META_MAX_RETRY = 2
-
-let _metaCache        = null
-let _metaFetchPromise = null
-
-async function fetchMetaAndCtx() {
-  if (_metaCache && Date.now() - _metaCache.ts < META_TTL_MS) return _metaCache.data
-  if (_metaFetchPromise) return _metaFetchPromise
-
-  _metaFetchPromise = (async () => {
-    let lastErr
-    for (let attempt = 0; attempt <= META_MAX_RETRY; attempt++) {
-      if (attempt > 0) await new Promise(r => setTimeout(r, META_RETRY_MS * attempt))
-      try {
-        const res  = await fetch(HL_INFO, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ type: 'metaAndAssetCtxs' }),
-        })
-        if (!res.ok) throw new Error(`/info metaAndAssetCtxs → HTTP ${res.status}`)
-        const data = await res.json()
-        _metaCache = { data, ts: Date.now() }
-        return data
-      } catch (e) { lastErr = e }
-    }
-    if (_metaCache) {
-      console.warn('[HL] /info dégradé — cache stale utilisé:', lastErr.message)
-      return _metaCache.data
-    }
-    throw lastErr
-  })()
-
-  try     { return await _metaFetchPromise }
-  finally { _metaFetchPromise = null }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function getAssetIndex(meta, coin) {
-  const idx = meta[0].universe.findIndex(u => u.name === coin)
-  if (idx === -1) throw new Error(`[HL] Coin inconnu dans la meta : ${coin}`)
-  return idx
-}
-
-function floatToWire(x, szDecimals) {
-  const rounded = Number(x.toFixed(szDecimals))
-  if (Math.abs(rounded) >= 1e15) throw new Error(`[HL] prix/taille trop grand : ${x}`)
-  let s = rounded.toFixed(szDecimals)
-  if (s.includes('.')) s = s.replace(/0+$/, '').replace(/\.$/, '')
-  if (s === '-0') s = '0'
-  return s
-}
-
-function orderToAction(coin, isBuy, limitPx, sz, reduceOnly, tif, cloid) {
-  return {
-    type: 'order',
-    orders: [{
-      a:  coin,
-      b:  isBuy,
-      p:  String(limitPx),
-      s:  String(sz),
-      r:  reduceOnly ?? false,
-      t:  { limit: { tif } },
-      ...(cloid ? { c: cloid } : {}),
-    }],
-    grouping: 'na',
-  }
-}
-
-/*
-async function signAction(action, nonce, agentPk) {
-  const account = privateKeyToAccount(agentPk)
-  const phantomAgent = {
-    source:    'a',
-    connectionId: keccak256(
-      encodeAbiParameters(
-        [{ type: 'bytes32' }, { type: 'uint64' }],
-        [keccak256(toBytes(JSON.stringify(action))), BigInt(nonce)]
-      )
-    ),
-  }
-  const signature = await account.signTypedData({
-    domain: {
-      name:              'Exchange',
-      version:           '1',
-      chainId:           1337,
-      verifyingContract: '0x0000000000000000000000000000000000000000',
-    },
-    types: {
-      Agent: [
-        { name: 'source',       type: 'string'  },
-        { name: 'connectionId', type: 'bytes32'  },
-      ],
-    },
-    primaryType: 'Agent',
-    message: phantomAgent,
-  })
-  return signature
-}
-*/
-
-// ── Exports publics ───────────────────────────────────────────────────────────
-
-/*
-export async function getMarkets() {
-  const meta = await fetchMetaAndCtx()
-  const discoveredMarkets = new Map()
-  const prices     = {}
-  const stepSizes  = {}
-  const assetMeta  = {}
-
-  meta[0].universe.forEach((u, i) => {
-    const ctx   = meta[1][i]
-    const price = parseFloat(ctx?.midPx ?? ctx?.markPx ?? 0)
-    const step  = Math.pow(10, -(u.szDecimals ?? 2))
-
-    discoveredMarkets.set(u.name, {
-      id:       u.name,
-      hlKey:    u.name,
-      label:    u.name,
-      category: 'Crypto',
-    })
-
-    if (price) prices[u.name] = price
-    stepSizes[u.name] = step
-    assetMeta[u.name] = {
-      szDecimals:   u.szDecimals   ?? 2,
-      maxLeverage:  u.maxLeverage  ?? 50,
-    }
-  })
-
-  return { discoveredMarkets, prices, stepSizes, assetMeta }
-}
-*/
-
-export async function getMarkets() {
-  const meta = await fetchMetaAndCtx()
-  const discoveredMarkets = new Map()
-  const prices     = {}
-  const stepSizes  = {}
-  const assetMeta  = {}
-
-  meta[0].universe.forEach((u, i) => {
-    const ctx   = meta[1][i]
-    const price = parseFloat(ctx?.midPx ?? ctx?.markPx ?? 0)
-    const step  = u.szDecimals != null ? Math.pow(10, -u.szDecimals) : 0.01
-
-    // id canonical (ex: 'xyz:CL' → 'OIL', 'BTC' → 'BTC')
-    const id       = HL_KEY_OVERRIDES[u.name]?.id ?? u.name
-    const isCrypto = !u.name.startsWith('xyz:') && !u.name.startsWith('hyna:')
-    const category = isCrypto ? 'Crypto' : inferCategory(id)
-
-    discoveredMarkets.set(id, {
-      id,
-      hlKey:    u.name,
-      extKey:   EXT_KEY_OVERRIDES[id] ?? (isCrypto ? id : null),
-      nadoKey:  NADO_KEY_OVERRIDES[id] ?? id,
-      label:    MARKET_LABELS[id] ?? id,
-      category,
-    })
-
-    if (price) prices[u.name] = price
-    stepSizes[u.name] = step
-    assetMeta[u.name] = {
-      szDecimals:  u.szDecimals  ?? 2,
-      maxLeverage: u.maxLeverage ?? 50,
-    }
-  })
-
-  return { discoveredMarkets, prices, stepSizes, assetMeta }
-}
-
-/*
-export async function getPrices() {
-  const meta = await fetchMetaAndCtx()
-  const priceMap = {}
-  meta[0].universe.forEach((u, i) => {
-    const ctx   = meta[1][i]
-    const price = parseFloat(ctx?.midPx ?? ctx?.markPx ?? 0)
-    if (price) priceMap[u.name] = price
-  })
-  return priceMap   // ← retourne le map plat directement, sans wrapper
-}
-*/
-
-export async function getPrecision() {
-  const meta = await fetchMetaAndCtx()
-  const precisionMap = {}
-  meta[0].universe.forEach((u, i) => {
-    precisionMap[u.name] = { szDecimals: u.szDecimals, pxDecimals: 6 }
-  })
-  return precisionMap
-}
-
-export async function getFunding(hlKey) {
-  if (!hlKey) return { fundingRate: null, bid: null, ask: null }
-  try {
-    const meta = await fetchMetaAndCtx()
-    const idx  = meta[0].universe.findIndex(u => u.name === hlKey)
-    if (idx === -1) return { fundingRate: null, bid: null, ask: null }
-    const ctx = meta[1][idx]
-    return {
-      fundingRate: parseFloat(ctx?.funding ?? null),
-      bid:         null,
-      ask:         null,
-    }
-  } catch { return { fundingRate: null, bid: null, ask: null } }
-}
-
-export async function getMargin(credentials) {
-  const { hlAddress, hlVaultAddress } = credentials
-
-  // Priorité au vaultAddress (sous-compte)
-  const target = hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim())
-    ? hlVaultAddress.trim().toLowerCase()
-    : hlAddress?.trim()?.toLowerCase()
-
-  if (!target || !/^0x[0-9a-fA-F]{40}$/i.test(target)) return null
-
-  try {
-    const res = await fetch(HL_INFO, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ type: 'clearinghouseState', user: target }),
-    })
-    const data = await res.json()
-    return parseFloat(data?.withdrawable ?? 0)
-  } catch { return null }
-}
-
-export async function getPositions(credentials, markets = []) {
-  const { hlAddress } = credentials
-  if (!hlAddress?.trim()) return []
-  try {
-    const res  = await fetch(HL_INFO, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ type: 'clearinghouseState', user: hlAddress.trim() }),
-    })
-    const data = await res.json()
-    return (data?.assetPositions || [])
-      .filter(p => parseFloat(p.position?.szi ?? 0) !== 0)
-      .map(p => {
-        const pos    = p.position
-        const szi    = parseFloat(pos.szi)
-        const market = markets.find(m => m.hlKey === pos.coin)
-        return {
-          platform: 'hyperliquid', coin: pos.coin,
-          marketId: market?.id ?? null, label: market?.label ?? pos.coin,
-          side: szi > 0 ? 'LONG' : 'SHORT', szi: Math.abs(szi),
-          entryPx: parseFloat(pos.entryPx ?? 0),
-          unrealizedPnl: parseFloat(pos.unrealizedPnl ?? 0),
-        }
-      })
-  } catch (e) { console.warn('[HL] getPositions:', e.message); return [] }
-}
-
-export async function updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross = true }) {
-  if (!leverage || leverage <= 0) return
-  const nonce  = Date.now()
-  const action = { type: 'updateLeverage', asset, isCross, leverage: Math.round(leverage) }
-  const wallet = privateKeyToAccount(hlAgentPk)
-  const sig = await signL1Action({ wallet, action, nonce })
-  //const sig    = await signAction(action, nonce, hlAgentPk)
-  const res    = await fetch(HL_EXCHANGE, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ action, nonce, signature: sig, vaultAddress: hlAddress }),
-  })
+async function fetchUniverse(body) {
+  const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!res.ok) throw new Error(`HL ${res.status}`)
   const data = await res.json()
-  if (data?.status !== 'ok') throw new Error(`[HL] updateLeverage: ${JSON.stringify(data)}`)
-  console.log('[HL] Leverage set:', data)
-  return data
+  const [meta] = Array.isArray(data) ? data : [null]
+  return new Set((meta?.universe || []).map(a => a.name))
 }
 
-// ── getBidAsk : bid/ask estimé depuis le mid ──────────────────────────────────
-// metaAndAssetCtxs ne fournit pas le carnet d'ordres → bid = ask = midPx
-export async function getBidAsk(hlKey) {
-  if (!hlKey) return { bid: null, ask: null }
+function buildMarket(hlKey) {
+  const override = HL_KEY_OVERRIDES[hlKey] || {}
+  const id = override.id || hlKey.replace(/^xyz:/, '')
+  const isXyz = hlKey.startsWith('xyz:')
+  const extKey = id in EXT_KEY_OVERRIDES ? EXT_KEY_OVERRIDES[id]
+    : !isXyz ? `${id}-USD` : `${id}_24_5-USD`
+  const nadoKey = NADO_KEY_OVERRIDES[id] ?? id
+  return {
+    id, label: MARKET_LABELS[id] || id,
+    category: isXyz ? inferCategory(id) : 'Crypto',
+    hlKey, extKey, nadoKey, assetIndex: null, nadoProductId: null,
+  }
+}
+
+export async function getMarkets() {
+  const [resNat, resXyz] = await Promise.all([
+    fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }) }),
+    fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs', dex: 'xyz' }) }),
+  ])
+  const [natData, xyzData] = await Promise.all([resNat.json(), resXyz.json()])
+
+  const discoveredMarkets = new Map()
+  const prices = {}, stepSizes = {}, assetMeta = {}
+
+  const [natMeta, natCtxs] = Array.isArray(natData) ? natData : [null, null];
+  (natMeta?.universe || []).forEach((asset, i) => {
+    const m = buildMarket(asset.name)
+    m.assetIndex = i
+    discoveredMarkets.set(m.id, m)
+    if (natCtxs?.[i]?.markPx) {
+      prices[asset.name] = natCtxs[i].markPx
+      stepSizes[asset.name] = Math.pow(10, -(asset.szDecimals ?? 3))
+    }
+    assetMeta[asset.name] = {
+      index: i, szDecimals: asset.szDecimals ?? 6,
+      pxDecimals: asset.pxDecimals ?? 2, maxLeverage: asset.maxLeverage ?? null,
+    }
+  })
+
+  const [xyzMeta, xyzCtxs] = Array.isArray(xyzData) ? xyzData : [null, null];
+  (xyzMeta?.universe || []).forEach((asset, i) => {
+    const m = buildMarket(asset.name)
+    if (!discoveredMarkets.has(m.id)) {
+      m.assetIndex = XYZ_OFFSET + i
+      discoveredMarkets.set(m.id, m)
+    }
+    if (xyzCtxs?.[i]?.markPx) {
+      prices[asset.name] = xyzCtxs[i].markPx
+      stepSizes[asset.name] = Math.pow(10, -(asset.szDecimals ?? 2))
+    }
+    const entry = {
+      index: XYZ_OFFSET + i, szDecimals: asset.szDecimals ?? 2,
+      pxDecimals: asset.pxDecimals ?? 2, maxLeverage: asset.maxLeverage ?? null,
+    }
+    assetMeta[asset.name] = entry
+    assetMeta[asset.name.replace(/^xyz:/, '')] = entry
+  })
+
+  return { discoveredMarkets, prices, stepSizes, assetMeta }
+}
+
+export const getPrices = getMarkets
+
+const _bidAskCache = new Map()
+
+export async function getBidAsk(hlKey, isXyz = false) {
+  const cacheKey = `bidask_${hlKey}`
+  const cached = _bidAskCache.get(cacheKey)
+  if (cached && Date.now() - cached.ts < 3000) return cached.d
   try {
-    const meta = await fetchMetaAndCtx()
-    const idx  = meta[0].universe.findIndex(u => u.name === hlKey)
-    if (idx === -1) return { bid: null, ask: null }
-    const ctx = meta[1][idx]
-    const mid = parseFloat(ctx?.midPx ?? 0)
-    return { bid: mid || null, ask: mid || null }
+    const body = { type: 'l2Book', coin: hlKey, nSigFigs: 1 }
+    if (isXyz) body.dex = 'xyz'
+    const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    if (!res.ok) return { bid: null, ask: null }
+    const data = await res.json()
+    const bid = data?.levels?.[0]?.[0]?.px ? parseFloat(data.levels[0][0].px) : null
+    const ask = data?.levels?.[1]?.[0]?.px ? parseFloat(data.levels[1][0].px) : null
+    const result = { bid, ask }
+    _bidAskCache.set(cacheKey, { d: result, ts: Date.now() })
+    return result
   } catch { return { bid: null, ask: null } }
 }
 
-// ── updateLeverageByName : wrapper coin → assetIndex ─────────────────────────
-export async function updateLeverageByName({ hlAgentPk, hlAddress, coin, leverage, isCross = true }) {
-  const meta  = await fetchMetaAndCtx()
-  const asset = getAssetIndex(meta, coin)
-  return updateLeverage({ hlAgentPk, hlAddress, asset, leverage, isCross })
+export async function getFunding() {
+  const [resNat, resXyz] = await Promise.all([
+    fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }) }),
+    fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs', dex: 'xyz' }) }),
+  ])
+  const [natData, xyzData] = await Promise.all([resNat.json(), resXyz.json()])
+  const rates = {}
+  const [natMeta, natCtxs] = Array.isArray(natData) ? natData : [null, null];
+  (natMeta?.universe || []).forEach((a, i) => { rates[a.name] = parseFloat(natCtxs?.[i]?.funding ?? 0) })
+  const [xyzMeta, xyzCtxs] = Array.isArray(xyzData) ? xyzData : [null, null];
+  (xyzMeta?.universe || []).forEach((a, i) => { rates[a.name] = parseFloat(xyzCtxs?.[i]?.funding ?? 0) })
+  return rates
 }
 
-// ── Place order ───────────────────────────────────────────────────────────────
+export async function getMargin(credentials) {
+  const { hlAddress, hlVaultAddress, platformId } = credentials
+
+  if (platformId === 'hyena') {
+    const candidates = [hlVaultAddress, hlAddress].filter(a => a?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(a.trim()))
+    for (const addr of candidates) {
+      try {
+        const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'spotClearinghouseState', user: addr.trim().toLowerCase() }) })
+        const state = await res.json()
+        const usde = state?.balances?.find(b => b.coin.toUpperCase() === 'USDE')
+        if (usde) { const val = parseFloat(usde.total ?? 0) - parseFloat(usde.hold ?? 0); if (val > 0) return val }
+      } catch { /* continue */ }
+    }
+    return null
+  }
+
+  if (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim())) {
+    const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'spotClearinghouseState', user: hlVaultAddress.trim().toLowerCase() }) })
+    const state = await res.json()
+    const usdc = state?.balances?.find(b => b.coin === 'USDC')
+    return parseFloat(usdc?.total ?? 0) - parseFloat(usdc?.hold ?? 0)
+  }
+
+  if (!hlAddress?.trim() || !/^0x[0-9a-fA-F]{40}$/i.test(hlAddress.trim())) return null
+  const res = await fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'clearinghouseState', user: hlAddress.trim().toLowerCase() }) })
+  const state = await res.json()
+  return parseFloat(state?.withdrawable ?? 0)
+}
+
+export async function getPositions(credentials, markets = []) {
+  const { hlAddress, hlVaultAddress } = credentials
+  const addresses = [hlAddress, hlVaultAddress].filter(a => a?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(a.trim()))
+  if (!addresses.length) return []
+
+  const parseState = (state, wallet) =>
+    (state?.assetPositions || [])
+      .filter(p => parseFloat(p.position?.szi) !== 0)
+      .map(p => {
+        const coin = p.position.coin, szi = parseFloat(p.position.szi)
+        const platform = coin.startsWith('xyz:') ? 'xyz' : coin.startsWith('hyna:') ? 'hyena' : 'hyperliquid'
+        const market = markets.find(m => m.hlKey === coin)
+        return {
+          platform, coin, wallet,
+          marketId: market?.id ?? null,
+          label: market?.label ?? coin,
+          side: szi > 0 ? 'LONG' : 'SHORT',
+          szi: Math.abs(szi),
+          entryPx: parseFloat(p.position.entryPx || 0),
+          unrealizedPnl: parseFloat(p.position.unrealizedPnl || 0),
+        }
+      })
+
+  const results = await Promise.allSettled(
+    addresses.flatMap(addr => [
+      fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'clearinghouseState', user: addr.trim() }) })
+        .then(r => r.json()).then(s => parseState(s, addr === hlVaultAddress ? 'vault' : 'main')),
+      fetch(HL_API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'clearinghouseState', user: addr.trim(), dex: 'xyz' }) })
+        .then(r => r.json()).then(s => parseState(s, addr === hlVaultAddress ? 'vault' : 'main')),
+    ])
+  )
+  const seen = new Set()
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+    .filter(p => { const k = `${p.wallet}-${p.platform}-${p.coin}`; return seen.has(k) ? false : seen.add(k) })
+}
+
+export async function getAvailableKeys(platformId = 'hyperliquid') {
+  const cacheKey = platformId === 'xyz' ? 'hl_xyz' : 'hl_all'
+  const cached = getCached(cacheKey)
+  if (cached) return cached
+  const keys = await fetchUniverse({ type: 'metaAndAssetCtxs', ...(platformId === 'xyz' ? { dex: 'xyz' } : {}) })
+  setCached(cacheKey, keys)
+  return keys
+}
 
 export async function placeOrder(order, credentials) {
-  const { isBuy, limitPrice, orderType, reduceOnly, market, leverage, tpSlConfig } = order
-  const { hlAgentPk, hlAddress } = credentials
-  if (!hlAgentPk || !hlAddress) throw new Error('Clé agent ou adresse HL manquante')
+  const { isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig } = order  // ← tpSlConfig ajouté
+  const { hlAgentPk, hlVaultAddress } = credentials
+  if (!hlAgentPk) throw new Error('Clé agent HL manquante')
+  if (market.assetIndex === null) throw new Error(`Index non résolu pour ${market.label}`)
 
-  const wallet = privateKeyToAccount(hlAgentPk)
-  const isXyz = market.hlKey?.startsWith('xyz:')
-  
-  const meta       = await fetchMetaAndCtx()
-  const assetIndex = getAssetIndex(meta, market.hlKey)
-  const { szDecimals } = meta[0].universe[assetIndex]
+  const roundedPrice = roundToHLPrice(limitPrice)
+  const roundedSize  = parseFloat(size.toFixed(market.szDecimals ?? 6))
+  const wallet       = privateKeyToAccount(hlAgentPk)
+  const isMaker      = !orderType || orderType === 'maker'
 
-  /*
-  if (leverage != null && leverage > 0) {
-    await updateLeverage({ hlAgentPk, hlAddress, asset: assetIndex, leverage, isCross: false })
-  }
-  */
-
-  const isMaker  = orderType !== 'taker'
-  const tif      = isMaker ? 'Gtc' : 'FrontendMarket'
-  const pricePx  = limitPrice
-
-  const szWire = floatToWire(order.size, szDecimals)
-  const pxWire = floatToWire(pricePx, 6)
-
-  const action = orderToAction(assetIndex, isBuy, pxWire, szWire, reduceOnly, tif)
-  const nonce  = Date.now()
-  //const sig    = await signAction(action, nonce, hlAgentPk)
-  const sig = await signL1Action({ wallet, action, nonce })
-  
-  console.log('[HL] placeOrder payload:', JSON.stringify({ action, nonce }))
-
-  const res  = await fetch(HL_EXCHANGE, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ action, nonce, signature: sig, vaultAddress: hlVaultAddress ?? hlAddress }),
-    ...(isXyz ? { dex: 'xyz' } : {}),
+  const client = new ExchangeClient({
+    wallet, transport: new HttpTransport(),
+    defaultVaultAddress: hlVaultAddress?.trim() || undefined,
   })
-  const data = await res.json()
-  console.log('[HL] response:', JSON.stringify(data))
 
-  const status = data?.response?.data?.statuses?.[0]
-  if (data?.status !== 'ok' || (status && typeof status === 'object' && status.error)) {
-    throw new Error(`[HL] ${status?.error ?? JSON.stringify(data)}`)
-  }
+  // ← await ajouté pour enchaîner le TP/SL
+  const data = await client.order({
+    orders: [{
+      a: market.assetIndex,
+      b: isBuy,
+      p: roundedPrice.toFixed(market.pxDecimals ?? 2),
+      s: roundedSize.toFixed(market.szDecimals ?? 6),
+      r: reduceOnly ?? false,
+      t: { limit: { tif: isMaker ? 'Gtc' : 'Ioc' } },
+    }],
+    grouping: 'na',
+  })
 
-  // ── TP/SL : requête séparée après l'ordre principal ───────────────────────
+  // ── TP/SL : requête séparée après l'ordre principal ← ajout depuis nouveau fichier
   if (tpSlConfig) {
+    const isXyz  = market.hlKey?.startsWith('xyz:')
+    const szWire = roundedSize.toFixed(market.szDecimals ?? 6)
     try {
       const tpSlAction = buildHlTpSlAction({
         side:       isBuy ? 'long' : 'short',
         prices:     tpSlConfig.prices,
-        assetIndex,
+        assetIndex: market.assetIndex,
         size:       szWire,
       })
       const tpSlNonce = Date.now()
-      //const tpSlSig   = await signAction(tpSlAction, tpSlNonce, hlAgentPk)
-      const tpSlSig = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
+      const tpSlSig   = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
 
       console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
 
-      const tpSlRes  = await fetch(HL_EXCHANGE, {
+      const tpSlRes  = await fetch('https://api.hyperliquid.xyz/exchange', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig, vaultAddress: hlVaultAddress ?? hlAddress, 
-                                 ...(isXyz ? { dex: 'xyz' } : {}), }),
+        body: JSON.stringify({
+          action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig,
+          vaultAddress: hlVaultAddress ?? undefined,
+          ...(isXyz ? { dex: 'xyz' } : {}),
+        }),
       })
       const tpSlData = await tpSlRes.json()
       console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
@@ -394,4 +265,27 @@ export async function placeOrder(order, credentials) {
   }
 
   return data
+}
+
+export async function enableAgentDexAbstraction(agentPrivateKey, vaultAddress = null) {
+  const wallet = privateKeyToAccount(agentPrivateKey)
+  const action = { type: 'agentEnableDexAbstraction' }
+  const nonce  = Date.now()
+  const signature = await signL1Action(
+    vaultAddress ? { wallet, action, nonce, vaultAddress } : { wallet, action, nonce }
+  )
+  const body = { action, signature, nonce }
+  if (vaultAddress) body.vaultAddress = vaultAddress
+  const res = await fetch('https://api.hyperliquid.xyz/exchange', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  })
+  const text = await res.text()
+  let result
+  try { result = JSON.parse(text) } catch { throw new Error(text) }
+  if (result?.status === 'err') {
+    const msg = result?.response ?? ''
+    if (msg.includes('transition not allowed')) return result
+    throw new Error(msg || 'Erreur agentEnableDexAbstraction')
+  }
+  return result
 }
