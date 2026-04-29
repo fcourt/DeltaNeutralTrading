@@ -391,6 +391,9 @@ export async function placeOrder(order, credentials) {
       })
       const tpSlNonce = Date.now()
       const tpSlSig   = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
+      const tpSlTarget = hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim())
+        ? hlVaultAddress.trim()
+        : hlAddress
 
       console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
 
@@ -399,7 +402,8 @@ export async function placeOrder(order, credentials) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig,
-          vaultAddress: hlVaultAddress ?? undefined,
+          //vaultAddress: hlVaultAddress ?? undefined,
+          vaultAddress: tpSlTarget,
           ...(isXyz ? { dex: 'xyz' } : {}),
         }),
       })
