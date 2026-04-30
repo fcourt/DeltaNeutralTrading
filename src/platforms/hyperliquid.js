@@ -390,7 +390,15 @@ export async function placeOrder(order, credentials) {
         size:       szWire,
       })
       const tpSlNonce = Date.now()
-      const tpSlSig   = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
+      //const tpSlSig   = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
+
+      const tpSlSig = await signL1Action({
+        wallet,
+        action: tpSlAction,
+        nonce: tpSlNonce,
+        vaultAddress: tpSlTarget,
+      })
+      
       const tpSlTarget = (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim()))
         ? hlVaultAddress.trim()
         : hlAddress?.trim()
