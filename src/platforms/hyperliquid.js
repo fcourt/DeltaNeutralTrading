@@ -410,6 +410,14 @@ export async function placeOrder(order, credentials) {
       const tpSlData = await tpSlRes.json()
       console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
 
+      console.log('[HL] credentials reçus:', {
+      hlAgentPk: hlAgentPk ? '✅ présent' : '❌ absent',
+      hlAddress,
+      hlVaultAddress,
+      })
+      
+      console.log('[HL] tpSlConfig:', JSON.stringify(tpSlConfig))
+
       if (tpSlData?.status !== 'ok') {
         console.warn('[HL] TP/SL placement échoué (ordre principal OK):', JSON.stringify(tpSlData))
       }
