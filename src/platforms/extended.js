@@ -205,6 +205,7 @@ export async function loadL2Configs() {
       syntheticId:          l2.syntheticId,
       syntheticResolution:  l2.syntheticResolution,
       collateralResolution: l2.collateralResolution,
+      collateralId:         l2.collateralId ?? '0x1',
       szDecimals:           m.assetPrecision ?? 0,
       pxDecimals:           pxDecimalsFromMinPrice(tc.minPriceChange),
     }
@@ -278,7 +279,9 @@ async function signTpSlSettlement({
     salt,
   )
 
-  const msgHash  = computeMessageHash(orderHash)  // même helper que l'ordre principal
+  //const msgHash  = computeMessageHash(orderHash)  // même helper que l'ordre principal
+  const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
+  const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
   const sig      = ec.starkCurve.sign(msgHash, extStarkPk)
   const starkKey = ec.starkCurve.getStarkKey(extStarkPk)
 
@@ -413,7 +416,9 @@ export async function placeOrder(order, credentials) {
     vaultIdBig, syntheticId, baseAmount,
     '0x1', quoteAmount, '0x1', feeAmount, expirationSecs, nonce,
   )
+  
   const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
+  
   const sig     = ec.starkCurve.sign(msgHash, extStarkPk)
 
   console.log('[Extended] Signing debug:', {
@@ -421,24 +426,7 @@ export async function placeOrder(order, credentials) {
     baseAmount, quoteAmount, feeAmount, expirationSecs, nonce, orderHash, msgHash,
   })
 
-  // Après calcul de nonce, vaultIdBig, pxDecimals, size
-
-if (tpSlConfig?.prices) {
-  const tpSlBlock = await buildExtendedTpSl({
-    side:           isBuy ? 'long' : 'short',
-    prices:         tpSlConfig.prices,
-    size:           parseFloat(sizeStr),
-    extStarkPk,
-    vaultId:        vaultIdBig,
-    marketL2Config: market.l2Config,   // { syntheticId, syntheticResolution, collateralId, collateralResolution }
-    feeRate:        0.0005,
-    expiryEpochMs:  expiryEpochMillis,
-    saltBase:       nonce,             // TP = nonce+1, SL = nonce+2 → nonces uniques
-    pxDecimals,
-  })
-  Object.assign(payload, tpSlBlock)
-}
-
+  /*
   const payload = {
     id:                       generateOrderId(),
     market:                   market.extKey,
@@ -468,6 +456,45 @@ if (tpSlConfig?.prices) {
       collateralPosition: vaultIdBig.toString(),
     },
   }
+  */
+
+  const payload = {
+    id: generateOrderId(),
+    market: market.extKey,
+    type: 'LIMIT',
+    side: isBuy ? 'BUY' : 'SELL',
+    qty: sizeStr,
+    price: priceStr,
+    timeInForce,
+    expiryEpochMillis,
+    fee: '0.0005',
+    nonce: nonce.toString(),
+    selfTradeProtectionLevel: 'ACCOUNT',
+    postOnly: !isMarket,
+    ...(reduceOnly && { reduceOnly: true }),
+    settlement: {
+      signature: { r: '0x' + sig.r.toString(16).padStart(64, '0'), s: '0x' + sig.s.toString(16).padStart(64, '0') },
+      starkKey,
+      collateralPosition: vaultIdBig.toString(),
+    },
+  }
+
+  if (tpSlConfig?.prices) {
+  const tpSlBlock = await buildExtendedTpSl({
+    side:           isBuy ? 'long' : 'short',
+    prices:         tpSlConfig.prices,
+    size:           parseFloat(sizeStr),
+    extStarkPk,
+    vaultId:        vaultIdBig,
+    //marketL2Config: market.l2Config,   // { syntheticId, syntheticResolution, collateralId, collateralResolution }
+    marketL2Config: l2Config,
+    feeRate:        0.0005,
+    expiryEpochMs:  expiryEpochMillis,
+    saltBase:       nonce,             // TP = nonce+1, SL = nonce+2 → nonces uniques
+    pxDecimals,
+  })
+  //Object.assign(payload, tpSlBlock)
+}
 
   console.log('[Extended] Payload:', JSON.stringify(payload, null, 2))
 
