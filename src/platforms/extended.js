@@ -265,7 +265,8 @@ async function signTpSlSettlement({
   const quoteAmount = quoteRaw * -sign
   const feeAmount  = BigInt(Math.ceil(Number(quoteRaw) * feeRate))
 
-  const expirationHours = Math.ceil(expiryEpochMs / 1000 / 3600)
+  //const expirationHours = Math.ceil(expiryEpochMs / 1000 / 3600)
+  const expirationSecs = Math.ceil(expiryEpochMs / 1000) + SERVER_CLOCK_OFFSET_S
 
   const orderHash = computeOrderHash(
     vaultId,
@@ -275,7 +276,8 @@ async function signTpSlSettlement({
     quoteAmount,
     collateralId,
     feeAmount,
-    expirationHours,
+    //expirationHours,
+    expirationSecs,
     salt,
   )
 
