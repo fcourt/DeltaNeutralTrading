@@ -380,65 +380,57 @@ export async function placeOrder(order, credentials) {
 
   // ── TP/SL : requête séparée après l'ordre principal ← ajout depuis nouveau fichier
   if (tpSlConfig) {
-    const isXyz  = market.hlKey?.startsWith('xyz:')
-    const szWire = roundedSize.toFixed(market.szDecimals ?? 6)
-    try {
-      const tpSlAction = buildHlTpSlAction({
-        side:       isBuy ? 'long' : 'short',
-        prices:     tpSlConfig.prices,
-        assetIndex: market.assetIndex,
-        size:       szWire,
-      })
-            
-      const tpSlTarget = (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim()))
-        ? hlVaultAddress.trim()
-        : hlAddress?.trim()
+  try {
+    // 1. Variables indépendantes en premier
+    const isXyz   = market.hlKey?.startsWith('xyz:')
+    const szWire  = roundedSize.toFixed(market.szDecimals ?? 6)
 
-      if (!tpSlTarget) throw new Error('[HL] Adresse wallet manquante pour le TP/SL')
+    // 2. Action (ne dépend que de variables déjà définies)
+    const tpSlAction = buildHlTpSlAction({
+      side:       isBuy ? 'long' : 'short',
+      prices:     tpSlConfig.prices,
+      assetIndex: market.assetIndex,
+      size:       szWire,
+    })
 
-      console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
+    // 3. Target (doit être avant tpSlSig)
+    const tpSlTarget = (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim()))
+      ? hlVaultAddress.trim()
+      : hlAddress?.trim()
 
-      const tpSlNonce = Date.now()
-      const tpSlSig = await signL1Action({
-        wallet,
-        action: tpSlAction,
-        nonce: tpSlNonce,
+    if (!tpSlTarget) throw new Error('[HL] Adresse wallet manquante pour le TP/SL')
+
+    // 4. Nonce + signature (dépendent de tpSlAction ET tpSlTarget)
+    const tpSlNonce = Date.now()
+    const tpSlSig   = await signL1Action({
+      wallet,
+      action:       tpSlAction,
+      nonce:        tpSlNonce,
+      vaultAddress: tpSlTarget,
+    })
+
+    // 5. Fetch
+    console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
+    const tpSlRes  = await fetch('https://api.hyperliquid.xyz/exchange', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action:       tpSlAction,
+        nonce:        tpSlNonce,
+        signature:    tpSlSig,
         vaultAddress: tpSlTarget,
-      })
-
-      const tpSlRes  = await fetch('https://api.hyperliquid.xyz/exchange', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: tpSlAction, nonce: tpSlNonce, signature: tpSlSig,
-          //vaultAddress: hlVaultAddress ?? undefined,
-          vaultAddress: tpSlTarget,
-          ...(isXyz ? { dex: 'xyz' } : {}),
-        }),
-      })
-      const tpSlData = await tpSlRes.json()
-      console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
-      console.log('[HL] hlAddress:', hlAddress)
-      console.log('[HL] hlVaultAddress:', hlVaultAddress)
-      console.log('[HL] tpSlTarget:', tpSlTarget)
-      console.log('[HL] wallet.address (agent):', wallet.address)
-
-      console.log('[HL] credentials reçus:', {
-      hlAgentPk: hlAgentPk ? '✅ présent' : '❌ absent',
-      hlAddress,
-      hlVaultAddress,
-      })
-      
-      console.log('[HL] tpSlConfig:', JSON.stringify(tpSlConfig))
-
-      if (tpSlData?.status !== 'ok') {
-        console.warn('[HL] TP/SL placement échoué (ordre principal OK):', JSON.stringify(tpSlData))
-      }
-    } catch (e) {
-      console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
+        ...(isXyz ? { dex: 'xyz' } : {}),
+      }),
+    })
+    const tpSlData = await tpSlRes.json()
+    console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
+    if (tpSlData?.status !== 'ok') {
+      console.warn('[HL] TP/SL placement échoué (ordre principal OK):', JSON.stringify(tpSlData))
     }
+  } catch (e) {
+    console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
   }
-
+}
   return data
 }
 
