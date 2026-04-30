@@ -9,7 +9,7 @@ import { ExchangeClient, HttpTransport } from '@nktkas/hyperliquid'
 import { signL1Action } from '@nktkas/hyperliquid/signing'
 import { privateKeyToAccount } from 'viem/accounts'
 import { roundToHLPrice } from '../utils/trading.js'
-import { buildHlTpSlAction } from '../utils/tpsl.js'   // ← ajout TP/SL
+import { buildHlTpSlAction, buildHlTpSlOrders } from '../utils/tpsl.js'
 
 const HL_API = 'https://api.hyperliquid.xyz/info'
 export const XYZ_OFFSET = 110_000
