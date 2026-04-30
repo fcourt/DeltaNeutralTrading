@@ -327,7 +327,7 @@ export async function updateLeverageByName({ hlAgentPk, hlVaultAddress, coin, le
 // passage d'ordre///////////////////////////////////////////////////////////////////////////////////
 export async function placeOrder(order, credentials) {
   const { isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig } = order  // ← tpSlConfig ajouté
-  const { hlAgentPk, hlVaultAddress } = credentials
+  const { hlAgentPk, hlVaultAddress, hlAddress } = credentials
   if (!hlAgentPk) throw new Error('Clé agent HL manquante')
   if (market.assetIndex === null) throw new Error(`Index non résolu pour ${market.label}`)
 
