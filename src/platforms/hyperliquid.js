@@ -379,6 +379,7 @@ export async function placeOrder(order, credentials) {
 })
 
   // ── TP/SL : requête séparée après l'ordre principal ← ajout depuis nouveau fichier
+  /*
   if (tpSlConfig) {
   try {
     // 1. Variables indépendantes en premier
@@ -431,6 +432,33 @@ export async function placeOrder(order, credentials) {
     console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
   }
 }
+*/
+
+if (tpSlConfig) {
+  try {
+    const szWire = roundedSize.toFixed(market.szDecimals ?? 6)
+
+    const tpSlOrders = buildHlTpSlOrders({
+      side:       isBuy ? 'long' : 'short',
+      prices:     tpSlConfig.prices,
+      assetIndex: market.assetIndex,
+      size:       szWire,
+    })
+
+    console.log('[HL] TP/SL orders:', JSON.stringify(tpSlOrders))
+
+    const tpSlData = await client.order({
+      orders:   tpSlOrders,
+      grouping: 'positionTpsl',
+    })
+
+    console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
+
+  } catch (e) {
+    console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
+  }
+}
+  
   return data
 }
 
