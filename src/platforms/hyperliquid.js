@@ -391,9 +391,11 @@ export async function placeOrder(order, credentials) {
       })
       const tpSlNonce = Date.now()
       const tpSlSig   = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
-      const tpSlTarget = hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim())
+      const tpSlTarget = (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim()))
         ? hlVaultAddress.trim()
-        : hlAddress
+        : hlAddress?.trim()
+
+      if (!tpSlTarget) throw new Error('[HL] Adresse wallet manquante pour le TP/SL')
 
       console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
 
@@ -409,6 +411,10 @@ export async function placeOrder(order, credentials) {
       })
       const tpSlData = await tpSlRes.json()
       console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
+      console.log('[HL] hlAddress:', hlAddress)
+      console.log('[HL] hlVaultAddress:', hlVaultAddress)
+      console.log('[HL] tpSlTarget:', tpSlTarget)
+      console.log('[HL] wallet.address (agent):', wallet.address)
 
       console.log('[HL] credentials reçus:', {
       hlAgentPk: hlAgentPk ? '✅ présent' : '❌ absent',
