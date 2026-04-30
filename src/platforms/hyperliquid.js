@@ -389,16 +389,7 @@ export async function placeOrder(order, credentials) {
         assetIndex: market.assetIndex,
         size:       szWire,
       })
-      const tpSlNonce = Date.now()
-      //const tpSlSig   = await signL1Action({ wallet, action: tpSlAction, nonce: tpSlNonce })
-
-      const tpSlSig = await signL1Action({
-        wallet,
-        action: tpSlAction,
-        nonce: tpSlNonce,
-        vaultAddress: tpSlTarget,
-      })
-      
+            
       const tpSlTarget = (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim()))
         ? hlVaultAddress.trim()
         : hlAddress?.trim()
@@ -406,6 +397,14 @@ export async function placeOrder(order, credentials) {
       if (!tpSlTarget) throw new Error('[HL] Adresse wallet manquante pour le TP/SL')
 
       console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
+
+      const tpSlNonce = Date.now()
+      const tpSlSig = await signL1Action({
+        wallet,
+        action: tpSlAction,
+        nonce: tpSlNonce,
+        vaultAddress: tpSlTarget,
+      })
 
       const tpSlRes  = await fetch('https://api.hyperliquid.xyz/exchange', {
         method:  'POST',
