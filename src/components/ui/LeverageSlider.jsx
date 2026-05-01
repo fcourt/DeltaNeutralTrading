@@ -1,23 +1,18 @@
 // src/components/ui/LeverageSlider.jsx
-// Slider de levier par leg card
-// Extended : PATCH /api/v1/user/leverage
-// HL       : POST /exchange { type: 'updateLeverage', asset, isCross, leverage }
-
 import { useState, useCallback } from 'react'
-import { setLeverage as extSetLeverage }         from '../../platforms/extended'
-import { updateLeverageByName as hlSetLeverage } from '../../platforms/hyperliquid'
+import { getPlatform } from '../../platforms/index.js'
 
 /**
  * @param {object}   props
- * @param {number}   props.value             - levier courant
+ * @param {number}   props.value
  * @param {Function} props.onChange          - (leverage: number) => void
- * @param {number}   props.min               - levier minimum du marché
- * @param {number}   props.max               - levier maximum du marché (ex: 50)
+ * @param {number}   props.min
+ * @param {number}   props.max
  * @param {'long'|'short'} props.side
- * @param {'extended'|'hyperliquid'|'nado'} props.platform
- * @param {object}   props.market            - { extKey, hlKey }
- * @param {object}   props.credentials       - { extApiKey, hlAgentPk, hlAddress }
- * @param {boolean}  [props.isCross=false]   - mode HL : cross ou isolated
+ * @param {string}   props.platformId        - 'hyperliquid' | 'extended' | 'nado' | …
+ * @param {object}   props.market            - { keys: { hl, ext, nado, … } }
+ * @param {object}   props.credentials
+ * @param {boolean}  [props.isCross=false]
  */
 export default function LeverageSlider({
   value,
@@ -25,38 +20,38 @@ export default function LeverageSlider({
   min = 1,
   max = 50,
   side,
-  platform,
+  platformId,
   market,
   credentials,
   isCross = false,
 }) {
-  const [status, setStatus] = useState(null)   // null | 'loading' | 'ok' | 'error'
+  const [status, setStatus] = useState(null)  // null | 'loading' | 'ok' | 'error'
   const [errMsg, setErrMsg] = useState(null)
 
   const apply = useCallback(async () => {
     if (!market || !value) return
+
+    const platform = getPlatform(platformId)
+    //if (!platform?.adapter?.setLeverage) return  // plateforme sans setLeverage → silencieux
+    if (!getPlatform(platformId)?.adapter?.setLeverage) return // plateforme sans setLeverage → bouton désactivé
+    
+
     setStatus('loading')
     setErrMsg(null)
     try {
-      if (platform === 'extended') {
-        await extSetLeverage(market.extKey, value, credentials.extApiKey)
-      } else if (platform === 'hyperliquid') {
-        await hlSetLeverage({
-          hlAgentPk: credentials.hlAgentPk,
-          hlAddress:  credentials.hlAddress,
-          hlVaultAddress: credentials.hlVaultAddress,
-          coin:       market.hlKey,
-          leverage:   value,
-          isCross,
-        })
-      }
+      await platform.adapter.setLeverage({
+        market,
+        leverage: value,
+        isCross,
+        credentials,
+      })
       setStatus('ok')
     } catch (e) {
       setStatus('error')
       setErrMsg(e.message)
     }
     setTimeout(() => setStatus(null), 2500)
-  }, [platform, market, credentials, value, isCross])
+  }, [platformId, market, credentials, value, isCross])
 
   const label = side === 'long' ? '🟢 Long' : '🔴 Short'
 
@@ -72,8 +67,8 @@ export default function LeverageSlider({
           title="Appliquer le levier sur la plateforme"
         >
           {status === 'loading' ? '…'
-           : status === 'ok'      ? '✓'
-           : status === 'error'   ? '✗'
+           : status === 'ok'    ? '✓'
+           : status === 'error' ? '✗'
            : '⚡'}
         </button>
       </div>
@@ -81,9 +76,7 @@ export default function LeverageSlider({
       <input
         type="range"
         className="lev-slider__range"
-        min={min}
-        max={max}
-        step={1}
+        min={min} max={max} step={1}
         value={value}
         onChange={e => onChange(Number(e.target.value))}
       />
@@ -100,3 +93,26 @@ export default function LeverageSlider({
     </div>
   )
 }
+
+/*
+Chaque adapter expose setLeverage avec une signature unifiée :
+
+// src/platforms/hyperliquid.js
+export async function setLeverage({ market, leverage, isCross, credentials }) {
+  return updateLeverageByName({
+    hlAgentPk:      credentials.hlAgentPk,
+    hlAddress:      credentials.hlAddress,
+    hlVaultAddress: credentials.hlVaultAddress,
+    coin:           market.keys?.hl,
+    leverage,
+    isCross,
+  })
+}
+
+// src/platforms/extended.js
+export async function setLeverage({ market, leverage, credentials }) {
+  return extSetLeverage(market.keys?.ext, leverage, credentials.extApiKey)
+}
+
+// src/platforms/nado.js — ne supporte pas setLeverage → ne pas exposer la fn
+*/
