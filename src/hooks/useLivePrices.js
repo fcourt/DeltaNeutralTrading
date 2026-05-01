@@ -143,9 +143,9 @@ export function useLivePrices(intervalMs = 3000) {
     markets, prices, lastUpdate,
     getPrice, getStepSize, getAssetMeta, getExtPrecision,
     // Rétrocompatibilité — accès directs aux mids par source
-    hlMids:   prices['hl']?.prices   ?? {},
-    extMids:  prices['ext']?.priceMap ?? {},
-    nadoMids: prices['nado']?.prices  ?? {},
+    //hlMids:   prices['hl']?.prices   ?? {},
+    //extMids:  prices['ext']?.priceMap ?? {},
+    //nadoMids: prices['nado']?.prices  ?? {},
   }
 }
 
