@@ -12,8 +12,7 @@ import {
   KEY_OVERRIDES,                            // ← nouveau nom unifié
 } from '../config/markets.js'
 
-const extKey  = id in KEY_OVERRIDES.ext  ? KEY_OVERRIDES.ext[id]  : ...
-const nadoKey = KEY_OVERRIDES.nado[id]   ?? id
+
 import { ExchangeClient, HttpTransport } from '@nktkas/hyperliquid'
 import { signL1Action } from '@nktkas/hyperliquid/signing'
 import { privateKeyToAccount } from 'viem/accounts'
