@@ -326,10 +326,12 @@ async function buildExtendedTpSl({
   expiryEpochMs,
   saltBase,      // nonce de base — +1 pour TP, +2 pour SL
   pxDecimals = 2,
+  isTradFi = false,   // ← nouveau paramètre
 }) {
   const isLong    = side === 'long'
   const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
   const slTrigger = isLong ? prices.downPrice : prices.upPrice
+  const triggerPriceType = isTradFi ? 'MARK' : 'LAST'   // ← adaptatif
 
   const [tpSettlement, slSettlement] = await Promise.all([
     signTpSlSettlement({
@@ -342,6 +344,7 @@ async function buildExtendedTpSl({
     signTpSlSettlement({
       extStarkPk, vaultId, side, size,
       triggerPrice:  slTrigger,
+      triggerPriceType,   // ← ici
       marketL2Config, feeRate, expiryEpochMs,
       //salt: saltBase + 2,
       salt: saltBase,
@@ -359,7 +362,8 @@ async function buildExtendedTpSl({
     },
     stopLoss: {
       triggerPrice:     String(slTrigger.toFixed(pxDecimals)),
-      triggerPriceType: 'LAST',
+      //triggerPriceType: 'LAST',
+      triggerPriceType,   // ← ici
       price:            String(slTrigger.toFixed(pxDecimals)),
       priceType:        'MARKET',
       settlement:       slSettlement,
@@ -501,6 +505,7 @@ export async function placeOrder(order, credentials) {
   }
 
   if (tpSlConfig?.prices) {
+    const isTradFi = market.category === 'TradFi'   // ou 'Equity', 'Forex', 'Commodity'...
     const tpSlBlock = await buildExtendedTpSl({
       side:           isBuy ? 'long' : 'short',
       prices:         tpSlConfig.prices,
@@ -513,6 +518,7 @@ export async function placeOrder(order, credentials) {
       expiryEpochMs:  expiryEpochMillis,
       saltBase:       nonce,             // TP = nonce+1, SL = nonce+2 → nonces uniques
       pxDecimals,
+      isTradFi,      // ← passer le flag
     })
     Object.assign(payload, tpSlBlock)
   }
