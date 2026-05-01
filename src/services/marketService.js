@@ -1,44 +1,63 @@
 // src/services/marketService.js
-import * as HL   from '../platforms/hyperliquid.js'
-import * as Nado from '../platforms/nado.js'
+import { PLATFORMS, getPlatform, platformHasMarket } from '../platforms/index.js'
 import { EMPTY_MARKET, NADO_ONLY_MARKETS } from '../config/markets.js'
 
 export async function getAllMarkets() {
-  const [hlResult, nadoSymbols] = await Promise.all([
-    HL.getMarkets(),
-    Nado.getSymbols().catch(() => ({})),
-  ])
+  // Sources uniques qui exposent getMarkets()
+  const seen = new Set()
+  const marketSources = PLATFORMS.filter(p => {
+    if (seen.has(p.source)) return false
+    seen.add(p.source)
+    return typeof p.adapter.getMarkets === 'function'
+  })
+
+  // Récupérer tous les marchés de toutes les sources en parallèle
+  const results = await Promise.allSettled(
+    marketSources.map(p => p.adapter.getMarkets())
+  )
+
+  // Fusionner les marchés découverts
+  const discoveredMarkets = new Map()
+  for (const result of results) {
+    if (result.status !== 'fulfilled') continue
+    for (const [id, market] of result.value.discoveredMarkets ?? new Map()) {
+      if (!discoveredMarkets.has(id)) discoveredMarkets.set(id, market)
+    }
+  }
+
+  // Sources qui exposent getSymbols() pour enrichissement
+  const symbolSources = PLATFORMS.filter((p, i, arr) =>
+    arr.findIndex(x => x.source === p.source) === i &&
+    typeof p.adapter.getSymbols === 'function'
+  )
+  const symbolResults = await Promise.allSettled(
+    symbolSources.map(p => p.adapter.getSymbols())
+  )
+  const allSymbols = symbolResults
+    .filter(r => r.status === 'fulfilled')
+    .reduce((acc, r) => ({ ...acc, ...r.value }), {})
+
   const baseMarkets = [
-    ...hlResult.discoveredMarkets.values(),
-    ...NADO_ONLY_MARKETS.filter(m => !hlResult.discoveredMarkets.has(m.id)),
+    ...discoveredMarkets.values(),
+    ...NADO_ONLY_MARKETS.filter(m => !discoveredMarkets.has(m.id)),
   ]
+
   return [
     EMPTY_MARKET,
-    ...baseMarkets.map(m => ({ ...m, ...(nadoSymbols[m.id] ?? {}) })),
+    ...baseMarkets.map(m => ({ ...m, ...(allSymbols[m.id] ?? {}) })),
   ]
 }
 
+
 export function filterMarkets(p1Id, p2Id, allMarkets) {
-  const hasP1 = (m) => {
-    if (!p1Id) return false
-    if (['hyperliquid', 'xyz', 'hyena'].includes(p1Id)) return !!m.hlKey
-    if (p1Id === 'extended') return !!m.extKey
-    if (p1Id === 'nado')     return !!m.nadoProductId
-    return false
-  }
-  const hasP2 = (m) => {
-    if (!p2Id) return true
-    if (['hyperliquid', 'xyz', 'hyena'].includes(p2Id)) return !!m.hlKey
-    if (p2Id === 'extended') return !!m.extKey
-    if (p2Id === 'nado')     return !!m.nadoProductId || !!m.nadoKey 
-    return false
-  }
   const real      = allMarkets.filter(m => m.id !== '')
-  const p1Markets = real.filter(hasP1)
-  const p2Markets = real.filter(hasP2)
-  const markets   = p2Id
+  const p1Markets = p1Id ? real.filter(m => platformHasMarket(p1Id, m)) : []
+  const p2Markets = p2Id ? real.filter(m => platformHasMarket(p2Id, m)) : real
+
+  const markets = p2Id
     ? p1Markets.filter(m => p2Markets.some(m2 => m2.id === m.id))
     : p1Markets
+
   return {
     markets: [EMPTY_MARKET, ...markets],
     isIntersection: !!p2Id,
