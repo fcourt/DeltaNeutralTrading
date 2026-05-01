@@ -1,0 +1,18 @@
+📋 README
+
+Pour intégrer une nouvelle plateforme
+
+Étape 1 — src/platforms/index.js
+Ajouter une entrée dans le tableau PLATFORMS :
+
+import * as maNouvellePlateforme from './ma-nouvelle-plateforme.js'
+
+{
+  id:           'ma-plateforme',        // identifiant unique utilisé partout dans l'app
+  label:        'Ma Plateforme',        // nom affiché dans l'UI
+  source:       'ma-plateforme',        // groupe backend (partagé si même API)
+  adapter:      maNouvellePlateforme,   // module importé
+  marketKey:    'maPfKey',             // champ sur l'objet market qui prouve la dispo
+  altMarketKey: 'maPfKeyAlt',          // optionnel — second champ accepté (OR logique)
+}
+
