@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
 import { getPlatform, PLATFORMS } from '../platforms/index.js'
-import { useLivePrices, PLATFORMS } from '../hooks/useLivePrices'
+import { useLivePrices } from '../hooks/useLivePrices'
 import { useMarketFilter }          from '../hooks/useMarketFilter'
 import { useFundingRates }          from '../hooks/useFundingRates'
 import { usePlaceOrder }            from '../hooks/usePlaceOrder'
@@ -273,7 +273,7 @@ export default function OpenTrade() {
   const { p1: fundingP1, p2: fundingP2, p1Bid, p1Ask, p2Bid, p2Ask } =
     useFundingRates(marketId, platform1, platform2, extApiKey, markets)
   const { margins } = useMargins(credentials)
-  const { placeOrder } = usePlaceOrder(markets)
+  //const { placeOrder } = usePlaceOrder(markets)
 
   // Reset controls when market changes
   useEffect(() => {
