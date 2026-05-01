@@ -38,7 +38,7 @@ export default function TpSlPanel({
 
   useEffect(() => {
     onTpSlChange?.(enabled && prices ? { tpPct, slPct, prices } : null)
-  }, [enabled, tpPct, slPct, prices])
+  }, [enabled, tpPct, slPct, prices, onTpSlChange])
 
   return (
     <div className="tpsl-panel">
