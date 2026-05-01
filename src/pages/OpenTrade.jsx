@@ -278,8 +278,10 @@ export default function OpenTrade() {
 
   const { markets, getPrice, getStepSize, getAssetMeta, getExtPrecision, lastUpdate } = useLivePrices(3000)
   const { filteredMarkets, loading, errors, isIntersection, counts } = useMarketFilter(platform1, platform2, markets)
+  //const { p1: fundingP1, p2: fundingP2, p1Bid, p1Ask, p2Bid, p2Ask } =
+  //  useFundingRates(marketId, platform1, platform2, extApiKey, markets)
   const { p1: fundingP1, p2: fundingP2, p1Bid, p1Ask, p2Bid, p2Ask } =
-    useFundingRates(marketId, platform1, platform2, extApiKey, markets)
+    useFundingRates(marketId, platform1, platform2, wallet.extApiKey, markets)
   const { margins } = useMargins(credentials)
   //const { placeOrder } = usePlaceOrder(markets)
 
