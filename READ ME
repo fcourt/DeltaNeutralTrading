@@ -62,6 +62,18 @@ getPositions(credentials, markets) → retourne Position[]
 
 Si plusieurs entrées PLATFORMS partagent le même source (ex: hl, xyz, hyena), getPositions n'est appelé qu'une seule fois par source.
 
+### Étape 5 — src/platforms/ma-nouvelle-plateforme.js
+
+Fonctions attendues pour priceService :
+
+getPrices()         → { priceMap: { [key]: price }, ... } ou shape plate { [key]: price }
+getFundingRate(market, credentials) → { rate, bid, ask }
+
+Le champ market.keys doit contenir la clé propre à la source :
+
+// src/config/markets.js
+{ id: 'BTC', keys: { hl: 'BTC', nado: 'BTC-PERP', maPf: 'BTCUSDT' } }
+
 
 
 
