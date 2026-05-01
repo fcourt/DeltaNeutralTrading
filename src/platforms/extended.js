@@ -506,6 +506,9 @@ export async function placeOrder(order, credentials) {
 
   if (tpSlConfig?.prices) {
     const isTradFi = market.category === 'TradFi'   // ou 'Equity', 'Forex', 'Commodity'...
+
+    console.log('[Extended] market.category:', market.category, '| isTradFi:', isTradFi)
+    
     const tpSlBlock = await buildExtendedTpSl({
       side:           isBuy ? 'long' : 'short',
       prices:         tpSlConfig.prices,
