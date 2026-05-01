@@ -8,7 +8,7 @@ import {
 import { ExchangeClient, HttpTransport } from '@nktkas/hyperliquid'
 import { signL1Action } from '@nktkas/hyperliquid/signing'
 import { privateKeyToAccount } from 'viem/accounts'
-import { roundToHLPrice } from '../utils/trading.js'
+import { roundToHLPrice, roundToHLTick } from '../utils/trading.js'
 import { buildHlTpSlAction, buildHlTpSlOrders } from '../utils/tpsl.js'
 
 const HL_API = 'https://api.hyperliquid.xyz/info'
@@ -27,6 +27,7 @@ let _metaFetchPromise = null
 
 //helpers //////////////////////////////////////////////////////////////////////////////////////////
 // Ajouter cette fonction en haut du fichier (à côté de roundToHLPrice)
+/*
 function roundToHLTick(price, szDecimals = 0) {
   // HL : max 5 chiffres significatifs + max (6 - szDecimals) décimales
   const maxDecimals  = Math.max(0, 6 - szDecimals)
@@ -36,7 +37,7 @@ function roundToHLTick(price, szDecimals = 0) {
   const decimals = Math.min(maxDecimals, sigFigDec)
   return parseFloat(price.toFixed(decimals))
 }
-
+*/
 
 //infos HL //////////////////////////////////////////////////////////////////////////////////////
 async function fetchUniverse(body) {
