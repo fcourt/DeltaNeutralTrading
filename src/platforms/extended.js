@@ -336,13 +336,15 @@ async function buildExtendedTpSl({
       extStarkPk, vaultId, side, size,
       triggerPrice:  tpTrigger,
       marketL2Config, feeRate, expiryEpochMs,
-      salt: saltBase + 1,
+      //salt: saltBase + 1,
+      salt: saltBase,
     }),
     signTpSlSettlement({
       extStarkPk, vaultId, side, size,
       triggerPrice:  slTrigger,
       marketL2Config, feeRate, expiryEpochMs,
-      salt: saltBase + 2,
+      //salt: saltBase + 2,
+      salt: saltBase,
     }),
   ])
 
