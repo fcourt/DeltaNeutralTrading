@@ -261,12 +261,20 @@ export default function OpenTrade() {
   const [leverage2,  setLeverage2]  = useState(null) // null = auto
   const [tpSlConfig, setTpSlConfig] = useState(null)
 
-  const credentials = useMemo(() => ({
-    hlAddress, hlVaultAddress, hlAgentPk,
-    extApiKey, extStarkPk, extL2Vault,
-    nadoAddress, nadoAgentPk, nadoSubaccount,
-  }), [hlAddress, hlVaultAddress, hlAgentPk, extApiKey, extStarkPk, extL2Vault,
-      nadoAddress, nadoAgentPk, nadoSubaccount])
+  //si Wallet est mémoïsé
+  const wallet = useWallet()
+  const credentials = wallet
+
+  //si Wallet n'est pas mémoïzé
+  const wallet      = useWallet()
+  const credentials = useMemo(() => wallet, [wallet])
+  
+  //const credentials = useMemo(() => ({
+  //  hlAddress, hlVaultAddress, hlAgentPk,
+  //  extApiKey, extStarkPk, extL2Vault,
+  //  nadoAddress, nadoAgentPk, nadoSubaccount,
+  //}), [hlAddress, hlVaultAddress, hlAgentPk, extApiKey, extStarkPk, extL2Vault,
+  //    nadoAddress, nadoAgentPk, nadoSubaccount])
 
   const { markets, getPrice, getStepSize, getAssetMeta, getExtPrecision, lastUpdate } = useLivePrices(3000)
   const { filteredMarkets, loading, errors, isIntersection, counts } = useMarketFilter(platform1, platform2, markets)
