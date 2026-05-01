@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
+import { getPlatform, PLATFORMS } from '../platforms/index.js'
 import { useLivePrices, PLATFORMS } from '../hooks/useLivePrices'
 import { useMarketFilter }          from '../hooks/useMarketFilter'
 import { useFundingRates }          from '../hooks/useFundingRates'
@@ -297,7 +298,9 @@ export default function OpenTrade() {
   const plat2  = PLATFORMS.find(p => p.id === platform2)
   const market = markets.find(m => m.id === marketId)
 
-  const canTradePlatform     = (id) => id === 'extended' ? canTradeExt : id === 'nado' ? canTradeNado : canTradeHL
+  //const canTradePlatform     = (id) => id === 'extended' ? canTradeExt : id === 'nado' ? canTradeNado : canTradeHL
+  const { placeOrder, canTradeOn } = usePlaceOrder(markets)
+  const canTradePlatform = (id) => canTradeOn(id, credentials)
   const getMarginForPlatform = (id) => margins[id] ?? null
 
   const suggestion = useMemo(() => {
@@ -309,11 +312,10 @@ export default function OpenTrade() {
   const side2 = suggestion?.p2 ?? 'SHORT'
 
   const getDefaultLimitPrice = useCallback((platformId, side, price, bid, ask) => {
-    if (platformId === 'extended')
-      return side === 'LONG' ? (bid ?? price * (1 - PRICE_OFFSET)) : (ask ?? price * (1 + PRICE_OFFSET))
-    if (platformId === 'nado')
-      return Math.round(side === 'LONG' ? price * (1 - PRICE_OFFSET) : price * (1 + PRICE_OFFSET))
-    return roundToHLPrice(side === 'LONG' ? price * (1 - PRICE_OFFSET) : price * (1 + PRICE_OFFSET))
+    const rounder = getPlatform(platformId)?.adapter?.roundPrice ?? ((p) => p)
+    return side === 'LONG'
+      ? rounder(bid ?? price * (1 - PRICE_OFFSET))
+      : rounder(ask ?? price * (1 + PRICE_OFFSET))
   }, [])
 
   const getLimitPrice = useCallback((platformId, side, price, mode, customPx, bid, ask) => {
@@ -390,10 +392,12 @@ export default function OpenTrade() {
   const effLev1 = leverage1 ?? calc?.autoLeverage ?? 1
   const effLev2 = leverage2 ?? calc?.autoLeverage ?? 1
 
+  /* avant migration "dynamique"
   const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, leverage) => {
     if (!market) throw new Error('Marché non résolu')
     const stepSize = getStepSize(marketId)
-    const meta     = getAssetMeta(market.hlKey)
+    //const meta     = getAssetMeta(market.hlKey)
+    const meta     = getAssetMeta(market.keys?.hl)
     const raw      = useStepSize && stepSize
       ? Math.floor(sizeAsset / stepSize) * stepSize
       : sizeAsset
@@ -401,9 +405,13 @@ export default function OpenTrade() {
     if (platformId === 'extended') {
       finalSize = raw
     } else {
-      const szDecimals = platformId === 'nado'
-        ? (market.nadoSzDecimals ?? 6)
-        : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01)))
+      //const szDecimals = platformId === 'nado'
+      //  ? (market.nadoSzDecimals ?? 6)
+      //  : (meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01)))
+      const platform = getPlatform(platformId)
+      const szDecimals = platform?.adapter?.getSzDecimals?.(market, meta, stepSize)
+               ?? meta?.szDecimals
+               ?? Math.round(-Math.log10(stepSize || 0.01))
       finalSize = parseFloat(raw.toFixed(szDecimals))
     }
     return {
@@ -416,6 +424,31 @@ export default function OpenTrade() {
       market, ...credentials,
     }
   }
+  */
+
+// ── buildOrderParams ───────────────────────────────────────────────────────
+const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, leverage) => {
+  if (!market) throw new Error('Marché non résolu')
+  const stepSize = getStepSize(marketId)
+  const meta     = getAssetMeta(market.keys?.hl)   // ← market.keys.hl au lieu de market.hlKey
+  const raw      = useStepSize && stepSize
+    ? Math.floor(sizeAsset / stepSize) * stepSize
+    : sizeAsset
+  const adapter    = getPlatform(platformId)?.adapter
+  const szDecimals = adapter?.getSzDecimals?.(market, meta, stepSize)
+                  ?? meta?.szDecimals
+                  ?? Math.round(-Math.log10(stepSize || 0.01))
+  const finalSize  = parseFloat(raw.toFixed(szDecimals))
+  return {
+    platformId, marketId,
+    isBuy: side === 'LONG',
+    size: finalSize,
+    limitPrice, orderType, reduceOnly: false,
+    leverage: leverage ?? null,
+    tpSlConfig: tpSlConfig ?? null,
+    market, ...credentials,
+  }
+}
 
   const handlePlaceLeg = async (legNum) => {
     const setter     = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
@@ -693,3 +726,74 @@ export default function OpenTrade() {
     </div>
   )
 }
+
+/*
+Chaque adapter expose optionnellement buildOrderParams — szDecimals :
+
+// src/platforms/nado.js
+export function getSzDecimals(market) {
+  return market.nadoSzDecimals ?? 6
+}
+
+// src/platforms/extended.js — pas besoin, raw est utilisé tel quel
+// src/platforms/hyperliquid.js — pas besoin, meta.szDecimals est correct
+
+Chaque adapter expose optionnellement getDefaultLimitPrice :
+
+// src/platforms/hyperliquid.js
+export const roundPrice = roundToHLPrice
+
+// src/platforms/nado.js
+export const roundPrice = (p) => Math.round(p)
+
+// src/platforms/extended.js — pas besoin, roundPrice absent = identité
+
+
+
+//Résumé des changements
+
+// src/pages/OpenTrade.jsx
+import { getPlatform, PLATFORMS } from '../platforms/index.js'
+
+// ...
+
+// ── Dans OpenTrade() ──────────────────────────────────────────────────────
+
+const { placeOrder, canTradeOn } = usePlaceOrder(markets)
+const canTradePlatform = useCallback((id) => canTradeOn(id, credentials), [canTradeOn, credentials])
+
+// Supprimer canTradeHL, canTradeExt, canTradeNado du destructuring useWallet
+// (ou les conserver uniquement si d'autres parties de la page les utilisent)
+
+// ── getDefaultLimitPrice ──────────────────────────────────────────────────
+const getDefaultLimitPrice = useCallback((platformId, side, price, bid, ask) => {
+  const rounder = getPlatform(platformId)?.adapter?.roundPrice ?? ((p) => p)
+  return side === 'LONG'
+    ? rounder(bid ?? price * (1 - PRICE_OFFSET))
+    : rounder(ask ?? price * (1 + PRICE_OFFSET))
+}, [])
+
+// ── buildOrderParams ───────────────────────────────────────────────────────
+const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, leverage) => {
+  if (!market) throw new Error('Marché non résolu')
+  const stepSize = getStepSize(marketId)
+  const meta     = getAssetMeta(market.keys?.hl)   // ← market.keys.hl au lieu de market.hlKey
+  const raw      = useStepSize && stepSize
+    ? Math.floor(sizeAsset / stepSize) * stepSize
+    : sizeAsset
+  const adapter    = getPlatform(platformId)?.adapter
+  const szDecimals = adapter?.getSzDecimals?.(market, meta, stepSize)
+                  ?? meta?.szDecimals
+                  ?? Math.round(-Math.log10(stepSize || 0.01))
+  const finalSize  = parseFloat(raw.toFixed(szDecimals))
+  return {
+    platformId, marketId,
+    isBuy: side === 'LONG',
+    size: finalSize,
+    limitPrice, orderType, reduceOnly: false,
+    leverage: leverage ?? null,
+    tpSlConfig: tpSlConfig ?? null,
+    market, ...credentials,
+  }
+}
+*/
