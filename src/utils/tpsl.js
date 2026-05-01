@@ -21,8 +21,10 @@ import { roundToHLTick } from './trading.js'
 export function calcDeltaNeutralPrices({ entryPrice, tpPct, slPct }) {
   const p = Number(entryPrice)
   return {
-    upPrice:   +(p * (1 + tpPct / 100)).toFixed(2),
-    downPrice: +(p * (1 - slPct / 100)).toFixed(2),
+    //upPrice:   +(p * (1 + tpPct / 100)).toFixed(2),
+    //downPrice: +(p * (1 - slPct / 100)).toFixed(2),
+    upPrice:   +(p * (1 + tpPct / 100)),
+    downPrice: +(p * (1 - slPct / 100)),
   }
 }
 
