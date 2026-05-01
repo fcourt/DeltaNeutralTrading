@@ -59,8 +59,8 @@ export const KEY_OVERRIDES = {
 }
 
 // Rétrocompatibilité — à supprimer après migration des consommateurs
-export const EXT_KEY_OVERRIDES  = KEY_OVERRIDES.ext
-export const NADO_KEY_OVERRIDES = KEY_OVERRIDES.nado
+//export const EXT_KEY_OVERRIDES  = KEY_OVERRIDES.ext
+//export const NADO_KEY_OVERRIDES = KEY_OVERRIDES.nado
 
 export const NADO_ONLY_MARKETS = [
   { id: 'XRP',    label: 'XRP',      keys: { nado: 'XRP'    }, category: 'Crypto'  },
