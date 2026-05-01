@@ -91,7 +91,7 @@ function buildMarket(hlKey) {
     // ← migration hlKey/extKey/nadoKey → keys
     keys: { hl: hlKey, ext: extKey, nado: nadoKey },
     // rétrocompat le temps de la migration complète
-    hlKey, extKey, nadoKey,
+    //hlKey, extKey, nadoKey,
     assetIndex: null, nadoProductId: null,
   }
 }
