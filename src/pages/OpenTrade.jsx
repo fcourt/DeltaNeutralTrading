@@ -266,8 +266,8 @@ export default function OpenTrade() {
   const credentials = wallet
 
   //si Wallet n'est pas mémoïzé
-  const wallet      = useWallet()
-  const credentials = useMemo(() => wallet, [wallet])
+  //const wallet      = useWallet()
+  //const credentials = useMemo(() => wallet, [wallet])
   
   //const credentials = useMemo(() => ({
   //  hlAddress, hlVaultAddress, hlAgentPk,
