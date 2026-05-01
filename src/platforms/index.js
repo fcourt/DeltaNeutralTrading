@@ -21,6 +21,7 @@ export const PLATFORMS = [
   { id: 'nado',        label: 'Nado',        source: 'nado', adapter: nado,        keysField: 'nado' },
 ]
 
+// Helper central — remplace tous les if/switch de l'app
 export function platformHasMarket(platformId, market) {
   const p = getPlatform(platformId)
   if (!p) return false
@@ -33,12 +34,15 @@ export function platformHasMarket(platformId, market) {
 
 export const getPlatform = (id) => PLATFORMS.find(p => p.id === id) ?? null
 
+/*
 // Helper central — remplace tous les if/switch de l'app
 export function platformHasMarket(platformId, market) {
   const p = getPlatform(platformId)
   if (!p) return false
   return !!market[p.marketKey] || (p.altMarketKey ? !!market[p.altMarketKey] : false)
 }
+*/
+
 /**
  * @typedef {Object} Market
  * @property {string}      id
