@@ -59,3 +59,10 @@ export async function getFundingRate(platformId, market, credentials = {}) {
 
   return platform.adapter.getFundingRate(market, credentials)
 }
+
+/*
+Ce qu'il faut aussi mettre à jour en parallèle :
+
+market.keys dans src/config/markets.js → migrer hlKey/nadoKey/extKey vers keys: { hl: '...', nado: '...', ext: '...' }
+
+Ajouter getFundingRate(market, credentials) dans chaque adapter (hyperliquid.js, extended.js, nado.js)
