@@ -80,6 +80,23 @@ function generateOrderId() {
 // Public helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── Interface unifiée attendue par les services ───────────────────────────────
+
+export function canTrade(credentials) {
+  return !!credentials.extStarkPk && !!credentials.extL2Vault
+}
+
+// roundPrice — utilisé par OpenTrade.getDefaultLimitPrice
+export const roundPrice = (p) => p  // Extended : pas d'arrondi spécifique
+
+// getSzDecimals — utilisé par OpenTrade.buildOrderParams
+export function getSzDecimals(market, meta, stepSize) {
+  // Extended utilise raw tel quel — szDecimals depuis l2Config via getPrices()
+  return meta?.szDecimals ?? 5
+}
+
+// ─────────────────────────────── Interface unifiée attendue par les services ──
+
 export async function getMarkets() {
   const cached = getCached('extended_keys')
   if (cached) return cached
@@ -142,6 +159,7 @@ export async function getPrices() {
   }
 }
 
+/* avant migration "dynamique"
 export async function getFunding(extKey, apiKey) {
   if (!extKey || !apiKey) return { fundingRate: null, bid: null, ask: null }
   try {
@@ -157,6 +175,29 @@ export async function getFunding(extKey, apiKey) {
     }
   } catch { return { fundingRate: null, bid: null, ask: null } }
 }
+*/
+// Signature unifiée : (market, credentials)
+export async function getFundingRate(market, credentials) {
+  const extKey = market.keys?.ext
+  const apiKey = credentials.extApiKey
+  if (!extKey || !apiKey) return { rate: null, bid: null, ask: null }
+  try {
+    const res  = await fetch(
+      `${EXT_PROXY}?endpoint=${encodeURIComponent('/info/markets')}`,
+      { headers: { 'X-Api-Key': apiKey } }
+    )
+    if (!res.ok) return { rate: null, bid: null, ask: null }
+    const data = await res.json()
+    const m    = (data.data || []).find(m => m.name === extKey)
+    if (!m) return { rate: null, bid: null, ask: null }
+    return {
+      rate: parseFloat(m.marketStats?.fundingRate ?? null),
+      bid:  parseFloat(m.marketStats?.bidPrice   ?? null),
+      ask:  parseFloat(m.marketStats?.askPrice   ?? null),
+    }
+  } catch { return { rate: null, bid: null, ask: null } }
+}
+
 
 export async function getMargin(credentials) {
   const { extApiKey } = credentials
@@ -173,7 +214,8 @@ export async function getPositions(credentials, markets = []) {
     const res  = await fetch(`${EXT_PROXY}?endpoint=${encodeURIComponent('/user/positions')}`, { headers: { 'X-Api-Key': extApiKey } })
     const data = await res.json()
     return (data?.data || []).map(p => {
-      const market = markets.find(m => m.extKey === p.market)
+      //const market = markets.find(m => m.extKey === p.market)
+      const market = markets.find(m => m.keys?.ext === p.market)
       return {
         platform: 'extended', coin: p.market,
         marketId: market?.id ?? null, label: market?.label ?? p.market,
@@ -219,6 +261,7 @@ export async function loadL2Configs() {
 // Leverage — PATCH /api/v1/user/leverage
 // ─────────────────────────────────────────────────────────────────────────────
 
+/* avant migration "dynamique"
 export async function setLeverage(marketKey, leverage, apiKey) {
   if (!leverage || leverage <= 0 || !marketKey || !apiKey) return
   const res = await fetch(
@@ -237,6 +280,30 @@ export async function setLeverage(marketKey, leverage, apiKey) {
   if (!res.ok || data?.status === 'ERROR')
     throw new Error(data?.error?.message || `Extended setLeverage HTTP ${res.status}`)
   console.log('[Extended] Leverage set:', data?.data)
+  return data?.data
+}
+*/
+
+// Signature unifiée : { market, leverage, credentials }
+export async function setLeverage({ market, leverage, credentials }) {
+  const marketKey = market.keys?.ext
+  const apiKey    = credentials.extApiKey
+  if (!leverage || leverage <= 0 || !marketKey || !apiKey) return
+  const res = await fetch(
+    `${EXT_PROXY}?endpoint=${encodeURIComponent('/user/leverage')}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+        'User-Agent': 'TrekApp/1.0',
+      },
+      body: JSON.stringify({ market: marketKey, leverage: Math.round(leverage) }),
+    }
+  )
+  const data = await res.json()
+  if (!res.ok || data?.status === 'ERROR')
+    throw new Error(data?.error?.message || `Extended setLeverage HTTP ${res.status}`)
   return data?.data
 }
 
