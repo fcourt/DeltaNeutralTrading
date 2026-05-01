@@ -1,18 +1,7 @@
 // src/hooks/usePlaceOrder.js
 import { placeOrder as servicePlaceOrder, canTrade } from '../services/orderService.js'
+import { PLATFORMS } from '../platforms/index.js'
 
-/**
- * Hook de placement d'ordre.
- * Les credentials sont passés explicitement depuis DeltaNeutralPage.
- *
- * params attendus par placeOrder() :
- *   - platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly
- *   - hlAddress, hlVaultAddress, hlAgentPk
- *   - extApiKey, extStarkPk, extL2Vault
- *   - nadoAddress, nadoAgentPk, nadoSubaccount
- *   - leverage    {number|null}  → transmis à l'adaptateur (setLeverage avant l'ordre)
- *   - tpSlConfig  {object|null}  → { tpPct, slPct, prices: { upPrice, downPrice } }
- */
 export function usePlaceOrder(markets = []) {
 
   const placeOrder = async (params) => {
@@ -24,8 +13,8 @@ export function usePlaceOrder(markets = []) {
       hlAddress, hlVaultAddress, hlAgentPk,
       extApiKey, extStarkPk, extL2Vault,
       nadoAddress, nadoAgentPk, nadoSubaccount,
-      leverage,    // transmis à l'adaptateur via orderService
-      tpSlConfig,  // transmis à l'adaptateur via orderService
+      leverage,
+      tpSlConfig,
     } = params
 
     const credentials = {
@@ -41,9 +30,19 @@ export function usePlaceOrder(markets = []) {
     )
   }
 
-  const canTradeHL   = (creds) => canTrade('hyperliquid', creds)
-  const canTradeExt  = (creds) => canTrade('extended', creds)
-  const canTradeNado = (creds) => canTrade('nado', creds)
+  // canTradeOn — générique, remplace les 3 helpers hardcodés
+  // Usage : canTradeOn('hyperliquid', creds)  canTradeOn('nado', creds)
+  const canTradeOn = (platformId, creds) => canTrade(platformId, creds)
 
-  return { placeOrder, canTradeHL, canTradeExt, canTradeNado }
+  // Rétrocompatibilité — à supprimer progressivement dans les composants consommateurs
+  const canTradeHL   = (creds) => canTradeOn('hyperliquid', creds)
+  const canTradeExt  = (creds) => canTradeOn('extended',    creds)
+  const canTradeNado = (creds) => canTradeOn('nado',        creds)
+
+  // Map complète : { hyperliquid: fn, xyz: fn, nado: fn, … }
+  const canTradeMap = Object.fromEntries(
+    PLATFORMS.map(p => [p.id, (creds) => canTradeOn(p.id, creds)])
+  )
+
+  return { placeOrder, canTradeOn, canTradeHL, canTradeExt, canTradeNado, canTradeMap }
 }
