@@ -231,12 +231,13 @@ function LegCard({
 // ── OpenTrade page ────────────────────────────────────────────────────────────
 export default function OpenTrade() {
   const { t } = useTranslation()
-  const {
-    hlAddress, hlVaultAddress, hlAgentPk,
-    extApiKey, extStarkPk, extL2Vault,
-    nadoAddress, nadoAgentPk, nadoSubaccount,
-    canTradeHL, canTradeExt, canTradeNado,
-  } = useWallet()
+
+  //const {
+  //  hlAddress, hlVaultAddress, hlAgentPk,
+  //  extApiKey, extStarkPk, extL2Vault,
+  //  nadoAddress, nadoAgentPk, nadoSubaccount,
+  //  canTradeHL, canTradeExt, canTradeNado,
+  //} = useWallet()
 
   const [platform1,        setPlatform1]        = useState('hyperliquid')
   const [platform2,        setPlatform2]        = useState('extended')
