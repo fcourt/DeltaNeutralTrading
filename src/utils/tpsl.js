@@ -129,6 +129,7 @@ export function buildHlTpSlOrders({ side, prices, assetIndex, size, szDecimals =
   const slTrigger = isLong ? prices.downPrice : prices.upPrice
 
   const makeOrder = (tpsl, triggerPx) => {
+    const roundedTrigger = roundToHLTick(triggerPx, szDecimals)  
     const rawLimit = closeSide ? triggerPx * 1.1 : triggerPx * 0.9
     const limitPx  = roundToHLTick(rawLimit, szDecimals)
     
