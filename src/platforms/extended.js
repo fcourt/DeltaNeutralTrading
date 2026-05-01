@@ -287,6 +287,23 @@ async function signTpSlSettlement({
   const msgHash = computeMessageHash(domainHash, starkKey, orderHash)
   const sig      = ec.starkCurve.sign(msgHash, extStarkPk)
 
+
+  console.log('[Extended] TP/SL signing:', {
+  vaultId: vaultId.toString(),
+  syntheticId,
+  collateralId,
+  baseAmount: baseAmount.toString(),
+  quoteAmount: quoteAmount.toString(),
+  feeAmount: feeAmount.toString(),
+  expirationSecs,
+  salt,
+  })
+
+  // Dans signTpSlSettlement — ajoute ce log pour confirmer
+console.log('[Extended] expiryEpochMs reçu:', expiryEpochMs)
+console.log('[Extended] expirationSecs calculé:', Math.ceil(expiryEpochMs / 1000) + SERVER_CLOCK_OFFSET_S)
+// Doit correspondre à debugInfo "seconds": "0x6a1929fb" = 1779834363
+  
   return {
     starkKey,
     collateralPosition: String(vaultId),
