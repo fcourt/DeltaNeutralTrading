@@ -2,7 +2,8 @@
 
 Pour intégrer une nouvelle plateforme
 
-Étape 1 — src/platforms/index.js
+### Étape 1 — src/platforms/index.js
+
 Ajouter une entrée dans le tableau PLATFORMS :
 
 import * as maNouvellePlateforme from './ma-nouvelle-plateforme.js'
@@ -15,4 +16,39 @@ import * as maNouvellePlateforme from './ma-nouvelle-plateforme.js'
   marketKey:    'maPfKey',             // champ sur l'objet market qui prouve la dispo
   altMarketKey: 'maPfKeyAlt',          // optionnel — second champ accepté (OR logique)
 }
+
+### Étape 2 — src/services/marketService.js
+
+Aucune modification requise si la nouvelle plateforme expose :
+- getMarkets() → retourne { discoveredMarkets: Map<id, market> }
+  Les marchés seront automatiquement fusionnés dans getAllMarkets()
+- getSymbols() → retourne { [marketId]: enrichissementObject }
+  Les symboles enrichiront automatiquement les marchés existants
+
+Le champ NADO_ONLY_MARKETS dans src/config/markets.js reste
+le seul endroit à modifier si des marchés n'existent que sur
+une seule plateforme et ne sont pas découverts via getMarkets().
+
+### Étape 3 — src/platforms/ma-nouvelle-plateforme.js
+
+La nouvelle plateforme doit exposer les fonctions suivantes :
+
+// Obligatoire — vérifie si les credentials sont suffisants pour trader
+export function canTrade(credentials) {
+  return !!credentials.maPfApiKey  // adapter selon les champs requis
+}
+
+// Obligatoire — place un ordre
+export async function placeOrder(order, credentials) { ... }
+
+// Recommandé
+export async function getMarkets()           { ... } // retourne { discoveredMarkets: Map }
+export async function getMargin(credentials) { ... } // retourne number (solde disponible)
+export async function getPositions(credentials, markets) { ... }
+export async function getFunding()           { ... }
+
+// Optionnel
+export async function getSymbols()           { ... } // enrichissement des marchés
+export async function setLeverage(...)       { ... }
+
 
