@@ -151,4 +151,20 @@ Pour ajouter une nouvelle plateforme :
   }
 }
 
+### Étape Étape 11 — Adapter complet : récapitulatif des exports attendus
+Voici l'interface complète qu'un adapter doit exposer. Tout est optionnel sauf placeOrder.
 
+| Export         | Obligatoire | Signature                                  | Rôle                    |
+| -------------- | ----------- | ------------------------------------------ | ----------------------- |
+| placeOrder     | ✅           | (order, credentials)                       | Placer un ordre         |
+| canTrade       | ✅           | (credentials) → bool                       | Vérifie les credentials |
+| getMarkets     | recommandé  | () → { discoveredMarkets: Map }            | Découverte des marchés  |
+| getPrices      | recommandé  | () → { priceMap, … }                       | Prix live               |
+| getFundingRate | recommandé  | (market, credentials) → { rate, bid, ask } | Funding + bid/ask       |
+| getMargin      | recommandé  | (credentials) → number                     | Solde disponible        |
+| getPositions   | recommandé  | (credentials, markets) → Position[]        | Positions ouvertes      |
+| getSymbols     | optionnel   | () → { [marketId]: enrichissement }        | Enrichissement marchés  |
+| setLeverage    | optionnel   | ({ market, leverage, credentials })        | Réglage levier          |
+| getFundingRate | optionnel   | (market, credentials) → { rate, bid, ask } | Funding                 |
+| roundPrice     | optionnel   | (price) → number                           | Arrondi prix plateforme |
+| getSzDecimals  | optionnel   | (market, meta, stepSize) → number          | Décimales taille        |
