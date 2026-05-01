@@ -1,10 +1,19 @@
 // src/platforms/hyperliquid.js
 // Couvre Hyperliquid, trade.xyz (dex:'xyz') et HyENA
 
+//import {
+//  HL_KEY_OVERRIDES, MARKET_LABELS, inferCategory,
+//  EXT_KEY_OVERRIDES, NADO_KEY_OVERRIDES,
+//} from '../config/markets.js'
+
+// hyperliquid.js — import migré
 import {
   HL_KEY_OVERRIDES, MARKET_LABELS, inferCategory,
-  EXT_KEY_OVERRIDES, NADO_KEY_OVERRIDES,
+  KEY_OVERRIDES,                            // ← nouveau nom unifié
 } from '../config/markets.js'
+
+const extKey  = id in KEY_OVERRIDES.ext  ? KEY_OVERRIDES.ext[id]  : ...
+const nadoKey = KEY_OVERRIDES.nado[id]   ?? id
 import { ExchangeClient, HttpTransport } from '@nktkas/hyperliquid'
 import { signL1Action } from '@nktkas/hyperliquid/signing'
 import { privateKeyToAccount } from 'viem/accounts'
@@ -68,10 +77,14 @@ function buildMarket(hlKey) {
   const override = HL_KEY_OVERRIDES[hlKey] || {}
   const id       = override.id || hlKey.replace(/^xyz:/, '')
   const isXyz    = hlKey.startsWith('xyz:')
-  const extKey   = id in EXT_KEY_OVERRIDES
-    ? EXT_KEY_OVERRIDES[id]
+  //const extKey   = id in EXT_KEY_OVERRIDES
+  //  ? EXT_KEY_OVERRIDES[id]
+  //  : !isXyz ? `${id}-USD` : `${id}_24_5-USD`
+  //const nadoKey  = NADO_KEY_OVERRIDES[id] ?? id
+  const extKey  = id in KEY_OVERRIDES.ext  
+    ? KEY_OVERRIDES.ext[id]  
     : !isXyz ? `${id}-USD` : `${id}_24_5-USD`
-  const nadoKey  = NADO_KEY_OVERRIDES[id] ?? id
+  const nadoKey = KEY_OVERRIDES.nado[id]   ?? id
   return {
     id, label: MARKET_LABELS[id] || id,
     category: isXyz ? inferCategory(id) : 'Crypto',
