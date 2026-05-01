@@ -131,7 +131,7 @@ export function buildHlTpSlOrders({ side, prices, assetIndex, size, szDecimals =
   const makeOrder = (tpsl, triggerPx) => {
     const rawLimit = closeSide ? triggerPx * 1.1 : triggerPx * 0.9
     const limitPx  = roundToHLTick(rawLimit, szDecimals)
-    const limitPx  = roundToHLTick(rawLimit, szDecimals)
+    
     return {
       a: assetIndex,
       b: closeSide,
