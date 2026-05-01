@@ -35,9 +35,9 @@ export function usePlaceOrder(markets = []) {
   const canTradeOn = (platformId, creds) => canTrade(platformId, creds)
 
   // Rétrocompatibilité — à supprimer progressivement dans les composants consommateurs
-  const canTradeHL   = (creds) => canTradeOn('hyperliquid', creds)
-  const canTradeExt  = (creds) => canTradeOn('extended',    creds)
-  const canTradeNado = (creds) => canTradeOn('nado',        creds)
+  //const canTradeHL   = (creds) => canTradeOn('hyperliquid', creds)
+  //const canTradeExt  = (creds) => canTradeOn('extended',    creds)
+  //const canTradeNado = (creds) => canTradeOn('nado',        creds)
 
   // Map complète : { hyperliquid: fn, xyz: fn, nado: fn, … }
   const canTradeMap = Object.fromEntries(
