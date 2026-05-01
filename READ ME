@@ -74,6 +74,29 @@ Le champ market.keys doit contenir la clé propre à la source :
 // src/config/markets.js
 { id: 'BTC', keys: { hl: 'BTC', nado: 'BTC-PERP', maPf: 'BTCUSDT' } }
 
+### Étape 6 — src/contexts/WalletContext.jsx
+C'est le seul fichier à modifier pour les credentials de la nouvelle plateforme.
+
+1. Ajouter les champs dans CREDENTIAL_FIELDS :
+
+{ key: 'maPf_api_key',    stateKey: 'maPfApiKey',    default: '', trim: false },
+{ key: 'maPf_secret_key', stateKey: 'maPfSecretKey', default: '', trim: false },
+// … selon les champs requis par la plateforme
+
+2. Décommenter (ou ajouter) le setter individuel :
+
+const saveMaPfApiKey    = (v) => save('maPfApiKey',    v)
+const saveMaPfSecretKey = (v) => save('maPfSecretKey', v)
+
+3. Décommenter (ou ajouter) le statut dérivé :
+
+const canTradeMaPf = canTrade('maPf', values)
+
+4. Exposer dans le value du Provider :
+
+saveMaPfApiKey, saveMaPfSecretKey,
+canTradeMaPf,
+
 
 
 
