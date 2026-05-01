@@ -505,7 +505,8 @@ export async function placeOrder(order, credentials) {
   }
 
   if (tpSlConfig?.prices) {
-    const isTradFi = market.category === 'TradFi'   // ou 'Equity', 'Forex', 'Commodity'...
+    //const isTradFi = market.category === 'TradFi'   // ou 'Equity', 'Forex', 'Commodity'...
+    const isTradFi = market.category !== 'Crypto'
 
     console.log('[Extended] market.category:', market.category, '| isTradFi:', isTradFi)
     
