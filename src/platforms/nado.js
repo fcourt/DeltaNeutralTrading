@@ -285,8 +285,9 @@ export async function getPositions(credentials, markets = []) {
         const market = markets.find(m => m.nadoProductId === p.product_id)
         const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
         return {
-          platform: 'nado', coin: market?.keys?.nado ?? market?.nadoKey ?? `product_${p.product_id}`,
+          platform: 'nado', //coin: market?.keys?.nado ?? market?.nadoKey ?? `product_${p.product_id}`,
           //coin: market?.nadoKey ?? `product_${p.product_id}`,
+          coin: market?.keys?.nado ?? `product_${p.product_id}`,
           marketId: market?.id ?? null, label: market?.label ?? `product_${p.product_id}`,
           side: szi > 0 ? 'LONG' : 'SHORT', szi: Math.abs(szi),
           entryPx: szi !== 0 ? Math.abs(vQuote / szi) : 0,
