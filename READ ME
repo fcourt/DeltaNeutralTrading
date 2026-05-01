@@ -137,6 +137,18 @@ export function getSzDecimals(market, meta, stepSize) {
   return market.keys?.maPf ? 3 : Math.round(-Math.log10(stepSize || 0.01))
 }
 
+### Étape 10 — src/pages/SettingKeys.jsx
+Pour ajouter une nouvelle plateforme :
 
+1. Décommenter le bloc dans platformBlocks et adapter les champs
+2. Ajouter les clés i18n correspondantes :
+
+"settingKeys": {
+  "platforms": { "maPf": "Ma Plateforme" },
+  "maPf": {
+    "apiKey":     "API Key",
+    "apiKeyHint": "Clé API générée dans les paramètres de votre compte"
+  }
+}
 
 
