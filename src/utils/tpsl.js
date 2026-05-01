@@ -128,7 +128,8 @@ export function buildHlTpSlOrders({ side, prices, assetIndex, size, szDecimals =
 
   const makeOrder = (tpsl, triggerPx) => {
     const rawLimit = closeSide ? triggerPx * 1.1 : triggerPx * 0.9
-    const limitPx  = roundToHLTick(rawLimit, szDecimals)  // ← règle HL exacte
+    const limitPx  = roundToHLTick(rawLimit, szDecimals)
+    const limitPx  = roundToHLTick(rawLimit, szDecimals)
     return {
       a: assetIndex,
       b: closeSide,
@@ -141,7 +142,8 @@ export function buildHlTpSlOrders({ side, prices, assetIndex, size, szDecimals =
         trigger: {
           isMarket:  true,     // exécution market après trigger
           tpsl,                // 'tp' ou 'sl'
-          triggerPx: String(triggerPx),
+          //triggerPx: String(triggerPx),
+          triggerPx: String(roundedTrigger), 
         },
       },
       isPositionTpsl: true,
