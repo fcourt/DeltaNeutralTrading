@@ -443,6 +443,7 @@ if (tpSlConfig) {
       prices:     tpSlConfig.prices,
       assetIndex: market.assetIndex,
       size:       szWire,
+      szDecimals: market.szDecimals ?? 0,
     })
 
     console.log('[HL] TP/SL orders:', JSON.stringify(tpSlOrders))
