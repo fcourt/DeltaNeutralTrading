@@ -337,6 +337,7 @@ async function buildExtendedTpSl({
     signTpSlSettlement({
       extStarkPk, vaultId, side, size,
       triggerPrice:  tpTrigger,
+      triggerPriceType,   // ← ici
       marketL2Config, feeRate, expiryEpochMs,
       //salt: saltBase + 1,
       salt: saltBase,
