@@ -46,15 +46,15 @@ export function WalletProvider({ children }) {
   }, [])
 
   // Sauvegarde individuelle — rétrocompat avec les composants existants
-  const saveHlAddress      = (v) => save('hlAddress',      v)
-  const saveHlVaultAddress = (v) => save('hlVaultAddress', v)
-  const saveHlAgentPk      = (v) => save('hlAgentPk',      v)
-  const saveExtApiKey      = (v) => save('extApiKey',      v)
-  const saveExtStarkPk     = (v) => save('extStarkPk',     v)
-  const saveExtL2Vault     = (v) => save('extL2Vault',     v)
-  const saveNadoAddress    = (v) => save('nadoAddress',    v)
-  const saveNadoAgentPk    = (v) => save('nadoAgentPk',    v)
-  const saveNadoSubaccount = (v) => save('nadoSubaccount', v)
+  //const saveHlAddress      = (v) => save('hlAddress',      v)
+  //const saveHlVaultAddress = (v) => save('hlVaultAddress', v)
+  //const saveHlAgentPk      = (v) => save('hlAgentPk',      v)
+  //const saveExtApiKey      = (v) => save('extApiKey',      v)
+  //const saveExtStarkPk     = (v) => save('extStarkPk',     v)
+  //const saveExtL2Vault     = (v) => save('extL2Vault',     v)
+  //const saveNadoAddress    = (v) => save('nadoAddress',    v)
+  //const saveNadoAgentPk    = (v) => save('nadoAgentPk',    v)
+  //const saveNadoSubaccount = (v) => save('nadoSubaccount', v)
   // ── Nouvelle plateforme ──
   // const saveMaPfApiKey = (v) => save('maPfApiKey', v)
 
