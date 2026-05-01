@@ -16,6 +16,18 @@ Voici la liste complète et ordonnée de toutes les modifications nécessaires :
 | 9     | src/pages/SettingKeys.jsx               | Ajouter le bloc UI credentials                    |
 | 10    | src/i18n/[lang].json                    | Ajouter les clés de traduction                    |
 
+L'adapter doit exposer au minimum :
+
+export function canTrade(credentials)           // obligatoire
+export async function placeOrder(order, creds)  // obligatoire
+export async function getMarkets()              // recommandé
+export async function getPrices()               // recommandé
+export async function getFundingRate(market, credentials) // recommandé
+export async function getMargin(credentials)    // recommandé
+export async function getPositions(credentials, markets)  // recommandé
+
+#######################################################################################################
+
 ### Étape 1 — src/platforms/index.js
 
 Ajouter une entrée dans le tableau PLATFORMS :
