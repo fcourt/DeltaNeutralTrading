@@ -33,6 +33,16 @@ export function roundToHLPrice(price) {
   return Math.round(price * factor) / factor
 }
 
+// Dans trading.js — ajoute
+export function roundToHLTick(price, szDecimals = 0) {
+  const maxDecimals = Math.max(0, 6 - szDecimals)
+  const sigFigDec = price > 0
+    ? Math.max(0, 5 - Math.floor(Math.log10(Math.abs(price))) - 1)
+    : 0
+  const decimals = Math.min(maxDecimals, sigFigDec)
+  return parseFloat(price.toFixed(decimals))
+}
+
 export function rawPricePnl(leg1, leg2, px1, px2) {
   if (!leg1 || !leg2 || !px1 || !px2) return 0
   const pnl1 = leg1.side === 'LONG' ? (px1 - leg1.entryPx) * leg1.szi : (leg1.entryPx - px1) * leg1.szi
