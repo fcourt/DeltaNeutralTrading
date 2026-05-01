@@ -1,11 +1,13 @@
 // src/hooks/useMargins.js
 import { useState, useEffect, useCallback } from 'react'
-import { getAllMargins } from '../services/accountService.js'
+import { getAllMargins }  from '../services/accountService.js'
+import { PLATFORMS }     from '../platforms/index.js'
+
+// État initial dynamique : { hyperliquid: null, xyz: null, nado: null, … }
+const INITIAL_MARGINS = Object.fromEntries(PLATFORMS.map(p => [p.id, null]))
 
 export function useMargins(credentials, intervalMs = 15_000) {
-  const [margins, setMargins] = useState({
-    hyperliquid: null, xyz: null, hyena: null, extended: null, nado: null,
-  })
+  const [margins, setMargins] = useState(INITIAL_MARGINS)
 
   const refresh = useCallback(async () => {
     try { setMargins(await getAllMargins(credentials)) }
