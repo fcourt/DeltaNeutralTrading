@@ -161,3 +161,4 @@ getAssetMeta — cherche assetMeta dans toutes les sources
 getExtPrecision — cherche precisionMap dans toutes les sources
 
 hlMids / extMids / nadoMids — conservés en rétrocompatibilité, à supprimer progressivement quand les composants consommateurs seront migrés
+*/
