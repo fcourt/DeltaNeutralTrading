@@ -356,7 +356,8 @@ async function buildExtendedTpSl({
     tpSlType: 'ORDER',
     takeProfit: {
       triggerPrice:     String(tpTrigger.toFixed(pxDecimals)),
-      triggerPriceType: 'LAST',
+      //triggerPriceType: 'LAST',
+      triggerPriceType,
       price:            String(tpTrigger.toFixed(pxDecimals)),
       priceType:        'MARKET',
       settlement:       tpSettlement,
