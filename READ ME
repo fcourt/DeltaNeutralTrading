@@ -1,6 +1,20 @@
 📋 README
 
 Pour intégrer une nouvelle plateforme
+Voici la liste complète et ordonnée de toutes les modifications nécessaires :
+
+| Étape | Fichier                                 | Action                                            |
+| ----- | --------------------------------------- | ------------------------------------------------- |
+| 1     | src/platforms/index.js                  | Enregistrer dans PLATFORMS                        |
+| 2     | src/services/marketService.js           | ✅ Aucune modification                             |
+| 3     | src/services/orderService.js            | ✅ Aucune modification                             |
+| 4     | src/services/accountService.js          | ✅ Aucune modification                             |
+| 5     | src/services/priceService.js            | ✅ Aucune modification                             |
+| 6     | src/contexts/WalletContext.jsx          | Ajouter champs credentials + canTrade             |
+| 7     | src/config/markets.js                   | Ajouter keys.maPf + overrides + marchés exclusifs |
+| 8     | src/platforms/ma-nouvelle-plateforme.js | Créer l'adapter (voir interface Étape 11)         |
+| 9     | src/pages/SettingKeys.jsx               | Ajouter le bloc UI credentials                    |
+| 10    | src/i18n/[lang].json                    | Ajouter les clés de traduction                    |
 
 ### Étape 1 — src/platforms/index.js
 
