@@ -15,6 +15,9 @@
  * @param {number} tpPct  - ex: 10 pour +10%
  * @param {number} slPct  - ex: 10 pour -10%
  */
+
+import { roundToHLTick } from /trading.js
+
 export function calcDeltaNeutralPrices({ entryPrice, tpPct, slPct }) {
   const p = Number(entryPrice)
   return {
@@ -116,29 +119,34 @@ export async function buildExtendedTpSl({
  * @param {number} assetIndex
  * @param {string|number} size  — taille de la position (sz)
  */
-export function buildHlTpSlOrders({ side, prices, assetIndex, size }) {
+export function buildHlTpSlOrders({ side, prices, assetIndex, size, szDecimals = 0 }) {
   const isLong    = side === 'long'
   const closeSide = !isLong  // fermer un long → SELL (false) / un short → BUY (true)
 
   const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
   const slTrigger = isLong ? prices.downPrice : prices.upPrice
 
-  const makeOrder = (tpsl, triggerPx) => ({
-    a: assetIndex,
-    b: closeSide,
-    //p: String(triggerPx),
-    p: closeSide ? String((triggerPx * 1.1).toFixed(2)) : String((triggerPx * 0.9).toFixed(2)),
-    s: String(size),
-    r: true,                 // reduce-only obligatoire
-    t: {
-      trigger: {
-        isMarket:  true,     // exécution market après trigger
-        tpsl,                // 'tp' ou 'sl'
-        triggerPx: String(triggerPx),
+  const makeOrder = (tpsl, triggerPx) => {
+    const rawLimit = closeSide ? triggerPx * 1.1 : triggerPx * 0.9
+    const limitPx  = roundToHLTick(rawLimit, szDecimals)  // ← règle HL exacte
+    return {
+      a: assetIndex,
+      b: closeSide,
+      //p: String(triggerPx),
+      //p: closeSide ? String((triggerPx * 1.1).toFixed(2)) : String((triggerPx * 0.9).toFixed(2)),
+      p: String(limitPx),
+      s: String(size),
+      r: true,                 // reduce-only obligatoire
+      t: {
+        trigger: {
+          isMarket:  true,     // exécution market après trigger
+          tpsl,                // 'tp' ou 'sl'
+          triggerPx: String(triggerPx),
+        },
       },
-    },
-    isPositionTpsl: true,
-  })
+      isPositionTpsl: true,
+      }
+    }
   
   return [
     makeOrder('tp', tpTrigger),
