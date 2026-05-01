@@ -50,6 +50,41 @@ async function syncClock() {
 }
 const serverNow = () => Date.now() + _clockOffset
 
+// ── Interface unifiée ─────────────────────────────────────────────────────────
+
+export function canTrade(credentials) {
+  return !!credentials.nadoAgentPk && !!credentials.nadoAddress
+}
+
+// getFundingRate — signature unifiée (market, credentials)
+export async function getFundingRate(market, credentials) {
+  const nadoKey = market.keys?.nado ?? market.nadoKey
+  if (!nadoKey) return { rate: null, bid: null, ask: null }
+  const [rates, priceData] = await Promise.all([
+    getFunding(),
+    getPrices(),
+  ])
+  return {
+    rate: rates[nadoKey]            ?? null,
+    bid:  priceData.bidPrices?.[nadoKey] ?? null,
+    ask:  priceData.askPrices?.[nadoKey] ?? null,
+  }
+}
+
+// setLeverage — Nado ne supporte pas le levier → ne pas exporter
+// (le composant LeverageSlider détecte l'absence de setLeverage et reste silencieux)
+
+// roundPrice — arrondi Nado : entier pour les TradFi/FX, sinon identité
+export const roundPrice = (p) => Math.round(p)
+
+// getSzDecimals
+export function getSzDecimals(market) {
+  return market.nadoSzDecimals ?? 6
+}
+
+// ───────────────────────────────────────────────────────── Interface unifiée ──
+
+
 /*
 function roundToTick(value, increment) {
   const tickX18  = BigInt(increment)
@@ -246,10 +281,12 @@ export async function getPositions(credentials, markets = []) {
       .filter(p => parseFloat(p.balance.amount) !== 0)
       .map(p => {
         const szi    = parseFloat(p.balance.amount) / 1e18
+        //const market = markets.find(m => m.nadoProductId === p.product_id)
         const market = markets.find(m => m.nadoProductId === p.product_id)
         const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
         return {
-          platform: 'nado', coin: market?.nadoKey ?? `product_${p.product_id}`,
+          platform: 'nado', coin: market?.keys?.nado ?? market?.nadoKey ?? `product_${p.product_id}`,
+          //coin: market?.nadoKey ?? `product_${p.product_id}`,
           marketId: market?.id ?? null, label: market?.label ?? `product_${p.product_id}`,
           side: szi > 0 ? 'LONG' : 'SHORT', szi: Math.abs(szi),
           entryPx: szi !== 0 ? Math.abs(vQuote / szi) : 0,
