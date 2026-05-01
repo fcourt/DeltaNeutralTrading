@@ -48,6 +48,7 @@ async function fetchUniverse(body) {
   return new Set((meta?.universe || []).map(a => a.name))
 }
 
+/*
 function buildMarket(hlKey) {
   const override = HL_KEY_OVERRIDES[hlKey] || {}
   const id = override.id || hlKey.replace(/^xyz:/, '')
@@ -59,6 +60,26 @@ function buildMarket(hlKey) {
     id, label: MARKET_LABELS[id] || id,
     category: isXyz ? inferCategory(id) : 'Crypto',
     hlKey, extKey, nadoKey, assetIndex: null, nadoProductId: null,
+  }
+}
+*/
+
+function buildMarket(hlKey) {
+  const override = HL_KEY_OVERRIDES[hlKey] || {}
+  const id       = override.id || hlKey.replace(/^xyz:/, '')
+  const isXyz    = hlKey.startsWith('xyz:')
+  const extKey   = id in EXT_KEY_OVERRIDES
+    ? EXT_KEY_OVERRIDES[id]
+    : !isXyz ? `${id}-USD` : `${id}_24_5-USD`
+  const nadoKey  = NADO_KEY_OVERRIDES[id] ?? id
+  return {
+    id, label: MARKET_LABELS[id] || id,
+    category: isXyz ? inferCategory(id) : 'Crypto',
+    // ← migration hlKey/extKey/nadoKey → keys
+    keys: { hl: hlKey, ext: extKey, nado: nadoKey },
+    // rétrocompat le temps de la migration complète
+    hlKey, extKey, nadoKey,
+    assetIndex: null, nadoProductId: null,
   }
 }
 
@@ -215,7 +236,8 @@ export async function getPositions(credentials, markets = []) {
       .map(p => {
         const coin = p.position.coin, szi = parseFloat(p.position.szi)
         const platform = coin.startsWith('xyz:') ? 'xyz' : coin.startsWith('hyna:') ? 'hyena' : 'hyperliquid'
-        const market = markets.find(m => m.hlKey === coin)
+        //const market = markets.find(m => m.hlKey === coin)
+        const market = markets.find(m => m.keys?.hl === coin)
         return {
           platform, coin, wallet,
           marketId: market?.id ?? null,
@@ -250,12 +272,49 @@ export async function getAvailableKeys(platformId = 'hyperliquid') {
 }
 
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////
-//          Fonction "dynamiques"
-////////////////////////////////////////////////////////////////////////////////////////////////////
+// ── Interface unifiée ─────────────────────────────────────────────────────────
 export function canTrade(credentials) {
   return !!credentials.hlAgentPk
 }
+
+// setLeverage — signature unifiée { market, leverage, isCross, credentials }
+export async function setLeverage({ market, leverage, isCross = true, credentials }) {
+  const coin = market.keys?.hl
+  if (!coin) throw new Error(`[HL] Clé hl manquante pour ${market.id}`)
+  return updateLeverageByName({
+    hlAgentPk:      credentials.hlAgentPk,
+    hlVaultAddress: credentials.hlVaultAddress,
+    coin,
+    leverage,
+    isCross,
+  })
+}
+
+// getFundingRate — signature unifiée (market, credentials)
+export async function getFundingRate(market, credentials) {
+  const hlKey = market.keys?.hl
+  if (!hlKey) return { rate: null, bid: null, ask: null }
+  const isXyz = hlKey.startsWith('xyz:')
+  const [rates, bidAsk] = await Promise.all([
+    getFunding(),
+    getBidAsk(hlKey, isXyz).catch(() => ({ bid: null, ask: null })),
+  ])
+  return {
+    rate: rates[hlKey] ?? null,
+    bid:  bidAsk.bid,
+    ask:  bidAsk.ask,
+  }
+}
+
+// roundPrice — utilisé par OpenTrade.getDefaultLimitPrice
+export { roundToHLPrice as roundPrice }
+
+// getSzDecimals — utilisé par OpenTrade.buildOrderParams
+export function getSzDecimals(market, meta, stepSize) {
+  return meta?.szDecimals ?? Math.round(-Math.log10(stepSize || 0.01))
+}
+
+// ───────────────────────────────────────────────────────── Interface unifiée ──
 
 //update Leverage////////////////////////////////////////////////////////////////////////////////////
 async function fetchMetaAndCtx() {
@@ -542,3 +601,9 @@ export async function enableAgentDexAbstraction(agentPrivateKey, vaultAddress = 
   }
   return result
 }
+
+/*
+Les champs hlKey, extKey, nadoKey sont conservés en rétrocompat pendant la migration.
+Une fois tous les consommateurs migrés vers market.keys?.hl etc.,
+supprimer les anciens champs de buildMarket et de EMPTY_MARKET.
+*/
