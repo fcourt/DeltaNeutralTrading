@@ -126,6 +126,17 @@ export async function setLeverage({ market, leverage, isCross, credentials }) {
   // ... appel API
 }
 
+### Étape 9 — src/platforms/ma-nouvelle-plateforme.js
+Fonctions optionnelles attendues par OpenTrade :
+
+// Arrondi prix spécifique à la plateforme (optionnel — identité si absent)
+export const roundPrice = (price) => Math.round(price * 100) / 100
+
+// Décimales de taille (optionnel — fallback sur meta.szDecimals)
+export function getSzDecimals(market, meta, stepSize) {
+  return market.keys?.maPf ? 3 : Math.round(-Math.log10(stepSize || 0.01))
+}
+
 
 
 
