@@ -117,4 +117,15 @@ maPf: {
 
 { id: 'MONACTIF', label: 'Mon Actif', keys: { maPf: 'MONACTIF-PERP' }, category: 'Crypto' }
 
+### Étape 8 — src/platforms/ma-nouvelle-plateforme.js
+
+// Optionnel — exposer uniquement si la plateforme supporte le setLeverage
+export async function setLeverage({ market, leverage, isCross, credentials }) {
+  const key = market.keys?.maPf
+  if (!key) throw new Error('Clé marché manquante pour maPf')
+  // ... appel API
+}
+
+
+
 
