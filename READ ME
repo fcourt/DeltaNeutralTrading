@@ -51,4 +51,17 @@ export async function getFunding()           { ... }
 export async function getSymbols()           { ... } // enrichissement des marchés
 export async function setLeverage(...)       { ... }
 
+### Étape 4 — src/services/accountService.js
+Aucune modification requise.
+
+La nouvelle plateforme sera automatiquement incluse dans getAllMargins et getAllPositions dès qu'elle est enregistrée dans PLATFORMS, à condition d'exposer :
+
+getMargin(credentials) → retourne number | null
+
+getPositions(credentials, markets) → retourne Position[]
+
+Si plusieurs entrées PLATFORMS partagent le même source (ex: hl, xyz, hyena), getPositions n'est appelé qu'une seule fois par source.
+
+
+
 
