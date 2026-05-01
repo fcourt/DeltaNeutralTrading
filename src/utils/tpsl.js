@@ -16,7 +16,7 @@
  * @param {number} slPct  - ex: 10 pour -10%
  */
 
-import { roundToHLTick } from '/trading.js'
+import { roundToHLTick } from 'trading.js'
 
 export function calcDeltaNeutralPrices({ entryPrice, tpPct, slPct }) {
   const p = Number(entryPrice)
