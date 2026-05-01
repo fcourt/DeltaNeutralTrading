@@ -329,8 +329,16 @@ async function buildExtendedTpSl({
   isTradFi = false,   // ← nouveau paramètre
 }) {
   const isLong    = side === 'long'
-  const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
-  const slTrigger = isLong ? prices.downPrice : prices.upPrice
+
+  const rawTp     = isLong ? prices.upPrice   : prices.downPrice
+  const rawSl     = isLong ? prices.downPrice : prices.upPrice
+  
+  //const tpTrigger = isLong ? prices.upPrice   : prices.downPrice
+  //const slTrigger = isLong ? prices.downPrice : prices.upPrice
+  // ← Arrondir ICI pour que prix signé = prix dans le payload
+  const tpTrigger = parseFloat(rawTp.toFixed(pxDecimals))
+  const slTrigger = parseFloat(rawSl.toFixed(pxDecimals))
+  
   const triggerPriceType = isTradFi ? 'MARK' : 'LAST'   // ← adaptatif
 
   const [tpSettlement, slSettlement] = await Promise.all([
@@ -355,7 +363,8 @@ async function buildExtendedTpSl({
   return {
     tpSlType: 'ORDER',
     takeProfit: {
-      triggerPrice:     String(tpTrigger.toFixed(pxDecimals)),
+      triggerPrice: String(tpTrigger),
+      //triggerPrice:     String(tpTrigger.toFixed(pxDecimals)),
       //triggerPriceType: 'LAST',
       triggerPriceType,
       price:            String(tpTrigger.toFixed(pxDecimals)),
@@ -363,7 +372,8 @@ async function buildExtendedTpSl({
       settlement:       tpSettlement,
     },
     stopLoss: {
-      triggerPrice:     String(slTrigger.toFixed(pxDecimals)),
+      triggerPrice: String(slTrigger),
+      //triggerPrice:     String(slTrigger.toFixed(pxDecimals)),
       //triggerPriceType: 'LAST',
       triggerPriceType,   // ← ici
       price:            String(slTrigger.toFixed(pxDecimals)),
