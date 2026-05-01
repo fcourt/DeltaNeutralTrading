@@ -59,9 +59,9 @@ export function WalletProvider({ children }) {
   // const saveMaPfApiKey = (v) => save('maPfApiKey', v)
 
   // Statuts dérivés — délégués à orderService.canTrade (source de vérité unique)
-  const canTradeHL   = canTrade('hyperliquid', values)
-  const canTradeExt  = canTrade('extended',    values)
-  const canTradeNado = canTrade('nado',        values)
+  //const canTradeHL   = canTrade('hyperliquid', values)
+  //const canTradeExt  = canTrade('extended',    values)
+  //const canTradeNado = canTrade('nado',        values)
   // ── Nouvelle plateforme ──
   // const canTradeMaPf = canTrade('maPf', values)
 
@@ -73,14 +73,14 @@ export function WalletProvider({ children }) {
   return (
     <WalletContext.Provider value={{
       ...values,
-      saveHlAddress, saveHlVaultAddress, saveHlAgentPk,
-      saveExtApiKey, saveExtStarkPk, saveExtL2Vault,
-      saveNadoAddress, saveNadoAgentPk, saveNadoSubaccount,
+      //saveHlAddress, saveHlVaultAddress, saveHlAgentPk,
+      //saveExtApiKey, saveExtStarkPk, saveExtL2Vault,
+      //saveNadoAddress, saveNadoAgentPk, saveNadoSubaccount,
       // saveMaPfApiKey,
-      canTradeHL, canTradeExt, canTradeNado,
       // canTradeMaPf,
       save,     // setter générique pour les nouveaux composants
       resetAll,
+      //canTradeHL, canTradeExt, canTradeNado,
     }}>
       {children}
     </WalletContext.Provider>
