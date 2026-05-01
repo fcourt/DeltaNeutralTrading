@@ -44,5 +44,5 @@ export function usePlaceOrder(markets = []) {
     PLATFORMS.map(p => [p.id, (creds) => canTradeOn(p.id, creds)])
   )
 
-  return { placeOrder, canTradeOn, canTradeHL, canTradeExt, canTradeNado, canTradeMap }
+  return { placeOrder, canTradeOn, canTradeMap }
 }
