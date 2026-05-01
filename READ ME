@@ -97,6 +97,24 @@ const canTradeMaPf = canTrade('maPf', values)
 saveMaPfApiKey, saveMaPfSecretKey,
 canTradeMaPf,
 
+### Étape 7 — src/config/markets.js
+Pour ajouter une nouvelle plateforme :
 
+1. Ajouter la source dans EMPTY_MARKET.keys :
+
+keys: { hl: null, ext: null, nado: null, maPf: null }
+
+2. Ajouter les overrides dans KEY_OVERRIDES :
+
+maPf: {
+  GOLD: 'XAUUSDT',
+  OIL:  'WTIUSDT',
+  // uniquement les marchés dont la clé diffère de l'id standard
+}
+
+3. Si des marchés n'existent que sur la nouvelle plateforme, les ajouter à la liste existante
+(ou créer MAPF_ONLY_MARKETS sur le même modèle que NADO_ONLY_MARKETS) :
+
+{ id: 'MONACTIF', label: 'Mon Actif', keys: { maPf: 'MONACTIF-PERP' }, category: 'Crypto' }
 
 
