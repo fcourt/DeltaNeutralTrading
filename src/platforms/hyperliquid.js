@@ -301,7 +301,7 @@ export async function updateLeverageByName({ hlAgentPk, hlAddress, hlVaultAddres
   return updateLeverage({ hlAgentPk, hlAddress, hlVaultAddress, asset, leverage, isCross })
 }
 */
-
+/*
 export async function updateLeverage({ hlAgentPk, hlVaultAddress, asset, leverage, isCross = true }) {
   if (!leverage || leverage <= 0) return
 
@@ -323,6 +323,54 @@ export async function updateLeverageByName({ hlAgentPk, hlVaultAddress, coin, le
   const meta  = await fetchMetaAndCtx()
   const asset = getAssetIndex(meta, coin)
   return updateLeverage({ hlAgentPk, hlVaultAddress, asset, leverage, isCross })
+}
+*/
+
+export async function updateLeverage({ hlAgentPk, hlVaultAddress, asset, leverage, isCross = true, dex = null }) {
+  if (!leverage || leverage <= 0) return
+
+  const wallet = privateKeyToAccount(hlAgentPk)
+  const nonce  = Date.now()
+  const action = { type: 'updateLeverage', asset, isCross, leverage: Math.round(leverage) }
+  const sig    = await signL1Action({
+    wallet, action, nonce,
+    ...(hlVaultAddress?.trim() ? { vaultAddress: hlVaultAddress.trim() } : {}),
+  })
+
+  const body = {
+    action, nonce, signature: sig,
+    ...(hlVaultAddress?.trim() ? { vaultAddress: hlVaultAddress.trim() } : {}),
+    ...(dex ? { dex } : {}),   // ← passe le dex si présent
+  }
+
+  const res  = await fetch(HL_EXCHANGE, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (data?.status !== 'ok') throw new Error(`[HL] updateLeverage: ${JSON.stringify(data)}`)
+  return data
+}
+
+export async function updateLeverageByName({ hlAgentPk, hlVaultAddress, coin, leverage, isCross = true }) {
+  // Détecter le DEX selon le préfixe
+  const dex  = coin.startsWith('xyz:')  ? 'xyz'
+             : coin.startsWith('hyna:') ? 'hyna'
+             : null
+
+  // Chercher l'index dans le bon endpoint
+  const body = { type: 'metaAndAssetCtxs', ...(dex ? { dex } : {}) }
+  const res  = await fetch(HL_API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  const meta = Array.isArray(data) ? data[0] : null
+  const idx  = meta?.universe?.findIndex(u => u.name === coin) ?? -1
+  if (idx === -1) throw new Error(`[HL] Coin inconnu : ${coin}`)
+
+  // Pour xyz, l'index est relatif au DEX (pas de XYZ_OFFSET)
+  return updateLeverage({ hlAgentPk, hlVaultAddress, asset: idx, leverage, isCross, dex })
 }
 
 // passage d'ordre///////////////////////////////////////////////////////////////////////////////////
