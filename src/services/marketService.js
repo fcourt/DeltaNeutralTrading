@@ -15,7 +15,13 @@ export function buildMarkets(baseMarkets, allSymbols) {
   return [
     EMPTY_MARKET,
     ...baseMarkets.map(m => {
-      const keys = { ...m.keys, ...buildKeys(m.id) }
+      const extraKeys = buildKeys(m.id)
+      // Fallback ext : si pas d'override → id + '-USD' (ex: BTC → BTC-USD)
+      if (!extraKeys.ext && m.keys?.hl) {
+        const isXyz = m.keys.hl.startsWith('xyz:')
+        extraKeys.ext = isXyz ? `${m.id}_24_5-USD` : `${m.id}-USD`
+      }
+      const keys = { ...m.keys, ...extraKeys }
       return {
         ...m,
         keys,
