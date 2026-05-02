@@ -66,6 +66,7 @@ function buildMarket(hlKey) {
 }
 */
 
+/*
 function buildMarket(hlKey) {
   const override = HL_KEY_OVERRIDES[hlKey] || {}
   const id       = override.id || hlKey.replace(/^xyz:/, '')
@@ -86,6 +87,21 @@ function buildMarket(hlKey) {
     // rétrocompat le temps de la migration complète
     //hlKey, extKey, nadoKey,
     assetIndex: null, nadoProductId: null,
+  }
+}
+*/
+
+function buildMarket(hlKey) {
+  const override = HL_KEY_OVERRIDES[hlKey] || {}
+  const id       = override.id || hlKey.replace(/^xyz:/, '')
+  const isXyz    = hlKey.startsWith('xyz:')
+
+  return {
+    id,
+    label:    MARKET_LABELS[id] || id,
+    category: isXyz ? inferCategory(id) : 'Crypto',
+    keys:     { hl: hlKey },
+    assetIndex: null,
   }
 }
 
