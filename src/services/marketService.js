@@ -3,12 +3,30 @@ import { PLATFORMS, getPlatform, platformHasMarket } from '../platforms/index.js
 import { KEY_OVERRIDES, EMPTY_MARKET, NADO_ONLY_MARKETS } from '../config/markets.js'
 
 // Génère l'objet keys : { nado: 'XAG', coinex: 'XAGUSD', ... }
+/*
 function buildKeys(id) {
   const keys = {}
   for (const [platform, overrides] of Object.entries(KEY_OVERRIDES)) {
     if (overrides[id]) keys[platform] = overrides[id]
   }
   return keys
+}
+*/
+
+export function buildMarkets(baseMarkets, allSymbols) {
+  return [
+    EMPTY_MARKET,
+    ...baseMarkets.map(m => {
+      const keys = { ...m.keys, ...buildKeys(m.id) }
+      return {
+        ...m,
+        keys,
+        ...(allSymbols[m.id]
+          ?? Object.values(keys).map(k => allSymbols[k]).find(Boolean)
+          ?? {}),
+      }
+    }),
+  ]
 }
 
 export async function getAllMarkets() {
