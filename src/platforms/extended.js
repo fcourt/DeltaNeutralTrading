@@ -170,6 +170,7 @@ export async function getPrices() {
 }
 */
 
+/*
 export async function getPrices() {
   const cached = getCached('ext_prices')
   if (cached) return cached
@@ -201,6 +202,13 @@ export async function getPrices() {
     console.warn('[Extended] getPrices error:', e.message)
     return { priceMap: {}, precisionMap: {} }
   }
+}
+*/
+
+// extended.js — getPrices redirige vers getMarkets (évite le double fetch)
+export async function getPrices() {
+  const { priceMap, precisionMap } = await getMarkets()
+  return { priceMap, precisionMap }
 }
 
 /* avant migration "dynamique"
