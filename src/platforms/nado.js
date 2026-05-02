@@ -254,8 +254,14 @@ export async function getFunding() {
       })
     }
     const productIds = Object.keys(_nadoIdToKey).map(Number)
-    const res = await fetch(`${ARCHIVE}/v1`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    //const res = await fetch(`${ARCHIVE}/v1`, {
+    //  method: 'POST', headers: { 'Content-Type': 'application/json' },
+    //  body: JSON.stringify({ funding_rates: { product_ids: productIds } }),
+    //})
+
+    const res = await fetch(`${ARCHIVE}&path=${encodeURIComponent('/v1')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ funding_rates: { product_ids: productIds } }),
     })
     
