@@ -1,6 +1,15 @@
 // src/services/marketService.js
 import { PLATFORMS, getPlatform, platformHasMarket } from '../platforms/index.js'
-import { EMPTY_MARKET, NADO_ONLY_MARKETS } from '../config/markets.js'
+import { KEY_OVERRIDES, EMPTY_MARKET, NADO_ONLY_MARKETS } from '../config/markets.js'
+
+// Génère l'objet keys : { nado: 'XAG', coinex: 'XAGUSD', ... }
+function buildKeys(id) {
+  const keys = {}
+  for (const [platform, overrides] of Object.entries(KEY_OVERRIDES)) {
+    if (overrides[id]) keys[platform] = overrides[id]
+  }
+  return keys
+}
 
 export async function getAllMarkets() {
   // Sources uniques qui exposent getMarkets()
@@ -47,9 +56,25 @@ export async function getAllMarkets() {
     const eth = baseMarkets.find(m => m.id === 'ETH')
     console.log('[marketService] ETH avant enrichissement:', eth)
 
+  /*
   return [
     EMPTY_MARKET,
     ...baseMarkets.map(m => ({ ...m, ...(allSymbols[m.id] ?? {}) })),
+  ]
+  */
+  return [
+    EMPTY_MARKET,
+    ...baseMarkets.map(m => {
+      const keys = buildKeys(m.id)
+        return {
+          ...m,
+          keys,
+          // Enrichissement : essaie l'id natif puis chaque override
+          ...(allSymbols[m.id]
+          ?? Object.values(keys).map(k => allSymbols[k]).find(Boolean)
+          ?? {}),
+        }
+    }),
   ]
 }
 
