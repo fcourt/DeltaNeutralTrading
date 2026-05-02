@@ -52,3 +52,13 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
+
+/*// Ordre normal
+fetch('/api/nado?action=execute', ...)
+
+// Query marché
+fetch('/api/nado?action=query', ...)
+
+// TP/SL trigger
+fetch('/api/nado?endpoint=trigger', ...)
+*/
