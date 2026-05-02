@@ -24,27 +24,37 @@ export default async function handler(req, res) {
 
 // api/nado.js
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end()
+  if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).end()
 
-  const { action = 'query', endpoint = 'gateway' } = req.query
+  const { action = 'query', endpoint = 'gateway', path = '' } = req.query
 
   const BASE_URLS = {
     gateway: 'https://gateway.prod.nado.xyz/v1',
     trigger: 'https://trigger.prod.nado.xyz/v1',
+    archive: 'https://archive.prod.nado.xyz',
   }
 
   const base = BASE_URLS[endpoint] ?? BASE_URLS.gateway
-  const route = endpoint === 'trigger' ? 'execute' : (action === 'execute' ? 'execute' : 'query')
+
+  // Routing de la route finale selon l'endpoint
+  let url
+  if (endpoint === 'archive') {
+    // ex: /api/nado?endpoint=archive&path=/v2/symbols
+    url = `${base}${path}`
+  } else if (endpoint === 'trigger') {
+    url = `${base}/execute`
+  } else {
+    url = `${base}/${action === 'execute' ? 'execute' : 'query'}`
+  }
 
   try {
-    const response = await fetch(`${base}/${route}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept-Encoding': 'gzip',
-      },
-      body: JSON.stringify(req.body),
-    })
+    const fetchOptions = {
+      method: req.method,
+      headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' },
+    }
+    if (req.method === 'POST') fetchOptions.body = JSON.stringify(req.body)
+
+    const response = await fetch(url, fetchOptions)
     const text = await response.text()
     res.setHeader('Content-Type', 'application/json')
     res.status(response.status).send(text)
@@ -52,7 +62,6 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
-
 /*// Ordre normal
 fetch('/api/nado?action=execute', ...)
 
