@@ -15,35 +15,41 @@ export function useLivePrices(intervalMs = 3000) {
     try {
       const { NADO_ONLY_MARKETS, EMPTY_MARKET } = await import('../config/markets.js')
 
-      // ── 1. Sources uniques qui exposent getMarkets() ou getPrices() ──────
-      const seenMarket = new Set()
-      const marketSources = PLATFORMS.filter(p => {
-        if (seenMarket.has(p.source)) return false
-        seenMarket.add(p.source)
-        return typeof p.adapter.getMarkets === 'function'
-      })
+      // ── 1. Sources ────────────────────────────────────────────────────────────
+const seenMarket = new Set()
+const marketSources = PLATFORMS.filter(p => {
+  if (seenMarket.has(p.source)) return false
+  seenMarket.add(p.source)
+  return typeof p.adapter.getMarkets === 'function'
+})
 
-      const seenPrice = new Set()
-      const priceSources = PLATFORMS.filter(p => {
-        if (seenPrice.has(p.source)) return false
-        seenPrice.add(p.source)
-        return typeof p.adapter.getPrices  === 'function'
-            || typeof p.adapter.getSymbols === 'function'
-      })
+const seenPrice = new Set()
+const priceSources = PLATFORMS.filter(p => {
+  if (seenPrice.has(p.source)) return false
+  seenPrice.add(p.source)
+  return typeof p.adapter.getPrices === 'function'
+})
 
-      // ── 2. Fetch en parallèle ─────────────────────────────────────────────
-      const [marketResults, priceResults] = await Promise.all([
-        Promise.allSettled(marketSources.map(p => p.adapter.getMarkets())),
-        Promise.allSettled(
-          priceSources.map(p =>
-            p.adapter.getPrices
-              ? p.adapter.getPrices().catch(() => ({}))
-              : p.adapter.getSymbols().catch(() => ({}))
-          )
-        ),
-      ])
+const seenSymbol = new Set()
+const symbolSources = PLATFORMS.filter(p => {
+  if (seenSymbol.has(p.source)) return false
+  seenSymbol.add(p.source)
+  return typeof p.adapter.getSymbols === 'function'
+})
 
-      // ── 3. Construire la liste unifiée des marchés ────────────────────────
+// ── 2. Fetch en parallèle ─────────────────────────────────────────────────
+const [marketResults, priceResults, symbolResults] = await Promise.all([
+  Promise.allSettled(marketSources.map(p => p.adapter.getMarkets())),
+  Promise.allSettled(priceSources.map(p => p.adapter.getPrices().catch(() => ({})))),
+  Promise.allSettled(symbolSources.map(p => p.adapter.getSymbols().catch(() => ({})))),
+])
+
+// ── 3. allSymbols ─────────────────────────────────────────────────────────
+const allSymbols = symbolResults
+  .filter(r => r.status === 'fulfilled')
+  .reduce((acc, r) => ({ ...acc, ...r.value }), {})
+      
+      // ── 4. Construire la liste unifiée des marchés ────────────────────────
       const discoveredMarkets = new Map()
       for (const result of marketResults) {
         if (result.status !== 'fulfilled') continue
@@ -52,10 +58,12 @@ export function useLivePrices(intervalMs = 3000) {
         }
       }
 
+      /*
       // Symboles enrichissants (ex: Nado.getSymbols)
       const allSymbols = priceResults
         .filter((r, i) => r.status === 'fulfilled' && !priceSources[i].adapter.getPrices)
         .reduce((acc, r) => ({ ...acc, ...r.value }), {})
+        */
 
       const baseMarkets = [
         ...discoveredMarkets.values(),
@@ -66,7 +74,7 @@ export function useLivePrices(intervalMs = 3000) {
         ...baseMarkets.map(m => ({ ...m, ...(allSymbols[m.id] ?? {}) })),
       ]
 
-      // ── 4. Construire prices indexé par source ────────────────────────────
+      // ── 5. Construire prices indexé par source ────────────────────────────
       // prices['hl']   = { prices, stepSizes, assetMeta, … }  (shape HL.getMarkets)
       // prices['ext']  = { priceMap, precisionMap }
       // prices['nado'] = { prices, bidPrices, askPrices }
