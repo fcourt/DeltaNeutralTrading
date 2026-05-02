@@ -3,7 +3,6 @@ import { PLATFORMS, getPlatform, platformHasMarket } from '../platforms/index.js
 import { KEY_OVERRIDES, EMPTY_MARKET, NADO_ONLY_MARKETS } from '../config/markets.js'
 
 // Génère l'objet keys : { nado: 'XAG', coinex: 'XAGUSD', ... }
-/*
 function buildKeys(id) {
   const keys = {}
   for (const [platform, overrides] of Object.entries(KEY_OVERRIDES)) {
@@ -11,7 +10,6 @@ function buildKeys(id) {
   }
   return keys
 }
-*/
 
 export function buildMarkets(baseMarkets, allSymbols) {
   return [
