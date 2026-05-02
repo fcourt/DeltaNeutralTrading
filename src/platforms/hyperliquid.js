@@ -12,6 +12,7 @@ import { signL1Action } from '@nktkas/hyperliquid/signing'
 import { privateKeyToAccount } from 'viem/accounts'
 import { roundToHLPrice, roundToHLTick } from '../utils/trading.js'
 import { buildHlTpSlAction, buildHlTpSlOrders } from '../utils/tpsl.js'
+import { HL_KEY_OVERRIDES, MARKET_LABELS, inferCategory } from '../config/markets.js'
 
 const HL_API = 'https://api.hyperliquid.xyz/info'
 export const XYZ_OFFSET = 110_000
