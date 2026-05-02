@@ -4,8 +4,8 @@
 import { privateKeyToAccount } from 'viem/accounts'
 
 const GATEWAY_PROXY = '/api/nado'
-//const ARCHIVE       = 'https://archive.prod.nado.xyz'
-const ARCHIVE       = '/api/nado?action=archive';
+const ARCHIVE       = 'https://archive.prod.nado.xyz'
+//const ARCHIVE       = '/api/nado?action=archive'; ?????????????????,
 //const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
 // Client trigger → endpoint dédié (TP/SL, stops)
 //const TRIGGER_URL = 'https://trigger.prod.nado.xyz/v1'
