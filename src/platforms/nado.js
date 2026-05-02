@@ -6,6 +6,8 @@ import { privateKeyToAccount } from 'viem/accounts'
 const GATEWAY_PROXY = '/api/nado'
 const ARCHIVE       = 'https://archive.prod.nado.xyz'
 const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
+// Client trigger → endpoint dédié (TP/SL, stops)
+const TRIGGER_URL = 'https://trigger.prod.nado.xyz/v1'
 //const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
@@ -379,6 +381,72 @@ if (notional < minSize) {
   if (data.status !== 'success') throw new Error(`[Nado] ${data.error ?? 'place_order failed'}`)
   return data
 }
+
+// -- TP/SL --------------------------------------------------------------------
+
+async function placeTriggerOrder(payload, signature) {
+  return fetch(`${TRIGGER_URL}/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...payload, signature })
+  })
+}
+
+function buildTriggerAppendix({ isolated = false } = {}) {
+  const TRIGGER_PRICE = 1n  // bits 12-13
+  return 1n                             // version
+    | ((isolated ? 1n : 0n) << 8n)     // bit 8
+    | (1n << 11n)                       // reduce_only OBLIGATOIRE pour TP/SL
+    | (TRIGGER_PRICE << 12n)            // = 4096
+}
+// Résultat normal : 4096 + 2048 (reduceOnly) = 6144
+
+async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, isolated }) {
+  const isBuy = side === 'sell' // pour fermer un long → buy ; fermer un short → sell
+
+  const buildTriggerOrder = (triggerPrice, isTP) => {
+    const closeAmount = side === 'buy'
+      ? toX18(size)          // fermer un short → positif
+      : toX18(-size)         // fermer un long → négatif
+
+    const pricereq = side === 'buy'
+      ? (isTP ? { oraclepricebelow: toX18(triggerPrice) }
+              : { oraclepriceabove: toX18(triggerPrice) })
+      : (isTP ? { oraclepriceabove: toX18(triggerPrice) }
+              : { oraclepricebelow: toX18(triggerPrice) })
+
+    return {
+      productid: productId,
+      order: {
+        sender: subaccount,
+        priceX18: isTP ? toX18(triggerPrice * 0.99) : toX18(triggerPrice * 1.01),
+        amount: closeAmount,
+        expiration: 4294967295,
+        nonce: genOrderNonce(),
+        appendix: buildTriggerAppendix({ isolated }).toString()
+      },
+      trigger: { pricetrigger: { pricerequirement: pricereq } }
+    }
+  }
+
+  const orders = []
+  if (tpPrice) orders.push(buildTriggerOrder(tpPrice, true))
+  if (slPrice) orders.push(buildTriggerOrder(slPrice, false))
+
+  // Envoyer via placeorders (batch) sur trigger endpoint
+  return placeTriggerOrder({
+    placeorders: {
+      orders: await Promise.all(orders.map(async o => ({
+        ...o,
+        signature: await signOrder(o.order, productId)
+      }))),
+      stoponfailure: false
+    }
+  })
+}
+
+// -------------------------------------------------------------------- TP/SL --
+
 
 export async function cancelOrders({ nadoAgentPk, nadoAddress, nadoSubaccount, productIds, digests }) {
   await syncClock()
