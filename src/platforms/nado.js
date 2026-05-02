@@ -526,6 +526,8 @@ async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, 
 */
 
 export async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, isolated, market, credentials }) {
+  
+  console.log('[TPSL] 1 - début', { productId, subaccount, side, size, tpPrice, slPrice, isolated })  // ← manquant
   await syncClock()
 
   const buildTriggerOrder = (triggerPrice, isTP) => {
