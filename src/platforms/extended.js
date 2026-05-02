@@ -2,6 +2,7 @@
 // Absorbe : adapter/extended.js + useExtendedL2Config.js + signing Stark
 
 import { ec, hash, shortString } from 'starknet'
+import { EXT_KEY_TO_ID } from '../config/markets.js'
 //import { buildExtendedTpSl }     from '../utils/tpsl.js' // ← nouveau
 
 const EXT_PROXY           = '/api/extended'
@@ -97,6 +98,48 @@ export function getSzDecimals(market, meta, stepSize) {
 
 // ─────────────────────────────── Interface unifiée attendue par les services ──
 
+// extended.js — getMarkets() unifié
+export async function getMarkets() {
+  const cached = getCached('extended_keys')
+  if (cached) return cached
+
+  const res  = await fetch(`${EXT_PROXY}?endpoint=/info/markets`)
+  if (!res.ok) throw new Error(`Extended /info/markets → ${res.status}`)
+  const data = await res.json()
+
+  const discoveredMarkets = new Map()
+  const priceMap = {}, precisionMap = {}
+
+  ;(data.data || []).forEach(m => {
+    if (!m.name) return
+    const extKey = m.name  // ex: 'BTC-USD', 'XAG-USD', 'TECH100m-USD'
+
+    // Retrouve l'id canonique via KEY_OVERRIDES.ext (inverse) ou supprime le suffixe
+    const id = EXT_KEY_TO_ID[extKey] ?? extKey.replace(/-USD$/, '').replace(/_24_5-USD$/, '')
+
+    if (!discoveredMarkets.has(id)) {
+      discoveredMarkets.set(id, {
+        id,
+        label: id,
+        category: m.category ?? 'Crypto',  // Extended expose la catégorie
+        keys: { ext: extKey },
+      })
+    }
+
+    const price = parseFloat(m.marketStats?.lastPrice || 0)
+    if (price) priceMap[extKey] = price
+    precisionMap[extKey] = {
+      szDecimals: m.assetPrecision ?? 5,
+      pxDecimals: pxDecimalsFromMinPrice(m.tradingConfig?.minPriceChange) ?? 2,
+    }
+  })
+
+  const result = { discoveredMarkets, priceMap, precisionMap }
+  setCached('extended_keys', result)
+  return result
+}
+
+/*
 export async function getMarkets() {
   const cached = getCached('extended_keys')
   if (cached) return cached
@@ -107,6 +150,7 @@ export async function getMarkets() {
   setCached('extended_keys', keys)
   return keys
 }
+*/
 
 /*
 export async function getPrices() {
