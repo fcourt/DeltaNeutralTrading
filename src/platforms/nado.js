@@ -4,8 +4,8 @@
 import { privateKeyToAccount } from 'viem/accounts'
 
 const GATEWAY_PROXY = '/api/nado'
-const ARCHIVE       = 'https://archive.prod.nado.xyz'
-//const ARCHIVE       = '/api/nado?action=archive'; ?????????????????,
+//const ARCHIVE       = 'https://archive.prod.nado.xyz'
+const ARCHIVE       = '/api/nado?endpoint=archive'; 
 //const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
 // Client trigger → endpoint dédié (TP/SL, stops)
 //const TRIGGER_URL = 'https://trigger.prod.nado.xyz/v1'
@@ -25,9 +25,15 @@ async function gatewayPost(body) {
   if (!res.ok) throw new Error(`Nado gateway → ${res.status}`)
   return res.json()
 }
-
+/*
 async function archiveGet(path) {
   const res = await fetch(`${ARCHIVE}${path}`)
+  if (!res.ok) throw new Error(`Nado archive ${path} → ${res.status}`)
+  return res.json()
+}
+*/
+async function archiveGet(path) {
+  const res = await fetch(`${ARCHIVE}&path=${encodeURIComponent(path)}`)
   if (!res.ok) throw new Error(`Nado archive ${path} → ${res.status}`)
   return res.json()
 }
@@ -252,6 +258,7 @@ export async function getFunding() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ funding_rates: { product_ids: productIds } }),
     })
+    
     if (!res.ok) return {}
     const raw   = await res.json()
     const rates = {}
