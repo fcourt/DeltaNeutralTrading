@@ -569,6 +569,7 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
     }
   }
 
+  /*
   const orders = []
   if (tpPrice) orders.push(buildTriggerOrder(tpPrice, true))
   if (slPrice) orders.push(buildTriggerOrder(slPrice, false))
@@ -578,14 +579,7 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
     ...o,
     signature: await signTriggerOrder(o.order, productId, credentials),
   })))
-/*
-  return placeTriggerOrder({
-    place_orders: {
-      orders: signedOrders,
-      stop_on_failure: false,
-    }
-  })
-*/
+
 // ← AJOUTE CES LIGNES
 console.log('[Trigger payload]', JSON.stringify({
   place_orders: { orders: signedOrders, stop_on_failure: false }
@@ -596,6 +590,31 @@ console.log('[Trigger payload]', JSON.stringify({
       orders: signedOrders,
       stoponfailure: false,
     }
+  })
+  */
+
+   const orders = []
+  if (tpPrice) orders.push(buildTriggerOrder(tpPrice, true))
+  if (slPrice) orders.push(buildTriggerOrder(slPrice, false))
+  console.log('[TPSL] 3 - orders built', orders.length)
+  if (!orders.length) { console.warn('[TPSL] aucun ordre, return'); return }
+
+  let signedOrders
+  try {
+    signedOrders = await Promise.all(orders.map(async o => {
+      console.log('[TPSL] 4 - signing order', o.order)
+      const sig = await signTriggerOrder(o.order, productId, credentials)
+      console.log('[TPSL] 5 - signed', sig?.slice(0, 20))
+      return { ...o, signature: sig }
+    }))
+  } catch (e) {
+    console.error('[TPSL] ERREUR signature:', e.message)
+    throw e
+  }
+
+  console.log('[TPSL] 6 - envoi trigger', JSON.stringify(signedOrders, null, 2))
+  return placeTriggerOrder({
+    place_orders: { orders: signedOrders, stop_on_failure: false }
   })
 }
 
