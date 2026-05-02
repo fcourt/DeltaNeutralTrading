@@ -15,7 +15,7 @@ export function useLivePrices(intervalMs = 3000) {
 
   const fetchAll = useCallback(async () => {
     try {
-      const { NADO_ONLY_MARKETS, EMPTY_MARKET } = await import('../config/markets.js')
+      const { NADO_ONLY_MARKETS } = await import('../config/markets.js')
 
       // ── 1. Sources ────────────────────────────────────────────────────────────
       const seenMarket = new Set()
