@@ -8,7 +8,11 @@ import { EMPTY_MARKET }  from '../config/markets.js'
  * Retourne l'intersection si deux plateformes, sinon tous les marchés de p1.
  */
 export function useMarketFilter(platform1, platform2, allMarkets = []) {
-  const safeMarkets = allMarkets.length > 1 ? allMarkets : [EMPTY_MARKET]
+  //const safeMarkets = allMarkets.length > 1 ? allMarkets : [EMPTY_MARKET]
+  const safeMarkets = useMemo(
+    () => allMarkets.length > 1 ? allMarkets : [EMPTY_MARKET],
+    [allMarkets]
+  )
 
   const result = useMemo(
     () => filterMarkets(platform1, platform2, safeMarkets),
