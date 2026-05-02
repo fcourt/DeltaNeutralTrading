@@ -51,10 +51,10 @@ export async function getAllMarkets() {
     ...NADO_ONLY_MARKETS.filter(m => !discoveredMarkets.has(m.id)),
   ]
 
-  console.log('[marketService] allSymbols keys:', Object.keys(allSymbols).slice(0, 5))
-    console.log('[marketService] ETH symbols entry:', allSymbols['ETH'])
-    const eth = baseMarkets.find(m => m.id === 'ETH')
-    console.log('[marketService] ETH avant enrichissement:', eth)
+  console.log('[marketService] baseMarkets[0]:', baseMarkets[0])
+  console.log('[marketService] keys BTC:', buildKeys('BTC'))
+  console.log('[marketService] keys SILVER:', buildKeys('SILVER'))
+  console.log('[marketService] allSymbols sample:', Object.keys(allSymbols).slice(0, 5))
 
   /*
   return [
