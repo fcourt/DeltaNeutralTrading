@@ -8,6 +8,12 @@ export async function getAllMarkets() {
   const marketSources = PLATFORMS.filter(p => {
     if (seen.has(p.source)) return false
     seen.add(p.source)
+
+    console.log('[marketService] allSymbols keys:', Object.keys(allSymbols).slice(0, 5))
+    console.log('[marketService] ETH symbols entry:', allSymbols['ETH'])
+    const eth = baseMarkets.find(m => m.id === 'ETH')
+    console.log('[marketService] ETH avant enrichissement:', eth)
+    
     return typeof p.adapter.getMarkets === 'function'
   })
 
