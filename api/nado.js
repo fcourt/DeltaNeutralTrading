@@ -1,4 +1,4 @@
-
+/*
 // api/nado.js — si proxy toujours nécessaire
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message });
   }
 }
+*/
 
-/*
 // api/nado.js
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
@@ -52,4 +52,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: e.message })
   }
 }
-*/
