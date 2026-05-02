@@ -433,6 +433,13 @@ async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, 
   if (tpPrice) orders.push(buildTriggerOrder(tpPrice, true))
   if (slPrice) orders.push(buildTriggerOrder(slPrice, false))
 
+  const text = await response.text()
+console.log('[Nado Trigger] status:', response.status)
+console.log('[Nado Trigger] response:', text)
+console.log('[Nado Trigger] body sent:', JSON.stringify(req.body))
+res.setHeader('Content-Type', 'application/json')
+res.status(response.status).send(text)
+  
   // Envoyer via placeorders (batch) sur trigger endpoint
   return placeTriggerOrder({
     placeorders: {
