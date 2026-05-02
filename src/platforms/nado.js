@@ -172,6 +172,7 @@ export async function getSymbols() {
       nadoMinSize: data.min_size,
       nadoPxDecimals: priceInc > 0 ? Math.max(0, Math.ceil(-Math.log10(priceInc))) : 2,
       nadoSzDecimals: sizeInc  > 0 ? Math.max(0, Math.ceil(-Math.log10(sizeInc)))  : 6,
+      nadoIsolatedOnly:      data.isolated_only === true,
     }
   })
   if (Object.keys(index).length > 0) setCached('nado_symbols', index)
@@ -343,9 +344,12 @@ if (notional < minSize) {
   const value     = { sender, priceX18, amount: amountX18, expiration, nonce, appendix }
   const signature = await signTyped(nadoAgentPk, domain, types, value)
 
+  const isIsolated = market.nadoIsolatedOnly === true || market.category !== 'Crypto'
+  
   const res = await fetch(NADO_EXECUTE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' },
+    /*
     body: JSON.stringify({
       place_order: {
         product_id: market.nadoProductId,
@@ -356,7 +360,20 @@ if (notional < minSize) {
         signature,
       },
     }),
+    */
+    body: JSON.stringify({
+      place_order: {
+        product_id:  market.nadoProductId,
+        margin_type: isIsolated ? 'isolated' : 'cross',  // ← ajout
+        order: {
+          sender, priceX18: String(priceX18), amount: String(amountX18),
+          expiration: String(expiration), nonce: String(nonce), appendix: String(appendix),
+        },
+        signature,
+      },
+    }),
   })
+  
   const data = await res.json()
   console.log('[Nado] status:', res.status, '| response:', JSON.stringify(data))
   if (data.status !== 'success') throw new Error(`[Nado] ${data.error ?? 'place_order failed'}`)
