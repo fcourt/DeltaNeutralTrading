@@ -30,6 +30,7 @@ export const PLATFORMS = [
 ]
 
 // Helper central — remplace tous les if/switch de l'app
+/*
 export function platformHasMarket(platformId, market) {
   const p = getPlatform(platformId)
   if (!p) return false
@@ -37,6 +38,14 @@ export function platformHasMarket(platformId, market) {
   if (p.keysField === 'nado') {
     return !!(market.keys?.nado || market.nadoProductId)
   }
+  return !!market.keys?.[p.keysField]
+}
+*/
+
+// ✅ index.js — platformHasMarket générique, sans hardcoding
+export function platformHasMarket(platformId, market) {
+  const p = getPlatform(platformId)
+  if (!p) return false
   return !!market.keys?.[p.keysField]
 }
 
