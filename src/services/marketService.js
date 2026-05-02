@@ -7,13 +7,7 @@ export async function getAllMarkets() {
   const seen = new Set()
   const marketSources = PLATFORMS.filter(p => {
     if (seen.has(p.source)) return false
-    seen.add(p.source)
-
-    console.log('[marketService] allSymbols keys:', Object.keys(allSymbols).slice(0, 5))
-    console.log('[marketService] ETH symbols entry:', allSymbols['ETH'])
-    const eth = baseMarkets.find(m => m.id === 'ETH')
-    console.log('[marketService] ETH avant enrichissement:', eth)
-    
+    seen.add(p.source)    
     return typeof p.adapter.getMarkets === 'function'
   })
 
@@ -47,6 +41,11 @@ export async function getAllMarkets() {
     ...discoveredMarkets.values(),
     ...NADO_ONLY_MARKETS.filter(m => !discoveredMarkets.has(m.id)),
   ]
+
+  console.log('[marketService] allSymbols keys:', Object.keys(allSymbols).slice(0, 5))
+    console.log('[marketService] ETH symbols entry:', allSymbols['ETH'])
+    const eth = baseMarkets.find(m => m.id === 'ETH')
+    console.log('[marketService] ETH avant enrichissement:', eth)
 
   return [
     EMPTY_MARKET,
