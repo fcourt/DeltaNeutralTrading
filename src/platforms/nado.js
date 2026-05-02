@@ -493,11 +493,25 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
   await syncClock()
 
   const buildTriggerOrder = (triggerPrice, isTP) => {
-    const closeAmount = side === 'buy' ? Math.abs(size) : -Math.abs(size)
+    //const closeAmount = side === 'buy' ? Math.abs(size) : -Math.abs(size)
+    // Position LONG → clôture = SELL → amount négatif
+    // Position SHORT → clôture = BUY → amount positif
+    const closeAmount = side === 'long' ? -Math.abs(size) : Math.abs(size)
+    
     const slippage    = isTP ? 0.99 : 1.01
+    /*
     const execPrice   = side === 'buy'
       ? (isTP ? triggerPrice * (2 - slippage) : triggerPrice * slippage)
       : (isTP ? triggerPrice * slippage        : triggerPrice * (2 - slippage))
+      */
+
+    // Pour un ordre de CLÔTURE, on veut toujours être sûr d'être rempli :
+    // - Clôture LONG (sell) : prix d'exec en dessous du trigger → * 0.99
+    // - Clôture SHORT (buy) : prix d'exec au-dessus du trigger  → * 1.01
+    const execPrice = side === 'buy'
+      ? triggerPrice * 1.01   // ferme un SHORT → buy au-dessus
+      : triggerPrice * 0.99   // ferme un LONG  → sell en dessous
+
 
     const pricereq = side === 'buy'
       ? (isTP ? { oraclepricebelow: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
