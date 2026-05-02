@@ -586,6 +586,11 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
     }
   })
 */
+// ← AJOUTE CES LIGNES
+console.log('[Trigger payload]', JSON.stringify({
+  place_orders: { orders: signedOrders, stop_on_failure: false }
+}, null, 2))
+  
   return placeTriggerOrder({
     placeorders: {
       orders: signedOrders,
