@@ -11,6 +11,7 @@ function buildKeys(id) {
   return keys
 }
 
+/*
 export function buildMarkets(baseMarkets, allSymbols) {
   return [
     EMPTY_MARKET,
@@ -21,6 +22,31 @@ export function buildMarkets(baseMarkets, allSymbols) {
         const isXyz = m.keys.hl.startsWith('xyz:')
         extraKeys.ext = isXyz ? `${m.id}_24_5-USD` : `${m.id}-USD`
       }
+      const keys = { ...m.keys, ...extraKeys }
+      return {
+        ...m,
+        keys,
+        ...(allSymbols[m.id]
+          ?? Object.values(keys).map(k => allSymbols[k]).find(Boolean)
+          ?? {}),
+      }
+    }),
+  ]
+}
+*/
+export function buildMarkets(baseMarkets, allSymbols) {
+  return [
+    EMPTY_MARKET,
+    ...baseMarkets.map(m => {
+      const extraKeys = buildKeys(m.id)   // overrides explicites de KEY_OVERRIDES
+
+      // Fallbacks génériques — chaque plateforme définit le sien dans index.js
+      for (const p of PLATFORMS) {
+        if (!extraKeys[p.keysField] && !m.keys?.[p.keysField] && p.keyFallback) {
+          extraKeys[p.keysField] = p.keyFallback(m.id)
+        }
+      }
+
       const keys = { ...m.keys, ...extraKeys }
       return {
         ...m,
