@@ -77,7 +77,7 @@ export async function getAllMarkets() {
     EMPTY_MARKET,
     ...baseMarkets.map(m => ({ ...m, ...(allSymbols[m.id] ?? {}) })),
   ]
-  */
+  
   return [
     EMPTY_MARKET,
     ...baseMarkets.map(m => {
@@ -91,6 +91,9 @@ export async function getAllMarkets() {
         }
     }),
   ]
+  */
+
+  return buildMarkets(baseMarkets, allSymbols)
 }
 
 
