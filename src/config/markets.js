@@ -50,6 +50,7 @@ export const KEY_OVERRIDES = {
   nado: {
     SILVER: 'XAG',
     OIL:    'WTI',
+    SP500: 'SPY',
   },
   // ── Nouvelle plateforme ──
   // maPf: {
@@ -77,6 +78,11 @@ export const NADO_ONLY_MARKETS = [
   { id: 'QQQ',    label: 'QQQ ETF',  keys: { nado: 'QQQ'    }, category: 'Indices' },
 ]
 
+// src/config/markets.js
+export const EXT_KEY_TO_ID = Object.fromEntries(
+  Object.entries(KEY_OVERRIDES.ext).map(([id, extKey]) => [extKey, id])
+)
+// { 'XAG-USD': 'SILVER', 'WTI-USD': 'OIL', 'TECH100m-USD': 'NASDAQ', ... }
 /*
 KEY_OVERRIDES — objet unifié indexé par source, remplace EXT_KEY_OVERRIDES et NADO_KEY_OVERRIDES séparés ; les anciens exports sont conservés en rétrocompat
 */
