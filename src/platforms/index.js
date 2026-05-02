@@ -11,7 +11,6 @@ export const PLATFORMS = [
   { id: 'extended',    label: 'Extended',    source: 'ext',  adapter: extended, marketKey:  'extKey'   },
   { id: 'nado',        label: 'Nado',        source: 'nado', adapter: nado, marketKey:  'nadoProductId', altMarketKey: 'nadoKey' },
 ]
-*/
 
 export const PLATFORMS = [
   { id: 'hyperliquid', label: 'Hyperliquid', source: 'hl',   adapter: hyperliquid, keysField: 'hl'   },
@@ -19,6 +18,15 @@ export const PLATFORMS = [
   { id: 'hyena',       label: 'HyENA',       source: 'hl',   adapter: hyperliquid, keysField: 'hl'   },
   { id: 'extended',    label: 'Extended',    source: 'ext',  adapter: extended,    keysField: 'ext'  },
   { id: 'nado',        label: 'Nado',        source: 'nado', adapter: nado,        keysField: 'nado' },
+]
+*/
+
+export const PLATFORMS = [
+  { id: 'hyperliquid', label: 'Hyperliquid', source: 'hl',   adapter: hyperliquid, keysField: 'hl',   keyFallback: null },
+  { id: 'xyz',         label: 'trade.xyz',   source: 'hl',   adapter: hyperliquid, keysField: 'hl',   keyFallback: null },
+  { id: 'hyena',       label: 'HyENA',       source: 'hl',   adapter: hyperliquid, keysField: 'hl',   keyFallback: null },
+  { id: 'extended',    label: 'Extended',    source: 'ext',  adapter: extended,    keysField: 'ext',  keyFallback: (id) => `${id}-USD` },
+  { id: 'nado',        label: 'Nado',        source: 'nado', adapter: nado,        keysField: 'nado', keyFallback: (id) => id },
 ]
 
 // Helper central — remplace tous les if/switch de l'app
