@@ -14,6 +14,13 @@ const TRIGGER_URL = '/api/nado?endpoint=trigger'
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
 
+// src/platforms/nado.js — adapter export
+export const adapter = {
+  placeOrder,
+  placeTpSl,   // 👈 seul ajout
+  canTrade,
+}
+
 const _cache = new Map()
 const _ttls  = { nado_prices: 5_000, nado_keys: 300_000, nado_symbols: 300_000 }
 const _DEF   = 300_000
