@@ -243,7 +243,7 @@ export async function getPrices() {
 }
 
 let _nadoIdToKey = null
-
+/*
 export async function getFunding() {
   try {
     if (!_nadoIdToKey) {
@@ -259,13 +259,35 @@ export async function getFunding() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ funding_rates: { product_ids: productIds } }),
     })
-
-    //const res = await fetch(`${ARCHIVE}&path=${encodeURIComponent('/v1')}`, {
-    //  method: 'POST',
-    //  headers: { 'Content-Type': 'application/json' },
-    //  body: JSON.stringify({ funding_rates: { product_ids: productIds } }),
-    //})
     
+    if (!res.ok) return {}
+    const raw   = await res.json()
+    const rates = {}
+    Object.values(raw).forEach(p => {
+      const key = _nadoIdToKey[p.product_id]
+      if (key) rates[key] = parseFloat(p.funding_rate_x18) / 1e18
+    })
+    return rates
+  } catch (e) { console.warn('[Nado getFunding]', e.message); return {} }
+}
+*/
+
+export async function getFunding() {
+  try {
+    if (!_nadoIdToKey) {
+      const raw = await archiveGet('/v2/symbols')
+      _nadoIdToKey = {}
+      Object.values(raw).forEach(s => {
+        const pid = s.product_id ?? null
+        if (pid != null && pid !== 0) _nadoIdToKey[pid] = s.symbol.replace(/-PERP$/, '').replace(/-SPOT$/, '')
+      })
+    }
+    const productIds = Object.keys(_nadoIdToKey).map(Number)
+    const res = await fetch(`${ARCHIVE}&path=${encodeURIComponent('/v1')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ funding_rates: { product_ids: productIds } }),
+    })
     if (!res.ok) return {}
     const raw   = await res.json()
     const rates = {}
