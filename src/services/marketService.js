@@ -65,14 +65,13 @@ export async function getAllMarkets() {
   return [
     EMPTY_MARKET,
     ...baseMarkets.map(m => {
-      const keys = buildKeys(m.id)
+      const keys = { ...m.keys, ...buildKeys(m.id) }
         return {
           ...m,
           keys,
-          // Enrichissement : essaie l'id natif puis chaque override
           ...(allSymbols[m.id]
-          ?? Object.values(keys).map(k => allSymbols[k]).find(Boolean)
-          ?? {}),
+              ?? Object.values(keys).map(k => allSymbols[k]).find(Boolean)
+              ?? {}),
         }
     }),
   ]
