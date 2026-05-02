@@ -4,13 +4,13 @@
 import { privateKeyToAccount } from 'viem/accounts'
 
 const GATEWAY_PROXY = '/api/nado'
-//const ARCHIVE       = 'https://archive.prod.nado.xyz'
-const ARCHIVE       = '/api/nado?endpoint=archive'; 
-//const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
+const ARCHIVE       = 'https://archive.prod.nado.xyz'
+//const ARCHIVE       = '/api/nado?endpoint=archive'; 
+const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
 // Client trigger → endpoint dédié (TP/SL, stops)
 //const TRIGGER_URL = 'https://trigger.prod.nado.xyz/v1'
 const TRIGGER_URL = '/api/nado?endpoint=trigger'
-const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
+//const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
 
