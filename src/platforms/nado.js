@@ -4,11 +4,13 @@
 import { privateKeyToAccount } from 'viem/accounts'
 
 const GATEWAY_PROXY = '/api/nado'
-const ARCHIVE       = 'https://archive.prod.nado.xyz'
-const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
+//const ARCHIVE       = 'https://archive.prod.nado.xyz'
+const ARCHIVE       = '/api/nado?action=archive';
+//const NADO_EXECUTE  = 'https://gateway.prod.nado.xyz/v1/execute'
 // Client trigger → endpoint dédié (TP/SL, stops)
-const TRIGGER_URL = 'https://trigger.prod.nado.xyz/v1'
-//const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
+//const TRIGGER_URL = 'https://trigger.prod.nado.xyz/v1'
+const TRIGGER_URL = '/api/nado?endpoint=trigger'
+const NADO_EXECUTE   = '/api/nado?action=execute'; // ← passe par le proxy
 const CHAIN_ID      = 57073
 const DEAD          = new Set(['not_tradable', 'reduce_only'])
 
@@ -384,6 +386,45 @@ if (notional < minSize) {
 
 // -- TP/SL --------------------------------------------------------------------
 
+async function signTriggerOrder(order, productId, credentials) {
+  const domain = {
+    name: 'Nado', version: '0.0.1', chainId: CHAIN_ID,
+    verifyingContract: productIdToAddress(productId)
+  }
+  const types = {
+    Order: [
+      { name: 'sender',     type: 'bytes32' },
+      { name: 'priceX18',   type: 'int128'  },
+      { name: 'amount',     type: 'int128'  },
+      { name: 'expiration', type: 'uint64'  },
+      { name: 'nonce',      type: 'uint64'  },
+      { name: 'appendix',   type: 'uint128' },
+    ],
+  }
+  const value = {
+    sender:     order.sender,
+    priceX18:   BigInt(order.priceX18),
+    amount:     BigInt(order.amount),
+    expiration: BigInt(order.expiration),
+    nonce:      BigInt(order.nonce),
+    appendix:   BigInt(order.appendix),
+  }
+  return signTyped(credentials.nadoAgentPk, domain, types, value)
+}
+
+async function placeTriggerOrder(payload) {
+  const res = await fetch(TRIGGER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await res.json()
+  console.log('[Nado Trigger]', res.status, JSON.stringify(data))
+  if (data.status !== 'success') throw new Error(`[Nado Trigger] ${data.error ?? 'failed'}`)
+  return data
+}
+
+/*
 async function placeTriggerOrder(payload, signature) {
   return fetch(`${TRIGGER_URL}/execute`, {
     method: 'POST',
@@ -391,6 +432,7 @@ async function placeTriggerOrder(payload, signature) {
     body: JSON.stringify({ ...payload, signature })
   })
 }
+*/
 
 function buildTriggerAppendix({ isolated = false } = {}) {
   const TRIGGER_PRICE = 1n  // bits 12-13
@@ -401,6 +443,7 @@ function buildTriggerAppendix({ isolated = false } = {}) {
 }
 // Résultat normal : 4096 + 2048 (reduceOnly) = 6144
 
+/*
 async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, isolated }) {
   const isBuy = side === 'sell' // pour fermer un long → buy ; fermer un short → sell
 
@@ -432,13 +475,6 @@ async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, 
   const orders = []
   if (tpPrice) orders.push(buildTriggerOrder(tpPrice, true))
   if (slPrice) orders.push(buildTriggerOrder(slPrice, false))
-
-  const text = await response.text()
-console.log('[Nado Trigger] status:', response.status)
-console.log('[Nado Trigger] response:', text)
-console.log('[Nado Trigger] body sent:', JSON.stringify(req.body))
-res.setHeader('Content-Type', 'application/json')
-res.status(response.status).send(text)
   
   // Envoyer via placeorders (batch) sur trigger endpoint
   return placeTriggerOrder({
@@ -448,6 +484,55 @@ res.status(response.status).send(text)
         signature: await signOrder(o.order, productId)
       }))),
       stoponfailure: false
+    }
+  })
+}
+*/
+
+export async function placeTPSL({ productId, subaccount, side, size, tpPrice, slPrice, isolated, market, credentials }) {
+  await syncClock()
+
+  const buildTriggerOrder = (triggerPrice, isTP) => {
+    const closeAmount = side === 'buy' ? Math.abs(size) : -Math.abs(size)
+    const slippage    = isTP ? 0.99 : 1.01
+    const execPrice   = side === 'buy'
+      ? (isTP ? triggerPrice * (2 - slippage) : triggerPrice * slippage)
+      : (isTP ? triggerPrice * slippage        : triggerPrice * (2 - slippage))
+
+    const pricereq = side === 'buy'
+      ? (isTP ? { oraclepricebelow: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
+              : { oraclepriceabove: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
+      : (isTP ? { oraclepriceabove: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
+              : { oraclepricebelow: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
+
+    return {
+      product_id: productId,
+      order: {
+        sender:     subaccount,
+        priceX18:   String(roundToTick(execPrice,    market.nadoPriceIncrementX18)),
+        amount:     String(roundToTick(closeAmount,  market.nadoSizeIncrement)),
+        expiration: '4294967295',
+        nonce:      String(buildNonce()),
+        appendix:   String(buildTriggerAppendix({ isolated })),
+      },
+      trigger: { price_trigger: { price_requirement: pricereq } }
+    }
+  }
+
+  const orders = []
+  if (tpPrice) orders.push(buildTriggerOrder(tpPrice, true))
+  if (slPrice) orders.push(buildTriggerOrder(slPrice, false))
+  if (!orders.length) return
+
+  const signedOrders = await Promise.all(orders.map(async o => ({
+    ...o,
+    signature: await signTriggerOrder(o.order, productId, credentials),
+  })))
+
+  return placeTriggerOrder({
+    place_orders: {
+      orders: signedOrders,
+      stop_on_failure: false,
     }
   })
 }
