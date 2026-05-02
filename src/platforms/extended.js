@@ -462,8 +462,8 @@ export async function placeOrder(order, credentials) {
   if (!extStarkPk || !extL2Vault) throw new Error('Clé Stark ou l2Vault manquant pour Extended')
 
   const L2_CONFIGS = await loadL2Configs()
-  const l2Config   = L2_CONFIGS[market.extKey]
-  if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.extKey}`)
+  const l2Config   = L2_CONFIGS[market.keys?.ext]
+  if (!l2Config) throw new Error(`Marché non supporté par Extended : ${market.keys?.ext}`)
 
   /*
   // ── Levier : applique sur la plateforme avant de signer ───────────────────
@@ -510,7 +510,7 @@ export async function placeOrder(order, credentials) {
   const domainHash = computeDomainHash('Perpetuals', 'v0', 'SN_MAIN', 1)
 
   console.log('[Extended] parseCollateral inputs:', {
-    market: market.extKey, sizeStr, priceStr,
+    market: market.keys?.ext, sizeStr, priceStr,
     syntheticResolution, collateralResolution,
     syntheticAmountAbs, collateralAmountAbs,
     ratio: collateralResolution / syntheticResolution,
@@ -564,7 +564,7 @@ export async function placeOrder(order, credentials) {
 
   const payload = {
     id: generateOrderId(),
-    market: market.extKey,
+    market: market.keys?.ext,
     type: 'LIMIT',
     side: isBuy ? 'BUY' : 'SELL',
     qty: sizeStr,
