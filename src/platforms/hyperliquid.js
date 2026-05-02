@@ -7,12 +7,6 @@
 //} from '../config/markets.js'
 
 // hyperliquid.js — import migré
-import {
-  HL_KEY_OVERRIDES, MARKET_LABELS, inferCategory,
-  KEY_OVERRIDES,                            // ← nouveau nom unifié
-} from '../config/markets.js'
-
-
 import { ExchangeClient, HttpTransport } from '@nktkas/hyperliquid'
 import { signL1Action } from '@nktkas/hyperliquid/signing'
 import { privateKeyToAccount } from 'viem/accounts'
