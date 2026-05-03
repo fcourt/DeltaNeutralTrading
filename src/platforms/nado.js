@@ -479,7 +479,8 @@ async function placeTriggerOrder(payload, signature) {
 
 function buildTriggerAppendix({ isolated = false } = {}) {
   const TRIGGER_PRICE = 1n  // bits 12-13 : type = PRICE (1)
-  return 1n                              // version (bit 0, obligatoire)
+  return 1n                              // version (bit 0)
+    | (1n << 11n)                        // reduce_only (bit 11) — OBLIGATOIRE pour TP/SL
     | ((isolated ? 1n : 0n) << 8n)      // isolated
     | (TRIGGER_PRICE << 12n)            // 4096
 
