@@ -627,7 +627,7 @@ console.log('[Trigger payload]', JSON.stringify({
   })
 }
 
-// src/platforms/nado.js
+/*
 export async function placeTpSl(order, credentials) {
   const { isBuy, size, tpSlConfig, market } = order
   await placeTPSL({
@@ -640,6 +640,27 @@ export async function placeTpSl(order, credentials) {
     size,
     tpPrice:    tpSlConfig.prices.tp ?? null,
     slPrice:    tpSlConfig.prices.sl ?? null,
+    isolated:   market.nadoIsolatedOnly ?? false,
+    market,
+    credentials,
+  })
+}
+*/
+
+export async function placeTpSl(order, credentials) {
+  const { isBuy, size, tpSlConfig, market } = order
+  const prices = tpSlConfig.prices
+  // Normalise les deux formats possibles
+  const tpPrice = prices.tp ?? (isBuy ? prices.upPrice : prices.downPrice) ?? null
+  const slPrice = prices.sl ?? (isBuy ? prices.downPrice : prices.upPrice) ?? null
+
+  await placeTPSL({
+    productId:  market.nadoProductId,
+    subaccount: buildSubaccount(credentials.nadoAddress, credentials.nadoSubaccount || 'default'),
+    side:       isBuy ? 'long' : 'short',
+    size,
+    tpPrice,
+    slPrice,
     isolated:   market.nadoIsolatedOnly ?? false,
     market,
     credentials,
