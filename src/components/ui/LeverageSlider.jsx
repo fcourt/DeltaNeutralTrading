@@ -1,4 +1,106 @@
 // src/components/ui/LeverageSlider.jsx
+import { useCallback, useRef } from 'react'
+import { getPlatform } from '../../platforms/index.js'
+
+/**
+ * @param {object}   props
+ * @param {number}   props.value
+ * @param {Function} props.onChange          - (leverage: number) => void
+ * @param {number}   props.min
+ * @param {number}   props.max
+ * @param {'long'|'short'} props.side
+ * @param {string}   props.platformId
+ * @param {object}   props.market
+ * @param {object}   props.credentials
+ * @param {boolean}  [props.isCross=false]
+ */
+export default function LeverageSlider({
+  value,
+  onChange,
+  min = 1,
+  max = 50,
+  side,
+  platformId,
+  market,
+  credentials,
+  isCross = false,
+}) {
+  const statusRef = useRef(null)  // évite un re-render sur chaque tick du slider
+  const [status, setStatus] = useState(null)  // null | 'loading' | 'ok' | 'error'
+  const [errMsg, setErrMsg]  = useState(null)
+
+  // Déclenché une seule fois quand l'utilisateur relâche le slider
+  const applyOnRelease = useCallback(async (leverage) => {
+    if (!market) return
+
+    const platform = getPlatform(platformId)
+
+    // Nado n'expose pas setLeverage → on ne fait rien ici
+    // la valeur est déjà remontée via onChange au parent
+    if (!platform?.adapter?.setLeverage) return
+
+    setStatus('loading')
+    setErrMsg(null)
+    try {
+      await platform.adapter.setLeverage({ market, leverage, isCross, credentials })
+      setStatus('ok')
+    } catch (e) {
+      setStatus('error')
+      setErrMsg(e.message)
+    }
+    setTimeout(() => setStatus(null), 2500)
+  }, [platformId, market, credentials, isCross])
+
+  const handleChange = (e) => onChange(Number(e.target.value))
+
+  const handleRelease = (e) => applyOnRelease(Number(e.target.value))
+
+  const label = side === 'long' ? '🟢 Long' : '🔴 Short'
+
+  const statusIcon = status === 'loading' ? '…'
+                   : status === 'ok'      ? '✓'
+                   : status === 'error'   ? '✗'
+                   : null
+
+  return (
+    <div className="lev-slider">
+      <div className="lev-slider__header">
+        <span className="lev-slider__side">{label}</span>
+        <span className="lev-slider__value">
+          ×{value}
+          {statusIcon && (
+            <span className={`lev-slider__status lev-slider__status--${status}`}>
+              {statusIcon}
+            </span>
+          )}
+        </span>
+      </div>
+
+      <input
+        type="range"
+        className="lev-slider__range"
+        min={min} max={max} step={1}
+        value={value}
+        onChange={handleChange}
+        onMouseUp={handleRelease}
+        onTouchEnd={handleRelease}
+      />
+
+      <div className="lev-slider__labels">
+        <span>{min}×</span>
+        <span>{Math.round((min + max) / 2)}×</span>
+        <span>{max}×</span>
+      </div>
+
+      {status === 'error' && errMsg && (
+        <p className="lev-slider__error">{errMsg}</p>
+      )}
+    </div>
+  )
+}
+
+/*
+// src/components/ui/LeverageSlider.jsx
 import { useState, useCallback } from 'react'
 import { getPlatform } from '../../platforms/index.js'
 
@@ -13,7 +115,7 @@ import { getPlatform } from '../../platforms/index.js'
  * @param {object}   props.market            - { keys: { hl, ext, nado, … } }
  * @param {object}   props.credentials
  * @param {boolean}  [props.isCross=false]
- */
+ 
 export default function LeverageSlider({
   value,
   onChange,
