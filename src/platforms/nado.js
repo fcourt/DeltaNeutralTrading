@@ -364,6 +364,7 @@ export async function placeOrder(order, credentials) {
   const priceX18  = roundToTick(adjPrice,    market.nadoPriceIncrementX18 ?? '1000000000000000000')
   const amountX18 = roundToTick(signedSize,  market.nadoSizeIncrement     ?? '1000000000000000')
 
+  /*
   // Après roundToTick(...)
 const notional = (amountX18 < 0n ? -amountX18 : amountX18) * priceX18 / BigInt(1e18);
 const minSize  = BigInt(market.nadoMinSize ?? '100000000000000000000');
@@ -376,7 +377,39 @@ if (notional < minSize) {
   const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
   const nonce      = buildNonce()
   const appendix   = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
+*/
 
+  // Vérification notionnel minimum
+  const notional = (amountX18 < 0n ? -amountX18 : amountX18) * priceX18 / BigInt(1e18)
+  const minSize  = BigInt(market.nadoMinSize ?? '100000000000000000000')
+  if (notional < minSize) {
+    const cur = Number(notional) / 1e18
+    const min = Number(minSize) / 1e18
+    throw new Error(`Notionnel trop faible : $${cur.toFixed(2)} < minimum $${min.toFixed(2)}`)
+  }
+
+  const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
+  const nonce      = buildNonce()
+
+  // ── AJOUT : isolated margin si leverage fourni ─────────────────────────
+  const leverage = order.leverage ?? null
+  let appendix
+  if (leverage && leverage > 0) {
+    const notionalUsd    = Math.abs(order.size) * adjPrice
+    const marginUsdt     = notionalUsd / leverage
+    const isolatedMargin = BigInt(Math.ceil(marginUsdt * 1e6))  // x6 precision
+    // Reconstruit l'appendix avec isolated=true et isolatedMargin
+    appendix = 1n                                     // version
+      | ((isMaker ? 0n : 1n) << 9n)                  // orderType : DEFAULT ou IOC
+      | ((reduceOnly ? 1n : 0n) << 11n)               // reduce_only
+      | (1n << 8n)                                    // isolated = true
+      | (isolatedMargin << 64n)                       // isolated margin en x6
+  } else {
+    appendix = buildAppendix({ reduceOnly, orderType: isMaker ? 'DEFAULT' : 'IOC' })
+  }
+  // ──────────────────────────────────────────────────────────────────────
+
+  
   const domain = { name: 'Nado', version: '0.0.1', chainId: CHAIN_ID, verifyingContract: productIdToAddress(market.nadoProductId) }
   const types  = {
     Order: [
