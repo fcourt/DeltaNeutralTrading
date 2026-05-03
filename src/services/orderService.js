@@ -20,6 +20,13 @@ export async function placeOrder(params, credentials) {
   return platform.adapter.placeOrder(order, credentials)
 }
 
+//log___________________________________________________________________________________
+const result = await platform.adapter.placeOrder(order, credentials)
+
+console.log('[orderService] tpSlConfig reçu:', JSON.stringify(order.tpSlConfig))
+console.log('[orderService] placeTpSl existe:', !!platform.adapter.placeTpSl)
+//___________________________________________________________________________________log
+
 export function canTrade(platformId, credentials) {
   const platform = getPlatform(platformId)
   if (!platform?.adapter?.canTrade) return false
