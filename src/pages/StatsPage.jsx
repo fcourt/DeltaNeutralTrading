@@ -27,7 +27,7 @@ export default function FuturePage() {
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { useWallet } from '../contexts/WalletContext.jsx'
+import { useWallet } from '../src/context/WalletContext.jsx'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
