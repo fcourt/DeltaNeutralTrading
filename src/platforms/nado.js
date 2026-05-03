@@ -390,8 +390,6 @@ if (notional < minSize) {
 
   //const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
   // Expiration 4294967295n = illimité pour les ordres limites
-  const isMaker = orderType !== 'taker'
-
   const expiration = isMaker
     ? 4294967295n                                            // GTC — limit maker
     : BigInt(Math.floor(serverNow() / 1000) + 30)           // 30s pour IOC taker
