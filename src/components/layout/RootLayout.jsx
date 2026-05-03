@@ -12,7 +12,7 @@ export default function RootLayout() {
   const navLinks = [
     { to: '/open-trade',       labelKey: 'nav.openTrade' },
     { to: '/manage-positions', labelKey: 'nav.managePositions' },
-    { to: '/future',           labelKey: 'nav.future' },
+    { to: '/stats',            labelKey: 'nav.stats' },
     { to: '/setting-keys',     labelKey: 'nav.settingKeys' }, 
   ]
 
