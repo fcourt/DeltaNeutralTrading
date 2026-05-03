@@ -17,15 +17,15 @@ export async function placeOrder(params, credentials) {
     tpSlConfig: params.tpSlConfig ?? null,
   }
 
-  return platform.adapter.placeOrder(order, credentials)
-}
-
-//log___________________________________________________________________________________
+  //log___________________________________________________________________________________
 const result = await platform.adapter.placeOrder(order, credentials)
 
 console.log('[orderService] tpSlConfig reçu:', JSON.stringify(order.tpSlConfig))
 console.log('[orderService] placeTpSl existe:', !!platform.adapter.placeTpSl)
 //___________________________________________________________________________________log
+
+  return platform.adapter.placeOrder(order, credentials)
+}
 
 export function canTrade(platformId, credentials) {
   const platform = getPlatform(platformId)
