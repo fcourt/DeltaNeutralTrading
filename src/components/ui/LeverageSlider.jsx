@@ -1,19 +1,8 @@
 // src/components/ui/LeverageSlider.jsx
-import { useCallback, useRef } from 'react'
+// src/components/ui/LeverageSlider.jsx
+import { useState, useCallback } from 'react'
 import { getPlatform } from '../../platforms/index.js'
 
-/**
- * @param {object}   props
- * @param {number}   props.value
- * @param {Function} props.onChange          - (leverage: number) => void
- * @param {number}   props.min
- * @param {number}   props.max
- * @param {'long'|'short'} props.side
- * @param {string}   props.platformId
- * @param {object}   props.market
- * @param {object}   props.credentials
- * @param {boolean}  [props.isCross=false]
- */
 export default function LeverageSlider({
   value,
   onChange,
@@ -25,19 +14,13 @@ export default function LeverageSlider({
   credentials,
   isCross = false,
 }) {
-  const statusRef = useRef(null)  // évite un re-render sur chaque tick du slider
-  const [status, setStatus] = useState(null)  // null | 'loading' | 'ok' | 'error'
-  const [errMsg, setErrMsg]  = useState(null)
+  const [status, setStatus] = useState(null)
+  const [errMsg, setErrMsg] = useState(null)
 
-  // Déclenché une seule fois quand l'utilisateur relâche le slider
   const applyOnRelease = useCallback(async (leverage) => {
     if (!market) return
-
     const platform = getPlatform(platformId)
-
-    // Nado n'expose pas setLeverage → on ne fait rien ici
-    // la valeur est déjà remontée via onChange au parent
-    if (!platform?.adapter?.setLeverage) return
+    if (!platform?.adapter?.setLeverage) return  // Nado → no-op
 
     setStatus('loading')
     setErrMsg(null)
@@ -51,12 +34,10 @@ export default function LeverageSlider({
     setTimeout(() => setStatus(null), 2500)
   }, [platformId, market, credentials, isCross])
 
-  const handleChange = (e) => onChange(Number(e.target.value))
-
+  const handleChange  = (e) => onChange(Number(e.target.value))
   const handleRelease = (e) => applyOnRelease(Number(e.target.value))
 
-  const label = side === 'long' ? '🟢 Long' : '🔴 Short'
-
+  const label      = side === 'long' ? '🟢 Long' : '🔴 Short'
   const statusIcon = status === 'loading' ? '…'
                    : status === 'ok'      ? '✓'
                    : status === 'error'   ? '✗'
@@ -98,6 +79,7 @@ export default function LeverageSlider({
     </div>
   )
 }
+
 
 /*
 // src/components/ui/LeverageSlider.jsx
