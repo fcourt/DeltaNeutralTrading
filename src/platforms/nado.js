@@ -429,6 +429,11 @@ if (notional < minSize) {
 
 // -- TP/SL --------------------------------------------------------------------
 
+const result = await platform.adapter.placeOrder(order, credentials)
+
+console.log('[orderService] tpSlConfig:', order.tpSlConfig)
+console.log('[orderService] placeTpSl existe:', !!platform.adapter.placeTpSl)
+
 async function signTriggerOrder(order, productId, credentials) {
   const domain = {
     name: 'Nado', version: '0.0.1', chainId: CHAIN_ID,
