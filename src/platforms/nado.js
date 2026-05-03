@@ -478,9 +478,11 @@ async function placeTriggerOrder(payload, signature) {
 */
 
 function buildTriggerAppendix({ isolated = false } = {}) {
-  const TRIGGER_PRICE = 1n  // bits 12-13
-  return (TRIGGER_PRICE << 12n)              // 4096
-    | ((isolated ? 1n : 0n) << 8n)
+  const TRIGGER_PRICE = 1n  // bits 12-13 : type = PRICE (1)
+  return 1n                              // version (bit 0, obligatoire)
+    | ((isolated ? 1n : 0n) << 8n)      // isolated
+    | (TRIGGER_PRICE << 12n)            // 4096
+}
   /*
   return 1n                             // version
     | ((isolated ? 1n : 0n) << 8n)     // bit 8
@@ -564,13 +566,13 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
 
 
     const pricereq = side === 'short'
-      ? (isTP ? { oraclepricebelow: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
-              : { oraclepriceabove: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
-      : (isTP ? { oraclepriceabove: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
-              : { oraclepricebelow: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
+      ? (isTP ? { oracle_price_below: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
+              : { oracle_price_above: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
+      : (isTP ? { oracle_price_above: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) }
+              : { oracle_price_below: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
 
     return {
-      productid: productId,
+      product_id: productId,
       order: {
         sender:     subaccount,
         priceX18:   String(roundToTick(execPrice,    market.nadoPriceIncrementX18)),
@@ -579,7 +581,7 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
         nonce:      String(buildNonce()),
         appendix:   String(buildTriggerAppendix({ isolated })),
       },
-      trigger: { pricetrigger: { pricerequirement: pricereq } }
+      trigger: { price_trigger: { price_requirement: pricereq } }
     }
   }
 
@@ -628,8 +630,7 @@ console.log('[Trigger payload]', JSON.stringify({
 
   console.log('[TPSL] 6 - envoi trigger', JSON.stringify(signedOrders, null, 2))
   return placeTriggerOrder({
-    //place_orders: { orders: signedOrders, stop_on_failure: false }
-    placeorders: { orders: signedOrders, stoponfailure: false }
+    place_orders: { orders: signedOrders, stop_on_failure: false }
   })
 }
 
