@@ -128,7 +128,8 @@ function LegCard({
         min={1}
         max={50}
         side={isLong ? 'long' : 'short'}
-        platform={platform?.id}
+        //platform={platform?.id} 
+        platformId={platform?.id}
         market={market}
         credentials={credentials}
       />
