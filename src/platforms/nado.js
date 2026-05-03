@@ -482,7 +482,7 @@ function buildTriggerAppendix({ isolated = false } = {}) {
   return 1n                              // version (bit 0, obligatoire)
     | ((isolated ? 1n : 0n) << 8n)      // isolated
     | (TRIGGER_PRICE << 12n)            // 4096
-}
+
   /*
   return 1n                             // version
     | ((isolated ? 1n : 0n) << 8n)     // bit 8
