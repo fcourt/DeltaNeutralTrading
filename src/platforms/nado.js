@@ -388,7 +388,14 @@ if (notional < minSize) {
     throw new Error(`Notionnel trop faible : $${cur.toFixed(2)} < minimum $${min.toFixed(2)}`)
   }
 
-  const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
+  //const expiration = BigInt(Math.floor(serverNow() / 1000) + 150)
+  // Expiration 4294967295n = illimité pour les ordres limites
+  const isMaker = orderType !== 'taker'
+
+  const expiration = isMaker
+    ? 4294967295n                                            // GTC — limit maker
+    : BigInt(Math.floor(serverNow() / 1000) + 30)           // 30s pour IOC taker
+   
   const nonce      = buildNonce()
 
   // ── AJOUT : isolated margin si leverage fourni ─────────────────────────
