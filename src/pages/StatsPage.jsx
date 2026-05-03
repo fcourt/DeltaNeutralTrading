@@ -23,10 +23,11 @@ export default function FuturePage() {
 */
 
 // ============================================================
-// stats.js v2 — Page Statistiques
+// stats.js v3 — Intégration WalletContext
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
+import { useWallet } from '../contexts/WalletContext.jsx'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,16 +69,15 @@ function fmtVol(val) {
   return n.toFixed(2) + ' $'
 }
 
-// ─── subaccount bytes32 helper ────────────────────────────────────────────────
-// Nado : wallet (20 bytes) + name padded to 12 bytes
+// Nado : wallet (20 bytes) + subaccount name padded to 12 bytes → bytes32 hex
 function addressToSubaccount(address, name = 'default') {
-  const addrHex = address.toLowerCase().replace('0x', '')
-  const nameBytes = Array.from(name).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
-  const namePadded = nameBytes.padEnd(24, '0').slice(0, 24)
+  const addrHex  = address.toLowerCase().replace('0x', '')
+  const nameHex  = Array.from(name).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+  const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
   return '0x' + addrHex + namePadded
 }
 
-// ─── HL / HIP-3 ──────────────────────────────────────────────────────────────
+// ─── HL fetch ─────────────────────────────────────────────────────────────────
 
 async function fetchHLFills(address, startTime) {
   const res = await fetch('https://api.hyperliquid.xyz/info', {
@@ -85,7 +85,7 @@ async function fetchHLFills(address, startTime) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ type: 'userFillsByTime', user: address, startTime, aggregateByTime: false })
   })
-  if (!res.ok) throw new Error('HL fills error')
+  if (!res.ok) throw new Error(`HL fills error (${res.status})`)
   return res.json()
 }
 
@@ -100,7 +100,6 @@ async function fetchHLSubAccounts(address) {
   return Array.isArray(data) ? data : []
 }
 
-// Retourne { pnlGross, fees, volume, trades } pour HL et HIP-3 séparément
 function aggregateHLFills(fills, startTs, endTs) {
   const hl   = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
   const hip3 = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
@@ -108,16 +107,15 @@ function aggregateHLFills(fills, startTs, endTs) {
     if (f.time < startTs || f.time > endTs) continue
     const isHip3 = typeof f.coin === 'string' && f.coin.includes('xyz')
     const t = isHip3 ? hip3 : hl
-    const fee = parseFloat(f.fee || 0)
-    t.pnlGross += parseFloat(f.closedPnl || 0)   // PnL brut SANS déduire les fees
-    t.fees     += fee
+    t.pnlGross += parseFloat(f.closedPnl || 0)
+    t.fees     += parseFloat(f.fee       || 0)
     t.volume   += parseFloat(f.px || 0) * parseFloat(f.sz || 0)
     t.trades   += 1
   }
   return { hl, hip3 }
 }
 
-// ─── Extended ─────────────────────────────────────────────────────────────────
+// ─── Extended fetch ────────────────────────────────────────────────────────────
 
 async function fetchExtendedPositions(apiKey, baseUrl, startTime, endTime) {
   let cursor = null, all = []
@@ -152,13 +150,11 @@ async function fetchExtendedTrades(apiKey, baseUrl, startTime, endTime) {
 function aggregateExtended(positions, trades) {
   const pnlGross = positions.reduce((s, p) => s + parseFloat(p.realisedPnl || 0), 0)
   const fees     = trades.reduce((s, t) => s + parseFloat(t.payedFee || 0), 0)
-  const volume   = trades.reduce((s, t) => s + parseFloat(t.value || 0), 0)
+  const volume   = trades.reduce((s, t) => s + parseFloat(t.value    || 0), 0)
   return { pnlGross, fees, volume, trades: trades.length }
 }
 
-// ─── Nado ──────────────────────────────────────────────────────────────────────
-// Archive Indexer : POST https://archive.prod.nado.xyz/v1
-// type: "matches" → basefilled, quotefilled, fee, closednetentry, timestamp
+// ─── Nado fetch ────────────────────────────────────────────────────────────────
 
 async function fetchNadoMatches(subaccountBytes32, baseUrl, startTime, endTime) {
   let cursor = null, all = []
@@ -173,13 +169,11 @@ async function fetchNadoMatches(subaccountBytes32, baseUrl, startTime, endTime) 
     if (!res.ok) break
     const json = await res.json()
     const matches = json.matches || []
-    // Filtre par période (timestamps en secondes dans Nado)
     const filtered = matches.filter(m => {
       const ts = (m.timestamp || 0) * 1000
       return ts >= startTime && ts <= endTime
     })
     all = all.concat(filtered)
-    // Si on reçoit moins que la limite OU si le plus ancien match est avant startTime → stop
     if (!json.cursor || matches.length < 500 || filtered.length < matches.length) break
     cursor = json.cursor
   }
@@ -187,122 +181,165 @@ async function fetchNadoMatches(subaccountBytes32, baseUrl, startTime, endTime) 
 }
 
 function aggregateNado(matches) {
-  // closednetentry = PnL réalisé brut pour ce fill (positions fermantes uniquement)
   const pnlGross = matches.reduce((s, m) => s + parseFloat(m.closednetentry || 0) / 1e18, 0)
-  const fees     = matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee || 0) / 1e18), 0)
+  const fees     = matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee  || 0) / 1e18), 0)
   const volume   = matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0)
   return { pnlGross, fees, volume, trades: matches.length }
 }
 
+// ─── Constantes ───────────────────────────────────────────────────────────────
+
+const PLATFORM_LABELS = { hl: 'Hyperliquid Perps', hip3: 'HIP-3 DEX', extended: 'Extended', nado: 'Nado' }
+const PLATFORM_COLORS = { hl: '#93c5fd', hip3: '#c4b5fd', extended: '#6cdfa9', nado: '#e1ac83' }
+const STORAGE_KEY = 'stats_options_v3'
+
+const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export default function StatsPage({ keys }) {
-  const STORAGE_KEY = 'stats_options_v2'
+export default function StatsPage() {
+  // ── Clés depuis WalletContext ──
+  const {
+    hlAddress,
+    hlVaultAddress,
+    extApiKey,
+    nadoAddress,
+    nadoSubaccount,
+  } = useWallet()
+
+  // ── Chargement options sauvegardées ──
   const savedOpts = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
 
   // ── Filtres ──
-  const [period,         setPeriod]         = useState(savedOpts?.period         ?? 'all')
-  const [viewMode,       setViewMode]        = useState(savedOpts?.viewMode       ?? 'unified')
-  const [feesInPnl,      setFeesInPnl]       = useState(savedOpts?.feesInPnl      ?? true)
-  const [platforms,      setPlatforms]       = useState(savedOpts?.platforms      ?? { hl: true, hip3: true, extended: true, nado: true })
-  const [accounts,       setAccounts]        = useState(savedOpts?.accounts       ?? {})
-  const [extraAddresses, setExtraAddresses]  = useState(savedOpts?.extraAddresses ?? [])
-  const [newAddress,     setNewAddress]      = useState('')
-  const [filtersOpen,    setFiltersOpen]     = useState(true)
+  const [period,         setPeriod]        = useState(savedOpts?.period         ?? 'all')
+  const [viewMode,       setViewMode]       = useState(savedOpts?.viewMode       ?? 'unified')
+  const [feesInPnl,      setFeesInPnl]      = useState(savedOpts?.feesInPnl      ?? true)
+  const [platforms,      setPlatforms]      = useState(savedOpts?.platforms      ?? { hl: true, hip3: true, extended: true, nado: true })
+  const [accounts,       setAccounts]       = useState(savedOpts?.accounts       ?? {})
+  const [extraAddresses, setExtraAddresses] = useState(savedOpts?.extraAddresses ?? [])
+  const [newAddress,     setNewAddress]     = useState('')
+  const [filtersOpen,    setFiltersOpen]    = useState(true)
 
   // ── Data ──
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState(null)
-  const [subAccounts, setSubAccounts] = useState([])
+  const [subAccounts, setSubAccounts] = useState([]) // sous-comptes HL fetchés
   const [stats,       setStats]       = useState(null)
-  /*
-    stats.byPlatform[p] = { pnlGross, fees, volume, trades }
-    stats.total         = { pnlGross, fees, volume, trades }
-  */
 
   // ── Persist options ──
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ period, viewMode, feesInPnl, platforms, accounts, extraAddresses })) } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ period, viewMode, feesInPnl, platforms, accounts, extraAddresses }))
+    } catch {}
   }, [period, viewMode, feesInPnl, platforms, accounts, extraAddresses])
 
-  // ── Load HL sub-accounts ──
+  // ── Adresse HL effective (vault ou address) ──
+  const hlEffectiveAddress = hlVaultAddress?.trim() || hlAddress?.trim() || null
+
+  // ── Charger les sous-comptes HL dès que l'adresse est connue ──
   useEffect(() => {
-    if (!keys?.hl?.address) return
-    fetchHLSubAccounts(keys.hl.address).then(subs => {
-      const list = subs.map(s => ({ address: s.subAccountUser || s.address, name: s.name || s.subAccountUser || 'Sub-account' }))
+    if (!hlEffectiveAddress) return
+    fetchHLSubAccounts(hlEffectiveAddress).then(subs => {
+      const list = subs.map(s => ({
+        address: s.subAccountUser || s.address,
+        name:    s.name || s.subAccountUser || 'Sub-account'
+      }))
       setSubAccounts(list)
+      // Initialiser les comptes cochés (principal + sous-comptes + extra)
       setAccounts(prev => {
         const next = { ...prev }
-        if (!(keys.hl.address in next)) next[keys.hl.address] = true
+        if (!(hlEffectiveAddress in next)) next[hlEffectiveAddress] = true
         for (const s of list) if (!(s.address in next)) next[s.address] = true
         for (const a of extraAddresses) if (!(a in next)) next[a] = true
         return next
       })
     }).catch(() => {})
-  }, [keys?.hl?.address])
+  }, [hlEffectiveAddress])
 
-  // ── Compute ──
+  // ── Disponibilité des plateformes (clés configurées ?) ──
+  const platformAvailable = {
+    hl:       !!hlEffectiveAddress,
+    hip3:     !!hlEffectiveAddress,
+    extended: !!extApiKey?.trim(),
+    nado:     !!nadoAddress?.trim(),
+  }
+
+  // ── Compute stats ──
   const compute = useCallback(async () => {
     setLoading(true); setError(null); setStats(null)
     try {
       const { start, end } = getPeriodRange(period)
 
-      const allAddresses = [
-        keys?.hl?.address,
+      // Adresses HL actives (principal + sous-comptes + extra)
+      const allHLAddresses = [
+        hlEffectiveAddress,
         ...subAccounts.map(s => s.address),
-        ...extraAddresses
+        ...extraAddresses,
       ].filter(Boolean)
-      const activeAddresses = allAddresses.filter(a => accounts[a] !== false)
+      const activeHLAddresses = allHLAddresses.filter(a => accounts[a] !== false)
 
       const res = {
-        hl:       { pnlGross: 0, fees: 0, volume: 0, trades: 0 },
-        hip3:     { pnlGross: 0, fees: 0, volume: 0, trades: 0 },
-        extended: { pnlGross: 0, fees: 0, volume: 0, trades: 0 },
-        nado:     { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
+        hl:       { ...EMPTY_PLATFORM },
+        hip3:     { ...EMPTY_PLATFORM },
+        extended: { ...EMPTY_PLATFORM },
+        nado:     { ...EMPTY_PLATFORM },
       }
 
-      // HL + HIP3
-      if (platforms.hl || platforms.hip3) {
-        for (const addr of activeAddresses) {
+      // ── HL + HIP-3 ──
+      if ((platforms.hl || platforms.hip3) && activeHLAddresses.length > 0) {
+        for (const addr of activeHLAddresses) {
           try {
             const fills = await fetchHLFills(addr, start)
             const { hl, hip3 } = aggregateHLFills(fills, start, end)
-            if (platforms.hl)   { res.hl.pnlGross += hl.pnlGross;   res.hl.fees += hl.fees;   res.hl.volume += hl.volume;   res.hl.trades += hl.trades }
-            if (platforms.hip3) { res.hip3.pnlGross += hip3.pnlGross; res.hip3.fees += hip3.fees; res.hip3.volume += hip3.volume; res.hip3.trades += hip3.trades }
-          } catch {}
+            if (platforms.hl) {
+              res.hl.pnlGross += hl.pnlGross; res.hl.fees += hl.fees
+              res.hl.volume   += hl.volume;   res.hl.trades += hl.trades
+            }
+            if (platforms.hip3) {
+              res.hip3.pnlGross += hip3.pnlGross; res.hip3.fees += hip3.fees
+              res.hip3.volume   += hip3.volume;   res.hip3.trades += hip3.trades
+            }
+          } catch (e) {
+            console.warn(`HL fills error for ${addr}:`, e.message)
+          }
         }
       }
 
-      // Extended
-      if (platforms.extended && keys?.extended?.apiKey) {
+      // ── Extended ──
+      if (platforms.extended && extApiKey?.trim()) {
         try {
-          const base = keys.extended.baseUrl || 'https://api.starknet.extended.exchange'
+          const base = 'https://api.starknet.extended.exchange'
           const [positions, trades] = await Promise.all([
-            fetchExtendedPositions(keys.extended.apiKey, base, start, end),
-            fetchExtendedTrades(keys.extended.apiKey, base, start, end)
+            fetchExtendedPositions(extApiKey, base, start, end),
+            fetchExtendedTrades(extApiKey, base, start, end),
           ])
           res.extended = aggregateExtended(positions, trades)
-        } catch {}
+        } catch (e) {
+          console.warn('Extended error:', e.message)
+        }
       }
 
-      // Nado
-      if (platforms.nado && keys?.nado?.address) {
+      // ── Nado ──
+      if (platforms.nado && nadoAddress?.trim()) {
         try {
-          const base = keys.nado.baseUrl || 'https://archive.prod.nado.xyz'
-          const subBytes32 = addressToSubaccount(keys.nado.address, keys.nado.subaccountName || 'default')
+          const base = 'https://archive.prod.nado.xyz'
+          const subName    = nadoSubaccount?.trim() || 'default'
+          const subBytes32 = addressToSubaccount(nadoAddress.trim(), subName)
           const matches = await fetchNadoMatches(subBytes32, base, start, end)
           res.nado = aggregateNado(matches)
-        } catch {}
+        } catch (e) {
+          console.warn('Nado error:', e.message)
+        }
       }
 
-      // Total
+      // ── Total ──
       const activePlatforms = Object.keys(platforms).filter(p => platforms[p])
       const total = activePlatforms.reduce((acc, p) => ({
         pnlGross: acc.pnlGross + (res[p]?.pnlGross || 0),
         fees:     acc.fees     + (res[p]?.fees     || 0),
         volume:   acc.volume   + (res[p]?.volume   || 0),
-        trades:   acc.trades   + (res[p]?.trades   || 0)
-      }), { pnlGross: 0, fees: 0, volume: 0, trades: 0 })
+        trades:   acc.trades   + (res[p]?.trades   || 0),
+      }), { ...EMPTY_PLATFORM })
 
       setStats({ total, byPlatform: res })
     } catch (e) {
@@ -310,18 +347,17 @@ export default function StatsPage({ keys }) {
     } finally {
       setLoading(false)
     }
-  }, [period, platforms, accounts, extraAddresses, keys, subAccounts])
+  }, [period, platforms, accounts, extraAddresses, hlEffectiveAddress, subAccounts, extApiKey, nadoAddress, nadoSubaccount])
 
   useEffect(() => { compute() }, [compute])
 
-  // ── PnL affiché = brut ou net (après fees) ──
-  function displayPnl(pnlGross, fees) {
-    return feesInPnl ? pnlGross - fees : pnlGross
-  }
+  // ── PnL affiché ──
+  const displayPnl = (pnlGross, fees) => feesInPnl ? pnlGross - fees : pnlGross
 
   // ── Handlers ──
-  function togglePlatform(p) { setPlatforms(prev => ({ ...prev, [p]: !prev[p] })) }
-  function toggleAccount(addr) { setAccounts(prev => ({ ...prev, [addr]: !prev[addr] })) }
+  const togglePlatform = p => setPlatforms(prev => ({ ...prev, [p]: !prev[p] }))
+  const toggleAccount  = addr => setAccounts(prev => ({ ...prev, [addr]: !prev[addr] }))
+
   function addExtra() {
     const a = newAddress.trim()
     if (!a || extraAddresses.includes(a)) return
@@ -334,22 +370,44 @@ export default function StatsPage({ keys }) {
     setAccounts(prev => { const n = { ...prev }; delete n[addr]; return n })
   }
 
-  // ── Render ──
-  const PLATFORM_LABELS = { hl: 'Hyperliquid Perps', hip3: 'HIP-3 DEX', extended: 'Extended', nado: 'Nado' }
-  const PLATFORM_COLORS = { hl: '#93c5fd', hip3: '#c4b5fd', extended: '#6cdfa9', nado: '#e1ac83' }
+  // ─────────────────────────────────────────────────────────────────────────────
+  //  RENDER
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Aucune clé configurée ?
+  const nothingConfigured = !hlEffectiveAddress && !extApiKey?.trim() && !nadoAddress?.trim()
+
+  if (nothingConfigured) {
+    return (
+      <div className="stats-page">
+        <div className="card">
+          <div className="empty-state">
+            <svg width="40" height="40" fill="none" stroke="var(--color-text-faint)" strokeWidth="1.5" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <div className="empty-state__title">Aucune clé configurée</div>
+            <div className="empty-state__desc">Configure tes clés dans la page <strong>Keys</strong> pour voir tes statistiques.</div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="stats-page">
 
-      {/* ── Filtres ── */}
+      {/* ─── Filtres ─── */}
       <div className="card stats-filters">
         <button className="stats-filters__toggle" onClick={() => setFiltersOpen(o => !o)}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--color-text)' }}>
+          <span style={{ display:'flex', alignItems:'center', gap:'var(--space-2)', fontWeight:700, fontSize:'var(--text-sm)', color:'var(--color-text)' }}>
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
             Filtres
             {loading && <span className="stats-spin">⟳</span>}
           </span>
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}><polyline points="6 9 12 15 18 9"/></svg>
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+            style={{ transform: filtersOpen ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}>
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
         </button>
 
         {filtersOpen && (
@@ -365,20 +423,28 @@ export default function StatsPage({ keys }) {
               </div>
             </div>
 
-            {/* Plateformes */}
+            {/* Plateformes disponibles */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Plateformes</div>
               <div className="stats-chips">
-                {Object.entries(PLATFORM_LABELS).map(([p, label]) => (
-                  <button key={p}
-                    className={`stats-chip${platforms[p] ? ' stats-chip--on' : ''}`}
-                    style={platforms[p] ? { borderColor: PLATFORM_COLORS[p], color: PLATFORM_COLORS[p], background: PLATFORM_COLORS[p] + '1a' } : {}}
-                    onClick={() => togglePlatform(p)}>{label}</button>
-                ))}
+                {Object.entries(PLATFORM_LABELS).map(([p, label]) => {
+                  const available = platformAvailable[p]
+                  const active    = platforms[p] && available
+                  return (
+                    <button key={p}
+                      className={`stats-chip${active ? ' stats-chip--on' : ''}${!available ? ' stats-chip--disabled' : ''}`}
+                      style={active ? { borderColor: PLATFORM_COLORS[p], color: PLATFORM_COLORS[p], background: PLATFORM_COLORS[p] + '1a' } : {}}
+                      title={!available ? 'Clé non configurée' : ''}
+                      onClick={() => available && togglePlatform(p)}>
+                      {label}
+                      {!available && <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.5 }}>🔒</span>}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* Mode d'affichage */}
+            {/* Mode affichage */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Affichage plateformes</div>
               <div className="stats-chips">
@@ -398,65 +464,76 @@ export default function StatsPage({ keys }) {
               </label>
             </div>
 
-            {/* Comptes */}
-            <div className="stats-filter-section">
-              <div className="stats-filter-label">Comptes</div>
-              <div className="stats-accounts">
-                {keys?.hl?.address && (
+            {/* Comptes HL */}
+            {hlEffectiveAddress && (
+              <div className="stats-filter-section">
+                <div className="stats-filter-label">Comptes Hyperliquid</div>
+                <div className="stats-accounts">
+
+                  {/* Compte principal (ou vault) */}
                   <label className="stats-account-row">
-                    <input type="checkbox" checked={accounts[keys.hl.address] !== false} onChange={() => toggleAccount(keys.hl.address)} />
-                    <span className="stats-account-name">Principal</span>
-                    <span className="stats-account-addr">{keys.hl.address.slice(0, 6)}…{keys.hl.address.slice(-4)}</span>
+                    <input type="checkbox" checked={accounts[hlEffectiveAddress] !== false} onChange={() => toggleAccount(hlEffectiveAddress)} />
+                    <span className="stats-account-name">{hlVaultAddress?.trim() ? 'Vault' : 'Principal'}</span>
+                    <span className="stats-account-addr">{hlEffectiveAddress.slice(0, 6)}…{hlEffectiveAddress.slice(-4)}</span>
                     <span className="badge badge--primary" style={{ marginLeft: 'auto', fontSize: '10px' }}>HL</span>
                   </label>
-                )}
-                {subAccounts.map(s => (
-                  <label key={s.address} className="stats-account-row">
-                    <input type="checkbox" checked={accounts[s.address] !== false} onChange={() => toggleAccount(s.address)} />
-                    <span className="stats-account-name">{s.name}</span>
-                    <span className="stats-account-addr">{s.address.slice(0, 6)}…{s.address.slice(-4)}</span>
-                    <span className="badge badge--primary" style={{ marginLeft: 'auto', fontSize: '10px' }}>sub</span>
-                  </label>
-                ))}
-                {extraAddresses.map(addr => (
-                  <label key={addr} className="stats-account-row">
-                    <input type="checkbox" checked={accounts[addr] !== false} onChange={() => toggleAccount(addr)} />
-                    <span className="stats-account-name" style={{ color: 'var(--color-text-muted)' }}>{addr.slice(0, 6)}…{addr.slice(-4)}</span>
-                    <button className="stats-account-remove" onClick={e => { e.preventDefault(); removeExtra(addr) }}>×</button>
-                  </label>
-                ))}
-                <div className="stats-add-addr">
-                  <input className="wc-input" placeholder="Ajouter une adresse 0x…" value={newAddress}
-                    onChange={e => setNewAddress(e.target.value)} onKeyDown={e => e.key === 'Enter' && addExtra()} />
-                  <button className="btn-secondary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-2) var(--space-4)' }} onClick={addExtra}>+</button>
+
+                  {/* Sous-comptes fetchés */}
+                  {subAccounts.map(s => (
+                    <label key={s.address} className="stats-account-row">
+                      <input type="checkbox" checked={accounts[s.address] !== false} onChange={() => toggleAccount(s.address)} />
+                      <span className="stats-account-name">{s.name}</span>
+                      <span className="stats-account-addr">{s.address.slice(0, 6)}…{s.address.slice(-4)}</span>
+                      <span className="badge badge--primary" style={{ marginLeft: 'auto', fontSize: '10px' }}>sub</span>
+                    </label>
+                  ))}
+
+                  {/* Adresses extra */}
+                  {extraAddresses.map(addr => (
+                    <label key={addr} className="stats-account-row">
+                      <input type="checkbox" checked={accounts[addr] !== false} onChange={() => toggleAccount(addr)} />
+                      <span className="stats-account-name" style={{ color: 'var(--color-text-muted)' }}>{addr.slice(0, 6)}…{addr.slice(-4)}</span>
+                      <span className="stats-account-addr" style={{ flex: 1 }} />
+                      <button className="stats-account-remove" onClick={e => { e.preventDefault(); removeExtra(addr) }}>×</button>
+                    </label>
+                  ))}
+
+                  {/* Ajout adresse */}
+                  <div className="stats-add-addr">
+                    <input className="wc-input" placeholder="Ajouter une adresse 0x…" value={newAddress}
+                      onChange={e => setNewAddress(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addExtra()} />
+                    <button className="btn-secondary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-2) var(--space-4)' }} onClick={addExtra}>+</button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
           </div>
         )}
       </div>
 
-      {/* ── Erreur ── */}
+      {/* ─── Erreur ─── */}
       {error && <div className="alert alert--error">⚠ {error}</div>}
 
-      {/* ── Loading ── */}
+      {/* ─── Loading ─── */}
       {loading && !stats && (
         <div className="stats-loading">
           <span className="stats-spin" style={{ fontSize: '1.5rem' }}>⟳</span>
-          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement…</span>
+          <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>Chargement des statistiques…</span>
         </div>
       )}
 
+      {/* ─── Stats ─── */}
       {stats && (() => {
-        const totalPnl   = displayPnl(stats.total.pnlGross, stats.total.fees)
-        const totalFees  = stats.total.fees
-        const totalVol   = stats.total.volume
-        const totalTrades= stats.total.trades
+        const totalPnl    = displayPnl(stats.total.pnlGross, stats.total.fees)
+        const totalFees   = stats.total.fees
+        const totalVol    = stats.total.volume
+        const totalTrades = stats.total.trades
 
         return (
           <>
-            {/* ── 4 grandes cartes ── */}
+            {/* 4 grandes cartes */}
             <div className="stats-main-cards stats-main-cards--4">
               <StatCard label={feesInPnl ? 'PnL Réalisé (net)' : 'PnL Réalisé (brut)'} value={fmtMoney(totalPnl, true)} positive={totalPnl >= 0} large />
               <StatCard label="Fees payés" value={fmtMoney(totalFees)} accent="warning" large />
@@ -464,11 +541,11 @@ export default function StatsPage({ keys }) {
               <StatCard label="Trades" value={totalTrades.toLocaleString()} large />
             </div>
 
-            {/* ── Par plateforme ── */}
+            {/* Par plateforme — split */}
             {viewMode === 'split' ? (
               <div className="stats-platform-grid">
-                {Object.entries(PLATFORM_LABELS).filter(([p]) => platforms[p]).map(([p, label]) => {
-                  const d = stats.byPlatform[p] || { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
+                {Object.entries(PLATFORM_LABELS).filter(([p]) => platforms[p] && platformAvailable[p]).map(([p, label]) => {
+                  const d   = stats.byPlatform[p] || EMPTY_PLATFORM
                   const pnl = displayPnl(d.pnlGross, d.fees)
                   return (
                     <div key={p} className="stats-platform-card" style={{ '--plat-color': PLATFORM_COLORS[p] }}>
@@ -477,7 +554,7 @@ export default function StatsPage({ keys }) {
                       </div>
                       <div className="stats-platform-card__row">
                         <MiniStat label={feesInPnl ? 'PnL net' : 'PnL brut'} value={fmtMoney(pnl, true)} positive={pnl >= 0} />
-                        <MiniStat label="Fees" value={fmtMoney(d.fees)} accent="warning" />
+                        <MiniStat label="Fees"   value={fmtMoney(d.fees)} accent="warning" />
                         <MiniStat label="Volume" value={fmtVol(d.volume)} />
                         <MiniStat label="Trades" value={d.trades.toLocaleString()} />
                       </div>
@@ -486,7 +563,7 @@ export default function StatsPage({ keys }) {
                 })}
               </div>
             ) : (
-              /* Vue unifiée — tableau */
+              /* Par plateforme — tableau unifié */
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <table className="positions-table">
                   <thead>
@@ -499,26 +576,25 @@ export default function StatsPage({ keys }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(PLATFORM_LABELS).filter(([p]) => platforms[p]).map(([p, label]) => {
-                      const d = stats.byPlatform[p] || { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
+                    {Object.entries(PLATFORM_LABELS).filter(([p]) => platforms[p] && platformAvailable[p]).map(([p, label]) => {
+                      const d   = stats.byPlatform[p] || EMPTY_PLATFORM
                       const pnl = displayPnl(d.pnlGross, d.fees)
                       return (
                         <tr key={p}>
                           <td><span style={{ color: PLATFORM_COLORS[p], fontWeight: 600, fontSize: 'var(--text-xs)' }}>{label}</span></td>
-                          <td style={{ textAlign: 'right', color: pnl >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>{fmtMoney(pnl, true)}</td>
-                          <td style={{ textAlign: 'right', color: 'var(--color-warning)', fontWeight: 600 }}>{fmtMoney(d.fees)}</td>
-                          <td style={{ textAlign: 'right' }}>{fmtVol(d.volume)}</td>
-                          <td style={{ textAlign: 'right' }}>{d.trades.toLocaleString()}</td>
+                          <td style={{ textAlign:'right', color: pnl >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>{fmtMoney(pnl, true)}</td>
+                          <td style={{ textAlign:'right', color: 'var(--color-warning)', fontWeight: 600 }}>{fmtMoney(d.fees)}</td>
+                          <td style={{ textAlign:'right' }}>{fmtVol(d.volume)}</td>
+                          <td style={{ textAlign:'right' }}>{d.trades.toLocaleString()}</td>
                         </tr>
                       )
                     })}
-                    {/* Ligne total */}
                     <tr style={{ borderTop: '2px solid var(--color-divider)' }}>
                       <td style={{ fontWeight: 700, fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>TOTAL</td>
-                      <td style={{ textAlign: 'right', color: totalPnl >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 700 }}>{fmtMoney(totalPnl, true)}</td>
-                      <td style={{ textAlign: 'right', color: 'var(--color-warning)', fontWeight: 700 }}>{fmtMoney(totalFees)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtVol(totalVol)}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{totalTrades.toLocaleString()}</td>
+                      <td style={{ textAlign:'right', color: totalPnl >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 700 }}>{fmtMoney(totalPnl, true)}</td>
+                      <td style={{ textAlign:'right', color: 'var(--color-warning)', fontWeight: 700 }}>{fmtMoney(totalFees)}</td>
+                      <td style={{ textAlign:'right', fontWeight: 700 }}>{fmtVol(totalVol)}</td>
+                      <td style={{ textAlign:'right', fontWeight: 700 }}>{totalTrades.toLocaleString()}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -534,29 +610,27 @@ export default function StatsPage({ keys }) {
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, positive, accent, large }) {
-  let valueColor = 'var(--color-text)'
-  if (positive === true)  valueColor = 'var(--color-success)'
-  if (positive === false) valueColor = 'var(--color-error)'
-  if (accent === 'warning') valueColor = 'var(--color-warning)'
-
+  let color = 'var(--color-text)'
+  if (positive === true)    color = 'var(--color-success)'
+  if (positive === false)   color = 'var(--color-error)'
+  if (accent === 'warning') color = 'var(--color-warning)'
   return (
     <div className={`stats-card${large ? ' stats-card--large' : ''}`}>
       <div className="stats-card__label">{label}</div>
-      <div className="stats-card__value" style={{ color: valueColor }}>{value ?? '—'}</div>
+      <div className="stats-card__value" style={{ color }}>{value ?? '—'}</div>
     </div>
   )
 }
 
 function MiniStat({ label, value, positive, accent }) {
-  let valueColor = 'var(--color-text)'
-  if (positive === true)  valueColor = 'var(--color-success)'
-  if (positive === false) valueColor = 'var(--color-error)'
-  if (accent === 'warning') valueColor = 'var(--color-warning)'
-
+  let color = 'var(--color-text)'
+  if (positive === true)    color = 'var(--color-success)'
+  if (positive === false)   color = 'var(--color-error)'
+  if (accent === 'warning') color = 'var(--color-warning)'
   return (
     <div className="stats-mini-stat">
       <div className="stats-mini-stat__label">{label}</div>
-      <div className="stats-mini-stat__value" style={{ color: valueColor }}>{value ?? '—'}</div>
+      <div className="stats-mini-stat__value" style={{ color }}>{value ?? '—'}</div>
     </div>
   )
 }
