@@ -17,13 +17,6 @@ export async function placeOrder(params, credentials) {
     tpSlConfig: params.tpSlConfig ?? null,
   }
 
-  //log___________________________________________________________________________________
-const result = await platform.adapter.placeOrder(order, credentials)
-
-console.log('[orderService] tpSlConfig reçu:', JSON.stringify(order.tpSlConfig))
-console.log('[orderService] placeTpSl existe:', !!platform.adapter.placeTpSl)
-//___________________________________________________________________________________log
-
   return platform.adapter.placeOrder(order, credentials)
 }
 
