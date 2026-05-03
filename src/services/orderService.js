@@ -17,7 +17,17 @@ export async function placeOrder(params, credentials) {
     tpSlConfig: params.tpSlConfig ?? null,
   }
 
-  return platform.adapter.placeOrder(order, credentials)
+  //pour Nado avec appel vers TP/SL à voir si HL & Ext fonctionne encore avec
+  const result = await platform.adapter.placeOrder(order, credentials)
+
+if (order.tpSlConfig && platform.adapter.placeTpSl) {
+  await platform.adapter.placeTpSl(order, credentials)
+}
+
+return result
+
+  //return avant chang. pour Nado au-dessus
+  //return platform.adapter.placeOrder(order, credentials)
 }
 
 export function canTrade(platformId, credentials) {
