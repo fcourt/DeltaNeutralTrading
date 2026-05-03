@@ -1639,4 +1639,376 @@ a, button, [role="button"], input, select {
   font-size: var(--text-xs);
   color: var(--color-error);
 }
- 
+
+stats_v2_final
+/* ════════════════════════════════════════════════════════
+   PAGE — STATISTICS
+   À ajouter à global.css
+════════════════════════════════════════════════════════ */
+
+/* Layout général */
+.stats-page {
+  max-width: var(--content-wide);
+  margin-inline: auto;
+  padding: var(--space-4) var(--space-6) var(--space-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Spinner ── */
+@keyframes stats-rotate { to { transform: rotate(360deg); } }
+.stats-spin {
+  display: inline-block;
+  animation: stats-rotate 0.8s linear infinite;
+  color: var(--color-primary);
+}
+
+.stats-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-12);
+}
+
+/* ════════════════════════════════════
+   FILTRES — DROPBOX
+════════════════════════════════════ */
+
+.stats-filters {
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.stats-filters__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color var(--transition-interactive);
+  border-radius: var(--radius-xl);
+}
+
+.stats-filters__toggle:hover { color: var(--color-text); }
+
+.stats-filters__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-5) var(--space-5);
+  border-top: 1px solid var(--color-divider);
+}
+
+.stats-filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stats-filter-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* ── Période ── */
+.stats-period-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.stats-period-btn {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-interactive);
+}
+
+.stats-period-btn:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.stats-period-btn--active {
+  background: var(--color-primary-highlight);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* ── Chips plateforme / mode ── */
+.stats-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.stats-chip {
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-interactive);
+}
+
+.stats-chip:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.stats-chip--on {
+  /* couleur dynamique via style inline pour les plateformes */
+  /* pour le mode : */
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-highlight);
+}
+
+/* ── Comptes ── */
+.stats-accounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.stats-account-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  font-size: var(--text-xs);
+}
+
+.stats-account-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.stats-account-name {
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.stats-account-addr {
+  color: var(--color-text-faint);
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  flex: 1;
+}
+
+.stats-account-remove {
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 var(--space-1);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.stats-account-remove:hover { color: var(--color-error); }
+
+.stats-add-addr {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+  margin-top: var(--space-1);
+}
+
+.stats-add-addr .wc-input {
+  flex: 1;
+  font-size: var(--text-xs);
+}
+
+/* ════════════════════════════════════
+   CARTES PRINCIPALES (3 grandes)
+════════════════════════════════════ */
+
+.stats-main-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .stats-main-cards { grid-template-columns: 1fr; }
+}
+
+.stats-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.stats-card--large {
+  padding: var(--space-6) var(--space-6);
+}
+
+.stats-card__label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stats-card__value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-card__value--pos { color: var(--color-success); }
+.stats-card__value--neg { color: var(--color-error); }
+
+/* ════════════════════════════════════
+   PAR PLATEFORME — CARTES SÉPARÉES
+════════════════════════════════════ */
+
+.stats-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .stats-platform-grid { grid-template-columns: 1fr; }
+}
+
+.stats-platform-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 2px solid var(--plat-color, var(--color-primary));
+  border-radius: var(--radius-xl);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.stats-platform-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stats-platform-card__title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stats-platform-card__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ── Mini stats ── */
+.stats-mini-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.stats-mini-stat__label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.stats-mini-stat__value {
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ════════════════════════════════════
+   AJOUTS v2 — Fees + toggle PnL
+════════════════════════════════════ */
+
+/* 4 cartes principales */
+.stats-main-cards--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 900px) {
+  .stats-main-cards--4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .stats-main-cards--4 { grid-template-columns: 1fr; }
+}
+
+/* Toggle fees dans PnL */
+.stats-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  padding: var(--space-2) 0;
+}
+
+.stats-toggle-row input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.stats-toggle-hint {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-3);
+  white-space: nowrap;
+}
+
+/* Ligne total dans le tableau */
+.positions-table tbody tr:last-child td {
+  padding-top: var(--space-3);
+}
+
