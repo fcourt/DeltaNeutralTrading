@@ -479,11 +479,16 @@ async function placeTriggerOrder(payload, signature) {
 
 function buildTriggerAppendix({ isolated = false } = {}) {
   const TRIGGER_PRICE = 1n  // bits 12-13
+  return (TRIGGER_PRICE << 12n)              // 4096
+    | ((isolated ? 1n : 0n) << 8n)
+  /*
   return 1n                             // version
     | ((isolated ? 1n : 0n) << 8n)     // bit 8
     | (1n << 11n)                       // reduce_only OBLIGATOIRE pour TP/SL
     | (TRIGGER_PRICE << 12n)            // = 4096
+    */
 }
+    
 // Résultat normal : 4096 + 2048 (reduceOnly) = 6144
 
 /*
@@ -565,7 +570,7 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
               : { oraclepricebelow: String(roundToTick(triggerPrice, market.nadoPriceIncrementX18)) })
 
     return {
-      product_id: productId,
+      productid: productId,
       order: {
         sender:     subaccount,
         priceX18:   String(roundToTick(execPrice,    market.nadoPriceIncrementX18)),
@@ -574,7 +579,7 @@ export async function placeTPSL({ productId, subaccount, side, size, tpPrice, sl
         nonce:      String(buildNonce()),
         appendix:   String(buildTriggerAppendix({ isolated })),
       },
-      trigger: { price_trigger: { price_requirement: pricereq } }
+      trigger: { pricetrigger: { pricerequirement: pricereq } }
     }
   }
 
@@ -623,7 +628,8 @@ console.log('[Trigger payload]', JSON.stringify({
 
   console.log('[TPSL] 6 - envoi trigger', JSON.stringify(signedOrders, null, 2))
   return placeTriggerOrder({
-    place_orders: { orders: signedOrders, stop_on_failure: false }
+    //place_orders: { orders: signedOrders, stop_on_failure: false }
+    placeorders: { orders: signedOrders, stoponfailure: false }
   })
 }
 
