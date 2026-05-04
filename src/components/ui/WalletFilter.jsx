@@ -1,4 +1,4 @@
-// src/components/filters/WalletFilter.jsx
+// src/components/ui/WalletFilter.jsx
 /**
  * Zone comptes/wallet pilotée par PLATFORMS.
  *
