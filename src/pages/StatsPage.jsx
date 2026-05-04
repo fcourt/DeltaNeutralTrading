@@ -29,6 +29,23 @@ export default function FuturePage() {
 import React, { useState, useEffect, useCallback } from 'react'
 import { useWallet } from '../context/WalletContext'
 
+import WalletFilter from './components/ui/WalletFilter'
+import { useWalletAccounts } from './hooks/useWalletAccounts'
+
+function FiltersPanel() {
+  const wallet = useWalletAccounts()
+
+  return (
+    <WalletFilter
+      savedAccounts={wallet.savedAccounts}
+      selectedAccounts={wallet.selectedAccounts}
+      onToggle={wallet.onToggle}
+      onAddAddress={wallet.onAddAddress}
+      onRemoveAddress={wallet.onRemoveAddress}
+    />
+  )
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getWeekRange() {
