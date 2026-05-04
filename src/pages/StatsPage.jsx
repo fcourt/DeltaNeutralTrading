@@ -30,7 +30,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useWallet } from '../context/WalletContext'
 
 import WalletFilter from '../components/ui/WalletFilter'
-import { useWalletAccounts } from './hooks/useWalletAccounts'
+import { useWalletAccounts } from '../hooks/useWalletAccounts'
 
 function FiltersPanel() {
   const wallet = useWalletAccounts()
