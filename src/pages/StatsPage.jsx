@@ -1,50 +1,10 @@
-/*
-import { useTranslation } from 'react-i18next'
-import Card from '../components/ui/Card.jsx'
-
-export default function FuturePage() {
-  const { t } = useTranslation()
-  return (
-    <>
-      <div className="page-header">
-        <h1 className="page-title">{t('future.title')}</h1>
-        <p className="page-desc">{t('future.description')}</p>
-      </div>
-      <Card>
-        <div className="future-card">
-          <div className="future-card__orb" aria-hidden="true" />
-          <div className="future-card__icon" aria-hidden="true">◈</div>
-          <p className="future-card__msg">{t('future.comingSoon')}</p>
-        </div>
-      </Card>
-    </>
-  )
-}
-*/
-
 // ============================================================
-// stats.js v3 — Intégration WalletContext
+// stats.js v4 — PLATFORMS dynamiques depuis Index.js
 // ============================================================
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useWallet } from '../context/WalletContext'
-
-import WalletFilter from '../components/ui/WalletFilter'
-import { useWalletAccounts } from '../hooks/useWalletAccounts'
-
-function FiltersPanel() {
-  const wallet = useWalletAccounts()
-
-  return (
-    <WalletFilter
-      savedAccounts={wallet.savedAccounts}
-      selectedAccounts={wallet.selectedAccounts}
-      onToggle={wallet.onToggle}
-      onAddAddress={wallet.onAddAddress}
-      onRemoveAddress={wallet.onRemoveAddress}
-    />
-  )
-}
+import { PLATFORMS } from '../platforms/index'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -88,11 +48,54 @@ function fmtVol(val) {
 
 // Nado : wallet (20 bytes) + subaccount name padded to 12 bytes → bytes32 hex
 function addressToSubaccount(address, name = 'default') {
-  const addrHex  = address.toLowerCase().replace('0x', '')
-  const nameHex  = Array.from(name).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+  const addrHex    = address.toLowerCase().replace('0x', '')
+  const nameHex    = Array.from(name).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
   const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
   return '0x' + addrHex + namePadded
 }
+
+// ─── Couleurs par keysField ────────────────────────────────────────────────────
+// Couleur par id de plateforme (pour distinguer Hyperliquid / trade.xyz / HyENA visuellement)
+const PLATFORM_COLORS_BY_ID = {
+  hyperliquid: '#93c5fd',
+  xyz:         '#c4b5fd',
+  hyena:       '#a5b4fc',
+  extended:    '#6cdfa9',
+  nado:        '#e1ac83',
+}
+
+// Couleur de stats agrégées par keysField
+const STATS_COLORS = {
+  hl:   '#93c5fd',
+  ext:  '#6cdfa9',
+  nado: '#e1ac83',
+}
+
+// Label affiché dans les stats par keysField
+const STATS_LABELS = {
+  hl:   'Hyperliquid / HIP-3',
+  ext:  'Extended',
+  nado: 'Nado',
+}
+
+// ─── Clés de stats distinctes ─────────────────────────────────────────────────
+// Les stats sont agrégées par keysField (hl, ext, nado) + hip3 séparé
+const STATS_KEYS = ['hl', 'hip3', 'ext', 'nado']
+const STATS_LABELS_FULL = {
+  hl:   'Hyperliquid Perps',
+  hip3: 'HIP-3 DEX (trade.xyz / HyENA)',
+  ext:  'Extended',
+  nado: 'Nado',
+}
+const STATS_COLORS_FULL = {
+  hl:   '#93c5fd',
+  hip3: '#c4b5fd',
+  ext:  '#6cdfa9',
+  nado: '#e1ac83',
+}
+
+const STORAGE_KEY = 'stats_options_v4'
+const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
 
 // ─── HL fetch ─────────────────────────────────────────────────────────────────
 
@@ -204,14 +207,6 @@ function aggregateNado(matches) {
   return { pnlGross, fees, volume, trades: matches.length }
 }
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const PLATFORM_LABELS = { hl: 'Hyperliquid Perps', hip3: 'HIP-3 DEX', extended: 'Extended', nado: 'Nado' }
-const PLATFORM_COLORS = { hl: '#93c5fd', hip3: '#c4b5fd', extended: '#6cdfa9', nado: '#e1ac83' }
-const STORAGE_KEY = 'stats_options_v3'
-
-const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
-
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
@@ -228,19 +223,23 @@ export default function StatsPage() {
   const savedOpts = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
 
   // ── Filtres ──
+  // platforms : { [platformId]: boolean } — une entrée par id PLATFORMS
+  const defaultPlatforms = Object.fromEntries(PLATFORMS.map(p => [p.id, true]))
   const [period,         setPeriod]        = useState(savedOpts?.period         ?? 'all')
   const [viewMode,       setViewMode]       = useState(savedOpts?.viewMode       ?? 'unified')
   const [feesInPnl,      setFeesInPnl]      = useState(savedOpts?.feesInPnl      ?? true)
-  const [platforms,      setPlatforms]      = useState(savedOpts?.platforms      ?? { hl: true, hip3: true, extended: true, nado: true })
+  const [platforms,      setPlatforms]      = useState(savedOpts?.platforms      ?? defaultPlatforms)
   const [accounts,       setAccounts]       = useState(savedOpts?.accounts       ?? {})
+  // extraAddresses : [{ address, platformId }]
   const [extraAddresses, setExtraAddresses] = useState(savedOpts?.extraAddresses ?? [])
-  const [newAddress,     setNewAddress]     = useState('')
+  // newAddress : { [platformId]: string }
+  const [newAddress,     setNewAddress]     = useState({})
   const [filtersOpen,    setFiltersOpen]    = useState(true)
 
   // ── Data ──
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState(null)
-  const [subAccounts, setSubAccounts] = useState([]) // sous-comptes HL fetchés
+  const [subAccounts, setSubAccounts] = useState([])
   const [stats,       setStats]       = useState(null)
 
   // ── Persist options ──
@@ -250,10 +249,17 @@ export default function StatsPage() {
     } catch {}
   }, [period, viewMode, feesInPnl, platforms, accounts, extraAddresses])
 
-  // ── Adresse HL effective (vault ou address) ──
+  // ── Adresse HL effective ──
   const hlEffectiveAddress = hlVaultAddress?.trim() || hlAddress?.trim() || null
 
-  // ── Charger les sous-comptes HL dès que l'adresse est connue ──
+  // ── Disponibilité des keysField ──
+  const keysFieldAvailable = {
+    hl:   !!hlEffectiveAddress,
+    ext:  !!extApiKey?.trim(),
+    nado: !!nadoAddress?.trim(),
+  }
+
+  // ── Charger les sous-comptes HL ──
   useEffect(() => {
     if (!hlEffectiveAddress) return
     fetchHLSubAccounts(hlEffectiveAddress).then(subs => {
@@ -262,57 +268,119 @@ export default function StatsPage() {
         name:    s.name || s.subAccountUser || 'Sub-account'
       }))
       setSubAccounts(list)
-      // Initialiser les comptes cochés (principal + sous-comptes + extra)
       setAccounts(prev => {
         const next = { ...prev }
         if (!(hlEffectiveAddress in next)) next[hlEffectiveAddress] = true
         for (const s of list) if (!(s.address in next)) next[s.address] = true
-        for (const a of extraAddresses) if (!(a in next)) next[a] = true
+        for (const e of extraAddresses) if (!(e.address in next)) next[e.address] = true
         return next
       })
     }).catch(() => {})
   }, [hlEffectiveAddress])
 
-  // ── Disponibilité des plateformes (clés configurées ?) ──
-  const platformAvailable = {
-    hl:       !!hlEffectiveAddress,
-    hip3:     !!hlEffectiveAddress,
-    extended: !!extApiKey?.trim(),
-    nado:     !!nadoAddress?.trim(),
+  // ── Adresses sauvegardées par platformId ──────────────────────────────────────
+  function savedAddressesFor(platformId) {
+    const plat = PLATFORMS.find(p => p.id === platformId)
+    if (!plat) return []
+
+    if (plat.keysField === 'hl') {
+      return [
+        hlEffectiveAddress && {
+          address: hlEffectiveAddress,
+          name: hlVaultAddress?.trim() ? 'Vault' : 'Principal',
+          badge: 'HL',
+          removable: false,
+        },
+        ...subAccounts.map(s => ({
+          address: s.address,
+          name: s.name,
+          badge: 'sub',
+          removable: false,
+        })),
+        ...extraAddresses
+          .filter(e => e.platformId === platformId)
+          .map(e => ({ address: e.address, name: null, badge: 'extra', removable: true })),
+      ].filter(Boolean)
+    }
+
+    if (plat.keysField === 'ext') {
+      return extApiKey?.trim()
+        ? [{ address: null, name: 'Clé API configurée', badge: 'API', removable: false, apiOnly: true }]
+        : []
+    }
+
+    if (plat.keysField === 'nado') {
+      const addr = nadoAddress?.trim()
+      if (!addr) return []
+      return [
+        { address: addr, name: nadoSubaccount?.trim() || 'default', badge: 'nado', removable: false },
+        ...extraAddresses
+          .filter(e => e.platformId === platformId)
+          .map(e => ({ address: e.address, name: null, badge: 'extra', removable: true })),
+      ]
+    }
+
+    return []
   }
 
-  // ── Compute stats ──
+  // ── Handlers ──
+  const togglePlatform = id => setPlatforms(prev => ({ ...prev, [id]: !prev[id] }))
+  const toggleAccount  = addr => setAccounts(prev => ({ ...prev, [addr]: !prev[addr] }))
+
+  function addExtra(platformId) {
+    const a = (newAddress[platformId] ?? '').trim()
+    if (!a || extraAddresses.find(e => e.address === a && e.platformId === platformId)) return
+    setExtraAddresses(prev => [...prev, { address: a, platformId }])
+    setAccounts(prev => ({ ...prev, [a]: true }))
+    setNewAddress(prev => ({ ...prev, [platformId]: '' }))
+  }
+
+  function removeExtra(address, platformId) {
+    setExtraAddresses(prev => prev.filter(e => !(e.address === address && e.platformId === platformId)))
+    setAccounts(prev => { const n = { ...prev }; delete n[address]; return n })
+  }
+
+  // ── Compute stats ──────────────────────────────────────────────────────────────
   const compute = useCallback(async () => {
     setLoading(true); setError(null); setStats(null)
     try {
       const { start, end } = getPeriodRange(period)
 
-      // Adresses HL actives (principal + sous-comptes + extra)
+      // Quelles plateformes HL sont actives ?
+      const hlPlatformIds  = PLATFORMS.filter(p => p.keysField === 'hl').map(p => p.id)
+      const anyHLActive    = hlPlatformIds.some(id => platforms[id])
+      // HIP-3 se déclenche si trade.xyz ou hyena sont actifs
+      const hip3PlatIds    = ['xyz', 'hyena']
+      const anyHIP3Active  = hip3PlatIds.some(id => platforms[id])
+      // HL perps se déclenche si hyperliquid est actif
+      const hlPerpsActive  = platforms['hyperliquid']
+
+      // Adresses HL actives
       const allHLAddresses = [
         hlEffectiveAddress,
         ...subAccounts.map(s => s.address),
-        ...extraAddresses,
+        ...extraAddresses.filter(e => hlPlatformIds.includes(e.platformId)).map(e => e.address),
       ].filter(Boolean)
       const activeHLAddresses = allHLAddresses.filter(a => accounts[a] !== false)
 
       const res = {
-        hl:       { ...EMPTY_PLATFORM },
-        hip3:     { ...EMPTY_PLATFORM },
-        extended: { ...EMPTY_PLATFORM },
-        nado:     { ...EMPTY_PLATFORM },
+        hl:   { ...EMPTY_PLATFORM },
+        hip3: { ...EMPTY_PLATFORM },
+        ext:  { ...EMPTY_PLATFORM },
+        nado: { ...EMPTY_PLATFORM },
       }
 
       // ── HL + HIP-3 ──
-      if ((platforms.hl || platforms.hip3) && activeHLAddresses.length > 0) {
+      if (anyHLActive && activeHLAddresses.length > 0) {
         for (const addr of activeHLAddresses) {
           try {
             const fills = await fetchHLFills(addr, start)
             const { hl, hip3 } = aggregateHLFills(fills, start, end)
-            if (platforms.hl) {
+            if (hlPerpsActive) {
               res.hl.pnlGross += hl.pnlGross; res.hl.fees += hl.fees
               res.hl.volume   += hl.volume;   res.hl.trades += hl.trades
             }
-            if (platforms.hip3) {
+            if (anyHIP3Active) {
               res.hip3.pnlGross += hip3.pnlGross; res.hip3.fees += hip3.fees
               res.hip3.volume   += hip3.volume;   res.hip3.trades += hip3.trades
             }
@@ -323,42 +391,50 @@ export default function StatsPage() {
       }
 
       // ── Extended ──
-      if (platforms.extended && extApiKey?.trim()) {
+      const extActive = PLATFORMS.filter(p => p.keysField === 'ext').some(p => platforms[p.id])
+      if (extActive && extApiKey?.trim()) {
         try {
           const base = 'https://api.starknet.extended.exchange'
           const [positions, trades] = await Promise.all([
             fetchExtendedPositions(extApiKey, base, start, end),
             fetchExtendedTrades(extApiKey, base, start, end),
           ])
-          res.extended = aggregateExtended(positions, trades)
+          res.ext = aggregateExtended(positions, trades)
         } catch (e) {
           console.warn('Extended error:', e.message)
         }
       }
 
       // ── Nado ──
-      if (platforms.nado && nadoAddress?.trim()) {
+      const nadoActive = PLATFORMS.filter(p => p.keysField === 'nado').some(p => platforms[p.id])
+      if (nadoActive && nadoAddress?.trim()) {
         try {
-          const base = 'https://archive.prod.nado.xyz'
-          const subName    = nadoSubaccount?.trim() || 'default'
-          const subBytes32 = addressToSubaccount(nadoAddress.trim(), subName)
-          const matches = await fetchNadoMatches(subBytes32, base, start, end)
+          const base     = 'https://archive.prod.nado.xyz'
+          const subName  = nadoSubaccount?.trim() || 'default'
+          const subBytes = addressToSubaccount(nadoAddress.trim(), subName)
+          const matches  = await fetchNadoMatches(subBytes, base, start, end)
           res.nado = aggregateNado(matches)
         } catch (e) {
           console.warn('Nado error:', e.message)
         }
       }
 
-      // ── Total ──
-      const activePlatforms = Object.keys(platforms).filter(p => platforms[p])
-      const total = activePlatforms.reduce((acc, p) => ({
-        pnlGross: acc.pnlGross + (res[p]?.pnlGross || 0),
-        fees:     acc.fees     + (res[p]?.fees     || 0),
-        volume:   acc.volume   + (res[p]?.volume   || 0),
-        trades:   acc.trades   + (res[p]?.trades   || 0),
+      // ── Total sur les stats keys actives ──
+      const activeStatsKeys = STATS_KEYS.filter(k => {
+        if (k === 'hl')   return hlPerpsActive
+        if (k === 'hip3') return anyHIP3Active
+        if (k === 'ext')  return extActive
+        if (k === 'nado') return nadoActive
+        return false
+      })
+      const total = activeStatsKeys.reduce((acc, k) => ({
+        pnlGross: acc.pnlGross + (res[k]?.pnlGross || 0),
+        fees:     acc.fees     + (res[k]?.fees     || 0),
+        volume:   acc.volume   + (res[k]?.volume   || 0),
+        trades:   acc.trades   + (res[k]?.trades   || 0),
       }), { ...EMPTY_PLATFORM })
 
-      setStats({ total, byPlatform: res })
+      setStats({ total, byPlatform: res, activeStatsKeys })
     } catch (e) {
       setError(e.message)
     } finally {
@@ -368,30 +444,12 @@ export default function StatsPage() {
 
   useEffect(() => { compute() }, [compute])
 
-  // ── PnL affiché ──
   const displayPnl = (pnlGross, fees) => feesInPnl ? pnlGross - fees : pnlGross
-
-  // ── Handlers ──
-  const togglePlatform = p => setPlatforms(prev => ({ ...prev, [p]: !prev[p] }))
-  const toggleAccount  = addr => setAccounts(prev => ({ ...prev, [addr]: !prev[addr] }))
-
-  function addExtra() {
-    const a = newAddress.trim()
-    if (!a || extraAddresses.includes(a)) return
-    setExtraAddresses(prev => [...prev, a])
-    setAccounts(prev => ({ ...prev, [a]: true }))
-    setNewAddress('')
-  }
-  function removeExtra(addr) {
-    setExtraAddresses(prev => prev.filter(a => a !== addr))
-    setAccounts(prev => { const n = { ...prev }; delete n[addr]; return n })
-  }
 
   // ─────────────────────────────────────────────────────────────────────────────
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  // Aucune clé configurée ?
   const nothingConfigured = !hlEffectiveAddress && !extApiKey?.trim() && !nadoAddress?.trim()
 
   if (nothingConfigured) {
@@ -430,7 +488,7 @@ export default function StatsPage() {
         {filtersOpen && (
           <div className="stats-filters__body">
 
-            {/* Période */}
+            {/* ── Période ── */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Période</div>
               <div className="stats-period-btns">
@@ -440,20 +498,21 @@ export default function StatsPage() {
               </div>
             </div>
 
-            {/* Plateformes disponibles */}
+            {/* ── Plateformes — itération sur PLATFORMS ── */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Plateformes</div>
               <div className="stats-chips">
-                {Object.entries(PLATFORM_LABELS).map(([p, label]) => {
-                  const available = platformAvailable[p]
-                  const active    = platforms[p] && available
+                {PLATFORMS.map(p => {
+                  const available = keysFieldAvailable[p.keysField] ?? false
+                  const active    = platforms[p.id] && available
+                  const color     = PLATFORM_COLORS_BY_ID[p.id] ?? '#94a3b8'
                   return (
-                    <button key={p}
+                    <button key={p.id}
                       className={`stats-chip${active ? ' stats-chip--on' : ''}${!available ? ' stats-chip--disabled' : ''}`}
-                      style={active ? { borderColor: PLATFORM_COLORS[p], color: PLATFORM_COLORS[p], background: PLATFORM_COLORS[p] + '1a' } : {}}
+                      style={active ? { borderColor: color, color, background: color + '1a' } : {}}
                       title={!available ? 'Clé non configurée' : ''}
-                      onClick={() => available && togglePlatform(p)}>
-                      {label}
+                      onClick={() => available && togglePlatform(p.id)}>
+                      {p.label}
                       {!available && <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.5 }}>🔒</span>}
                     </button>
                   )
@@ -461,7 +520,7 @@ export default function StatsPage() {
               </div>
             </div>
 
-            {/* Mode affichage */}
+            {/* ── Mode affichage ── */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Affichage plateformes</div>
               <div className="stats-chips">
@@ -471,7 +530,7 @@ export default function StatsPage() {
               </div>
             </div>
 
-            {/* Options PnL */}
+            {/* ── Options PnL ── */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Options PnL</div>
               <label className="stats-toggle-row">
@@ -481,50 +540,90 @@ export default function StatsPage() {
               </label>
             </div>
 
-            {/* Comptes HL */}
-            {hlEffectiveAddress && (
-              <div className="stats-filter-section">
-                <div className="stats-filter-label">Comptes Hyperliquid</div>
-                <div className="stats-accounts">
+            {/* ── Comptes — une section par plateforme (PLATFORMS) ── */}
+            <div className="stats-filter-section">
+              <div className="stats-filter-label">Comptes</div>
+              <div className="stats-accounts-platforms">
+                {PLATFORMS.map(plat => {
+                  const color     = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
+                  const available = keysFieldAvailable[plat.keysField] ?? false
+                  const addrs     = savedAddressesFor(plat.id)
+                  const hasAddrs  = addrs.length > 0
 
-                  {/* Compte principal (ou vault) */}
-                  <label className="stats-account-row">
-                    <input type="checkbox" checked={accounts[hlEffectiveAddress] !== false} onChange={() => toggleAccount(hlEffectiveAddress)} />
-                    <span className="stats-account-name">{hlVaultAddress?.trim() ? 'Vault' : 'Principal'}</span>
-                    <span className="stats-account-addr">{hlEffectiveAddress.slice(0, 6)}…{hlEffectiveAddress.slice(-4)}</span>
-                    <span className="badge badge--primary" style={{ marginLeft: 'auto', fontSize: '10px' }}>HL</span>
-                  </label>
+                  return (
+                    <div key={plat.id} className="stats-accounts-platform">
 
-                  {/* Sous-comptes fetchés */}
-                  {subAccounts.map(s => (
-                    <label key={s.address} className="stats-account-row">
-                      <input type="checkbox" checked={accounts[s.address] !== false} onChange={() => toggleAccount(s.address)} />
-                      <span className="stats-account-name">{s.name}</span>
-                      <span className="stats-account-addr">{s.address.slice(0, 6)}…{s.address.slice(-4)}</span>
-                      <span className="badge badge--primary" style={{ marginLeft: 'auto', fontSize: '10px' }}>sub</span>
-                    </label>
-                  ))}
+                      {/* En-tête plateforme */}
+                      <div className="stats-accounts-platform__header">
+                        <span className="stats-accounts-platform__name" style={{ color }}>
+                          {plat.label}
+                        </span>
+                        {!available && (
+                          <span className="stats-accounts-platform__lock" title="Clé non configurée">🔒</span>
+                        )}
+                      </div>
 
-                  {/* Adresses extra */}
-                  {extraAddresses.map(addr => (
-                    <label key={addr} className="stats-account-row">
-                      <input type="checkbox" checked={accounts[addr] !== false} onChange={() => toggleAccount(addr)} />
-                      <span className="stats-account-name" style={{ color: 'var(--color-text-muted)' }}>{addr.slice(0, 6)}…{addr.slice(-4)}</span>
-                      <span className="stats-account-addr" style={{ flex: 1 }} />
-                      <button className="stats-account-remove" onClick={e => { e.preventDefault(); removeExtra(addr) }}>×</button>
-                    </label>
-                  ))}
+                      {/* Aucune adresse */}
+                      {!hasAddrs && (
+                        <div className="stats-no-addr-warning">
+                          <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ flexShrink:0 }}>
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                          </svg>
+                          Aucune adresse associée
+                        </div>
+                      )}
 
-                  {/* Ajout adresse */}
-                  <div className="stats-add-addr">
-                    <input className="wc-input" placeholder="Ajouter une adresse 0x…" value={newAddress}
-                      onChange={e => setNewAddress(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && addExtra()} />
-                    <button className="btn-secondary" style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-2) var(--space-4)' }} onClick={addExtra}>+</button>
-                  </div>
-                </div>
+                      {/* Liste des adresses */}
+                      {hasAddrs && (
+                        <div className="stats-accounts">
+                          {addrs.map((entry, i) => (
+                            <label key={entry.address ?? `api-${i}`} className={`stats-account-row${entry.apiOnly ? ' stats-account-row--api' : ''}`}>
+                              {!entry.apiOnly && (
+                                <input type="checkbox"
+                                  checked={accounts[entry.address] !== false}
+                                  onChange={() => toggleAccount(entry.address)} />
+                              )}
+                              <span className="stats-account-name" style={!entry.name ? { color: 'var(--color-text-muted)' } : {}}>
+                                {entry.name ?? (entry.address ? `${entry.address.slice(0,6)}…${entry.address.slice(-4)}` : '—')}
+                              </span>
+                              {entry.address && !entry.apiOnly && (
+                                <span className="stats-account-addr">
+                                  {entry.address.slice(0, 6)}…{entry.address.slice(-4)}
+                                </span>
+                              )}
+                              <span className="badge" style={{ marginLeft:'auto', fontSize:'10px', color }}>
+                                {entry.badge}
+                              </span>
+                              {entry.removable && (
+                                <button className="stats-account-remove"
+                                  onClick={e => { e.preventDefault(); removeExtra(entry.address, plat.id) }}>
+                                  ×
+                                </button>
+                              )}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Champ ajout adresse (sauf Extended qui est API-only) */}
+                      {plat.keysField !== 'ext' && (
+                        <div className="stats-add-addr">
+                          <input className="wc-input"
+                            placeholder={`Ajouter une adresse ${plat.label}…`}
+                            value={newAddress[plat.id] ?? ''}
+                            onChange={e => setNewAddress(prev => ({ ...prev, [plat.id]: e.target.value }))}
+                            onKeyDown={e => e.key === 'Enter' && addExtra(plat.id)} />
+                          <button className="btn-secondary"
+                            style={{ fontSize: 'var(--text-xs)', padding: 'var(--space-2) var(--space-4)' }}
+                            onClick={() => addExtra(plat.id)}>+</button>
+                        </div>
+                      )}
+
+                    </div>
+                  )
+                })}
               </div>
-            )}
+            </div>
 
           </div>
         )}
@@ -558,16 +657,18 @@ export default function StatsPage() {
               <StatCard label="Trades" value={totalTrades.toLocaleString()} large />
             </div>
 
-            {/* Par plateforme — split */}
+            {/* Par stats key — split */}
             {viewMode === 'split' ? (
               <div className="stats-platform-grid">
-                {Object.entries(PLATFORM_LABELS).filter(([p]) => platforms[p] && platformAvailable[p]).map(([p, label]) => {
-                  const d   = stats.byPlatform[p] || EMPTY_PLATFORM
-                  const pnl = displayPnl(d.pnlGross, d.fees)
+                {stats.activeStatsKeys.map(k => {
+                  const d     = stats.byPlatform[k] || EMPTY_PLATFORM
+                  const pnl   = displayPnl(d.pnlGross, d.fees)
+                  const color = STATS_COLORS_FULL[k]
+                  const label = STATS_LABELS_FULL[k]
                   return (
-                    <div key={p} className="stats-platform-card" style={{ '--plat-color': PLATFORM_COLORS[p] }}>
+                    <div key={k} className="stats-platform-card" style={{ '--plat-color': color }}>
                       <div className="stats-platform-card__header">
-                        <span className="stats-platform-card__title" style={{ color: PLATFORM_COLORS[p] }}>{label}</span>
+                        <span className="stats-platform-card__title" style={{ color }}>{label}</span>
                       </div>
                       <div className="stats-platform-card__row">
                         <MiniStat label={feesInPnl ? 'PnL net' : 'PnL brut'} value={fmtMoney(pnl, true)} positive={pnl >= 0} />
@@ -580,7 +681,7 @@ export default function StatsPage() {
                 })}
               </div>
             ) : (
-              /* Par plateforme — tableau unifié */
+              /* Par stats key — tableau unifié */
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <table className="positions-table">
                   <thead>
@@ -593,12 +694,14 @@ export default function StatsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(PLATFORM_LABELS).filter(([p]) => platforms[p] && platformAvailable[p]).map(([p, label]) => {
-                      const d   = stats.byPlatform[p] || EMPTY_PLATFORM
-                      const pnl = displayPnl(d.pnlGross, d.fees)
+                    {stats.activeStatsKeys.map(k => {
+                      const d     = stats.byPlatform[k] || EMPTY_PLATFORM
+                      const pnl   = displayPnl(d.pnlGross, d.fees)
+                      const color = STATS_COLORS_FULL[k]
+                      const label = STATS_LABELS_FULL[k]
                       return (
-                        <tr key={p}>
-                          <td><span style={{ color: PLATFORM_COLORS[p], fontWeight: 600, fontSize: 'var(--text-xs)' }}>{label}</span></td>
+                        <tr key={k}>
+                          <td><span style={{ color, fontWeight: 600, fontSize: 'var(--text-xs)' }}>{label}</span></td>
                           <td style={{ textAlign:'right', color: pnl >= 0 ? 'var(--color-success)' : 'var(--color-error)', fontWeight: 600 }}>{fmtMoney(pnl, true)}</td>
                           <td style={{ textAlign:'right', color: 'var(--color-warning)', fontWeight: 600 }}>{fmtMoney(d.fees)}</td>
                           <td style={{ textAlign:'right' }}>{fmtVol(d.volume)}</td>
@@ -651,4 +754,3 @@ function MiniStat({ label, value, positive, accent }) {
     </div>
   )
 }
-
