@@ -2014,17 +2014,16 @@ stats_v2_final
 
 /* ═══════════════════════════════════════════
    WALLET FILTER — Zone comptes / checkboxes
-   Complète global.css (wc-* tokens déjà définis)
+   À importer en complément de global.css
 ═══════════════════════════════════════════ */
 
-/* Conteneur principal */
 .wf-wrapper {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
 }
 
-/* ── Titre de section (réutilise .wc-section-title) ── */
+/* Titre de plateforme — réutilise .wc-section-title de global.css */
 .wc-section-title {
   display: flex;
   align-items: center;
@@ -2044,7 +2043,7 @@ stats_v2_final
   gap: var(--space-2);
 }
 
-/* ── Ligne compte (label cliquable) ── */
+/* ── Ligne compte ── */
 .wf-account-row {
   display: flex;
   align-items: center;
@@ -2053,8 +2052,9 @@ stats_v2_final
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  transition: background var(--transition-interactive),
-              border-color var(--transition-interactive);
+  transition:
+    background var(--transition-interactive),
+    border-color var(--transition-interactive);
   user-select: none;
 }
 
@@ -2063,7 +2063,7 @@ stats_v2_final
   border-color: var(--color-primary);
 }
 
-/* ── Checkbox ── */
+/* ── Checkbox custom ── */
 .wf-checkbox {
   appearance: none;
   -webkit-appearance: none;
@@ -2075,8 +2075,9 @@ stats_v2_final
   cursor: pointer;
   flex-shrink: 0;
   position: relative;
-  transition: background var(--transition-interactive),
-              border-color var(--transition-interactive);
+  transition:
+    background var(--transition-interactive),
+    border-color var(--transition-interactive);
 }
 
 .wf-checkbox:checked {
@@ -2088,9 +2089,6 @@ stats_v2_final
   content: '';
   position: absolute;
   inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M2 6l3 3 5-5' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
@@ -2139,8 +2137,9 @@ stats_v2_final
   border-radius: var(--radius-sm);
   cursor: pointer;
   line-height: 1;
-  transition: color var(--transition-interactive),
-              background var(--transition-interactive);
+  transition:
+    color var(--transition-interactive),
+    background var(--transition-interactive);
 }
 
 .wf-remove-btn:hover {
@@ -2198,17 +2197,9 @@ stats_v2_final
 
 /* ── Responsive ── */
 @media (max-width: 480px) {
-  .wf-add-row {
-    flex-wrap: wrap;
-  }
-  .wf-input-label {
-    width: 100%;
-  }
-  .wf-input-addr {
-    width: 100%;
-  }
-  .wf-add-btn {
-    align-self: flex-end;
-  }
+  .wf-add-row { flex-wrap: wrap; }
+  .wf-input-label { width: 100%; }
+  .wf-input-addr  { width: 100%; }
+  .wf-add-btn     { align-self: flex-end; }
 }
 
