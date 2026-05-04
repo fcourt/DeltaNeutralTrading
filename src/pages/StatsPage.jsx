@@ -29,7 +29,7 @@ export default function FuturePage() {
 import React, { useState, useEffect, useCallback } from 'react'
 import { useWallet } from '../context/WalletContext'
 
-import WalletFilter from './components/ui/WalletFilter'
+import WalletFilter from '../components/ui/WalletFilter'
 import { useWalletAccounts } from './hooks/useWalletAccounts'
 
 function FiltersPanel() {
