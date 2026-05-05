@@ -1,8 +1,10 @@
 // src/contexts/WalletContext.jsx
-import { createContext, useContext, useState, useCallback } from 'react'
-import { ALL_CREDENTIAL_FIELDS } from '../platforms/index.js'
+import { createContext, useContext, useState, useCallback, useMemo } from 'react'
+//import { ALL_CREDENTIAL_FIELDS } from '../platforms/index.js'
 import { canTrade } from '../services/orderService.js'
-import { PLATFORMS } from '../platforms/index.js'
+//import { PLATFORMS } from '../platforms/index.js'
+import { PLATFORMS, ALL_CREDENTIAL_FIELDS } from '../platforms/index.js'
+
 
 const WalletContext = createContext(null)
 
@@ -29,12 +31,27 @@ export function WalletProvider({ children }) {
   }, [])
 
   // canTrade auto-généré pour chaque keysField unique — zéro hardcoding
-  const canTradeMap = Object.fromEntries(
+ /* 
+   const canTradeMap = Object.fromEntries(
     [...new Set(PLATFORMS.map(p => p.keysField))].map(kf => [
       kf, canTrade(kf, values)
     ])
   )
+    */
   // ex: { hl: true, ext: false, nado: false }
+
+  // canTradeMap auto-généré, sans hardcoding
+const canTradeMap = useMemo(() =>
+  Object.fromEntries(
+    [...new Set(PLATFORMS.map(p => p.keysField))].map(kf => {
+      // Prendre la première platform du groupe — elles partagent le même adapter
+      const platform = PLATFORMS.find(p => p.keysField === kf)
+      return [kf, canTrade(platform.id, values)]
+      //                   ^^^^^^^^^^^
+      //                   'hyperliquid', 'extended', 'nado' → getPlatform() trouve
+    })
+  ),
+[values])
 
   return (
     <WalletContext.Provider value={{ ...values, save, resetAll, canTradeMap }}>
