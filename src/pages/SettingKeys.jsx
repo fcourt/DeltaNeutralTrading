@@ -1,7 +1,10 @@
 // src/pages/SettingKeys.jsx
-import { useState, useEffect } from 'react'
+//import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
+import { PLATFORMS, CREDENTIAL_FIELDS } from '../platforms/index.js'
+
 
 function FieldGroup({ fields, accentColor }) {
   const [localValues, setLocalValues] = useState(() =>
@@ -68,7 +71,7 @@ function PlatformBlock({ title, accentColor, statusDots, fields }) {
     </div>
   )
 }
-
+/*
 export default function SettingKeys() {
   const { t } = useTranslation()
   const wallet = useWallet()
@@ -146,6 +149,64 @@ export default function SettingKeys() {
           <PlatformBlock key={block.title} {...block} />
         ))}
 
+        <div className="wc-reset-zone">
+          <button onClick={handleReset} className="wc-reset-btn">
+            🗑️ {t('settingKeys.resetAll')}
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+*/
+
+export default function SettingKeys() {
+  const { t } = useTranslation()
+  const wallet = useWallet()
+
+  // Dédupliquer les keysField — hl/xyz/hyena partagent le même bloc credentials
+  const uniqueKeysFields = [...new Set(PLATFORMS.map(p => p.keysField))]
+
+  const platformBlocks = useMemo(() =>
+    uniqueKeysFields.map(kf => {
+      // Prendre la première platform du groupe pour le titre et l'accentColor
+      const platform = PLATFORMS.find(p => p.keysField === kf)
+      const fields   = CREDENTIAL_FIELDS[kf] ?? []
+
+      return {
+        key:         kf,
+        title:       t(`settingKeys.platforms.${kf}`),
+        accentColor: platform?.accentColor ?? 'gray',
+        statusDots: [
+          { label: t('settingKeys.status.connected'), color: fields[0] && wallet[fields[0].stateKey] ? 'green' : 'gray' },
+          { label: t('settingKeys.status.trading'),   color: wallet.canTradeMap[kf] ? 'green' : 'gray' },
+        ],
+        fields: fields.map(f => ({
+          label:  t(f.label),
+          val:    wallet[f.stateKey] ?? '',
+          setter: v => wallet.save(f.stateKey, v),
+          type:   f.type,
+          hint:   t(f.hint),
+        })),
+      }
+    }),
+  [wallet, t, uniqueKeysFields])
+
+  const handleReset = () => {
+    if (!confirm(t('settingKeys.confirmReset'))) return
+    wallet.resetAll()
+  }
+
+  return (
+    <>
+      <div className="page-header">
+        <h1 className="page-title">{t('settingKeys.title')}</h1>
+        <p className="page-desc">{t('settingKeys.description')}</p>
+      </div>
+      <div className="wc-platforms">
+        {platformBlocks.map(block => (
+          <PlatformBlock key={block.key} {...block} />
+        ))}
         <div className="wc-reset-zone">
           <button onClick={handleReset} className="wc-reset-btn">
             🗑️ {t('settingKeys.resetAll')}
