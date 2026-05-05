@@ -1,5 +1,5 @@
 // src/pages/SettingKeys.jsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
 
