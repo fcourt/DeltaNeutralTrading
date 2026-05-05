@@ -42,6 +42,35 @@ export function platformHasMarket(platformId, market) {
 }
 */
 
+/**
+ * Chaque groupe de credentials est lié à un keysField de PLATFORMS.
+ * Ajouter une plateforme = ajouter un bloc ici + une entrée dans PLATFORMS.
+ */
+export const CREDENTIAL_FIELDS = {
+  hl: [
+    { key: 'hl_address',       stateKey: 'hlAddress',      label: 'settingKeys.hl.address', type: 'text',     hint: 'settingKeys.hl.addressHint', trim: true  },
+    { key: 'hl_agent_pk',      stateKey: 'hlAgentPk',      label: 'settingKeys.hl.agentPk', type: 'password', hint: 'settingKeys.hl.agentPkHint', trim: false },
+    { key: 'hl_vault_address', stateKey: 'hlVaultAddress', label: 'settingKeys.hl.vault',   type: 'text',     hint: 'settingKeys.hl.vaultHint',   trim: true  },
+  ],
+  ext: [
+    { key: 'ext_api_key',  stateKey: 'extApiKey',  label: 'settingKeys.ext.apiKey',  type: 'password', hint: 'settingKeys.ext.apiKeyHint',  trim: false },
+    { key: 'ext_stark_pk', stateKey: 'extStarkPk', label: 'settingKeys.ext.starkPk', type: 'password', hint: 'settingKeys.ext.starkPkHint', trim: false },
+    { key: 'ext_l2_vault', stateKey: 'extL2Vault', label: 'settingKeys.ext.l2Vault', type: 'text',     hint: 'settingKeys.ext.l2VaultHint', trim: false },
+  ],
+  nado: [
+    { key: 'nado_address',    stateKey: 'nadoAddress',    label: 'settingKeys.nado.address',    type: 'text',     hint: 'settingKeys.nado.addressHint',    trim: false },
+    { key: 'nado_agent_pk',   stateKey: 'nadoAgentPk',    label: 'settingKeys.nado.agentPk',    type: 'password', hint: 'settingKeys.nado.agentPkHint',    trim: false },
+    { key: 'nado_subaccount', stateKey: 'nadoSubaccount', label: 'settingKeys.nado.subaccount', type: 'text',     hint: 'settingKeys.nado.subaccountHint', trim: false, default: 'default' },
+  ],
+  // ── Nouvelle plateforme : ajouter un bloc ici ──
+  // maPf: [
+  //   { key: 'ma_pf_api_key', stateKey: 'maPfApiKey', label: 'settingKeys.maPf.apiKey', type: 'password', hint: 'settingKeys.maPf.apiKeyHint', trim: false },
+  // ],
+}
+
+/** Liste plate de tous les champs — utilisée par WalletContext */
+export const ALL_CREDENTIAL_FIELDS = Object.values(CREDENTIAL_FIELDS).flat()
+
 // ✅ index.js — platformHasMarket générique, sans hardcoding
 export function platformHasMarket(platformId, market) {
   const p = getPlatform(platformId)
