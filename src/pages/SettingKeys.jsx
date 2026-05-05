@@ -1,36 +1,52 @@
 // src/pages/SettingKeys.jsx
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useWallet } from '../context/WalletContext'
 
-function FieldGroup({ fields, accentColor, draft, setDraft }) {
-  return fields.map(({ label, key, setter, type, hint }) => (
+function FieldGroup({ fields, accentColor }) {
+  const [localValues, setLocalValues] = useState(() =>
+    fields.reduce((acc, f) => {
+      acc[f.label] = f.val || ''
+      return acc
+    }, {})
+  )
+
+  // Sync si wallet change (ex: reset)
+  useEffect(() => {
+    setLocalValues(
+      fields.reduce((acc, f) => {
+        acc[f.label] = f.val || ''
+        return acc
+      }, {})
+    )
+  }, [fields])
+
+  const handleChange = (label, value, setter) => {
+    setLocalValues(prev => ({ ...prev, [label]: value }))
+    setter(value) // update wallet
+  }
+
+  return fields.map(({ label, setter, type, hint }) => (
     <div key={label} className="wc-field-group">
       <label className="wc-field-label">{label}</label>
       <div className="wc-field-row">
         <input
           type={type}
-          value={draft[key] ?? ''}
-          onChange={e => setDraft(prev => ({ ...prev, [key]: e.target.value }))}
-          onBlur={e => setter(e.target.value)}
+          value={localValues[label] || ''}
+          onChange={e => handleChange(label, e.target.value, setter)}
           placeholder={type === 'text' ? '0x...' : '••••••'}
           className={`wc-input wc-input--${accentColor}`}
         />
-        {draft[key] && <span className="wc-field-check">✓</span>}
+        {localValues[label] && <span className="wc-field-check">✓</span>}
       </div>
       <p className="wc-field-hint">{hint}</p>
     </div>
   ))
 }
 
+
 function PlatformBlock({ title, accentColor, statusDots, fields }) {
   const [open, setOpen] = useState(false)
-
-  // État tampon local — isolé du contexte, ne provoque pas de re-render global
-  const [draft, setDraft] = useState(() =>
-    Object.fromEntries(fields.map(f => [f.key, f.val ?? '']))
-  )
-
   return (
     <div className="wc-wrapper">
       <button onClick={() => setOpen(o => !o)} className="wc-toggle">
@@ -45,12 +61,7 @@ function PlatformBlock({ title, accentColor, statusDots, fields }) {
       {open && (
         <div className="wc-body">
           <div className="wc-section">
-            <FieldGroup
-              fields={fields}
-              accentColor={accentColor}
-              draft={draft}
-              setDraft={setDraft}
-            />
+            <FieldGroup fields={fields} accentColor={accentColor} />
           </div>
         </div>
       )}
@@ -59,7 +70,7 @@ function PlatformBlock({ title, accentColor, statusDots, fields }) {
 }
 
 export default function SettingKeys() {
-  const { t }  = useTranslation()
+  const { t } = useTranslation()
   const wallet = useWallet()
 
   // ── Déclaration centralisée des blocs plateforme ────────────────────────
@@ -73,9 +84,9 @@ export default function SettingKeys() {
         { label: t('settingKeys.status.trading'),   color: wallet.canTradeHL ? 'green' : 'yellow' },
       ],
       fields: [
-        { label: t('settingKeys.hl.address'), key: 'hlAddress',      val: wallet.hlAddress,      setter: wallet.saveHlAddress,      type: 'text',     hint: t('settingKeys.hl.addressHint') },
-        { label: t('settingKeys.hl.agentPk'), key: 'hlAgentPk',      val: wallet.hlAgentPk,      setter: wallet.saveHlAgentPk,      type: 'password', hint: t('settingKeys.hl.agentPkHint') },
-        { label: t('settingKeys.hl.vault'),   key: 'hlVaultAddress', val: wallet.hlVaultAddress, setter: wallet.saveHlVaultAddress, type: 'text',     hint: t('settingKeys.hl.vaultHint')   },
+        { label: t('settingKeys.hl.address'), val: wallet.hlAddress,      setter: wallet.saveHlAddress,      type: 'text',     hint: t('settingKeys.hl.addressHint') },
+        { label: t('settingKeys.hl.agentPk'), val: wallet.hlAgentPk,      setter: wallet.saveHlAgentPk,      type: 'password', hint: t('settingKeys.hl.agentPkHint') },
+        { label: t('settingKeys.hl.vault'),   val: wallet.hlVaultAddress, setter: wallet.saveHlVaultAddress, type: 'text',     hint: t('settingKeys.hl.vaultHint')    },
       ],
     },
     {
@@ -86,9 +97,9 @@ export default function SettingKeys() {
         { label: t('settingKeys.status.trading'),   color: wallet.canTradeExt ? 'green' : 'yellow' },
       ],
       fields: [
-        { label: t('settingKeys.ext.apiKey'),  key: 'extApiKey',  val: wallet.extApiKey,  setter: wallet.saveExtApiKey,  type: 'password', hint: t('settingKeys.ext.apiKeyHint')  },
-        { label: t('settingKeys.ext.starkPk'), key: 'extStarkPk', val: wallet.extStarkPk, setter: wallet.saveExtStarkPk, type: 'password', hint: t('settingKeys.ext.starkPkHint') },
-        { label: t('settingKeys.ext.l2Vault'), key: 'extL2Vault', val: wallet.extL2Vault, setter: wallet.saveExtL2Vault, type: 'text',     hint: t('settingKeys.ext.l2VaultHint') },
+        { label: t('settingKeys.ext.apiKey'),  val: wallet.extApiKey,  setter: wallet.saveExtApiKey,  type: 'password', hint: t('settingKeys.ext.apiKeyHint')  },
+        { label: t('settingKeys.ext.starkPk'), val: wallet.extStarkPk, setter: wallet.saveExtStarkPk, type: 'password', hint: t('settingKeys.ext.starkPkHint') },
+        { label: t('settingKeys.ext.l2Vault'), val: wallet.extL2Vault, setter: wallet.saveExtL2Vault, type: 'text',     hint: t('settingKeys.ext.l2VaultHint') },
       ],
     },
     {
@@ -99,9 +110,9 @@ export default function SettingKeys() {
         { label: t('settingKeys.status.trading'),   color: wallet.canTradeNado ? 'green' : 'gray' },
       ],
       fields: [
-        { label: t('settingKeys.nado.address'),    key: 'nadoAddress',    val: wallet.nadoAddress,    setter: wallet.saveNadoAddress,    type: 'text',     hint: t('settingKeys.nado.addressHint')    },
-        { label: t('settingKeys.nado.agentPk'),    key: 'nadoAgentPk',    val: wallet.nadoAgentPk,    setter: wallet.saveNadoAgentPk,    type: 'password', hint: t('settingKeys.nado.agentPkHint')    },
-        { label: t('settingKeys.nado.subaccount'), key: 'nadoSubaccount', val: wallet.nadoSubaccount, setter: wallet.saveNadoSubaccount, type: 'text',     hint: t('settingKeys.nado.subaccountHint') },
+        { label: t('settingKeys.nado.address'),    val: wallet.nadoAddress,    setter: wallet.saveNadoAddress,    type: 'text',     hint: t('settingKeys.nado.addressHint')    },
+        { label: t('settingKeys.nado.agentPk'),    val: wallet.nadoAgentPk,    setter: wallet.saveNadoAgentPk,    type: 'password', hint: t('settingKeys.nado.agentPkHint')    },
+        { label: t('settingKeys.nado.subaccount'), val: wallet.nadoSubaccount, setter: wallet.saveNadoSubaccount, type: 'text',     hint: t('settingKeys.nado.subaccountHint') },
       ],
     },
     // ── Nouvelle plateforme ──────────────────────────────────────────────
@@ -109,11 +120,11 @@ export default function SettingKeys() {
     //   title:       t('settingKeys.platforms.maPf'),
     //   accentColor: 'orange',
     //   statusDots: [
-    //     { label: t('settingKeys.status.connected'), color: wallet.maPfApiKey   ? 'green' : 'gray' },
-    //     { label: t('settingKeys.status.trading'),   color: wallet.canTradeMaPf ? 'green' : 'gray' },
+    //     { label: t('settingKeys.status.connected'), color: wallet.maPfApiKey    ? 'green' : 'gray' },
+    //     { label: t('settingKeys.status.trading'),   color: wallet.canTradeMaPf  ? 'green' : 'gray' },
     //   ],
     //   fields: [
-    //     { label: t('settingKeys.maPf.apiKey'), key: 'maPfApiKey', val: wallet.maPfApiKey, setter: wallet.saveMaPfApiKey, type: 'password', hint: t('settingKeys.maPf.apiKeyHint') },
+    //     { label: t('settingKeys.maPf.apiKey'), val: wallet.maPfApiKey, setter: wallet.saveMaPfApiKey, type: 'password', hint: t('settingKeys.maPf.apiKeyHint') },
     //   ],
     // },
   ]
