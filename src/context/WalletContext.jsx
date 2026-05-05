@@ -1,5 +1,55 @@
 // src/contexts/WalletContext.jsx
 import { createContext, useContext, useState, useCallback } from 'react'
+import { ALL_CREDENTIAL_FIELDS } from '../platforms/index.js'
+import { canTrade } from '../services/orderService.js'
+import { PLATFORMS } from '../platforms/index.js'
+
+const WalletContext = createContext(null)
+
+function readField(f) {
+  const raw = localStorage.getItem(f.key) ?? (f.default ?? '')
+  return f.trim ? raw.trim() : raw
+}
+
+export function WalletProvider({ children }) {
+  const [values, setValues] = useState(() =>
+    Object.fromEntries(ALL_CREDENTIAL_FIELDS.map(f => [f.stateKey, readField(f)]))
+  )
+
+  const save = useCallback((stateKey, value) => {
+    const field = ALL_CREDENTIAL_FIELDS.find(f => f.stateKey === stateKey)
+    const val   = field?.trim ? value.trim() : value
+    setValues(prev => ({ ...prev, [stateKey]: val }))
+    if (field) localStorage.setItem(field.key, val)
+  }, [])
+
+  const resetAll = useCallback(() => {
+    ALL_CREDENTIAL_FIELDS.forEach(f => localStorage.removeItem(f.key))
+    setValues(Object.fromEntries(ALL_CREDENTIAL_FIELDS.map(f => [f.stateKey, f.default ?? ''])))
+  }, [])
+
+  // canTrade auto-généré pour chaque keysField unique — zéro hardcoding
+  const canTradeMap = Object.fromEntries(
+    [...new Set(PLATFORMS.map(p => p.keysField))].map(kf => [
+      kf, canTrade(kf, values)
+    ])
+  )
+  // ex: { hl: true, ext: false, nado: false }
+
+  return (
+    <WalletContext.Provider value={{ ...values, save, resetAll, canTradeMap }}>
+      {children}
+    </WalletContext.Provider>
+  )
+}
+
+export function useWallet() {
+  const ctx = useContext(WalletContext)
+  if (!ctx) throw new Error('useWallet must be used inside <WalletProvider>')
+  return ctx
+}
+/*
+import { createContext, useContext, useState, useCallback } from 'react'
 import { canTrade } from '../services/orderService.js'
 
 const WalletContext = createContext(null)
@@ -92,9 +142,10 @@ export function useWallet() {
   if (!ctx) throw new Error('useWallet must be used inside <WalletProvider>')
   return ctx
 }
+*/
 
-/*
+/**
 save(stateKey, value) — setter générique qui remplace les 9 setters individuels en interne ; les saveXxx sont conservés en rétrocompat
 
 Pour la nouvelle plateforme, 3 lignes à décommenter : le champ dans CREDENTIAL_FIELDS, le saveXxx, et le canTradeXxx.
-*/
+**/
