@@ -1661,9 +1661,16 @@ PAGE — STATISTICS
 }
 
 /* ── Filters card ── */
+/* Remplace l'actuel .stats-filters */
 .stats-filters {
   padding: 0;
   overflow: hidden;
+
+  /* Déborde hors du padding de .stats-page */
+  margin-inline: calc(-1 * var(--space-6));
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
 }
 
 .stats-filters__toggle {
@@ -1997,8 +2004,25 @@ PAGE — STATISTICS
 /* ── Platform split cards ── */
 .stats-platform-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(var(--card-count, 3), 1fr);
   gap: var(--space-3);
+}
+
+/* Responsive : au-dessous de 700px, max 2 colonnes */
+@media (max-width: 700px) {
+  .stats-platform-grid {
+    grid-template-columns: repeat(
+      min(var(--card-count, 3), 2),
+      1fr
+    );
+  }
+}
+
+/* Responsive : au-dessous de 480px, 1 colonne */
+@media (max-width: 480px) {
+  .stats-platform-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .stats-platform-card {
