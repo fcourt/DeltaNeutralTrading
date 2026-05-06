@@ -32,7 +32,6 @@ function isSameMonth(a, b) { return a.getFullYear()===b.getFullYear() && a.getMo
 const MONTH_NAMES = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 const DAY_NAMES   = ['L','M','M','J','V','S','D']
 
-// Calcule le range {start, end} selon le mode de période
 function computeRange(mode, customStart, customEnd) {
   const now = new Date()
   if (mode === 'all')     return { start: 0, end: Date.now() }
@@ -40,7 +39,6 @@ function computeRange(mode, customStart, customEnd) {
   if (mode === 'week')    return { start: startOfWeek(now).getTime(),  end: endOfWeek(now).getTime() }
   if (mode === 'month')   return { start: startOfMonth(now).getTime(), end: endOfMonth(now).getTime() }
   if (mode === 'custom')  return { start: customStart ?? 0, end: customEnd ?? Date.now() }
-  // mode = timestamp ISO d'un jour/semaine/mois cliqué dans le calendrier
   if (mode?.type === 'calDay') {
     const d = new Date(mode.ts)
     return { start: startOfDay(d).getTime(), end: endOfDay(d).getTime() }
@@ -61,11 +59,8 @@ function computeRange(mode, customStart, customEnd) {
 function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
   const today     = new Date()
   const yearStart = today.getFullYear()
-
-  // calMode : 'day' | 'week' | 'month'
   const [calMode,   setCalMode]   = useState('month')
-  // Pour le mode intervalle custom
-  const [picking,   setPicking]   = useState(null) // 'start' | 'end' | null
+  const [picking,   setPicking]   = useState(null)
   const [hoverDay,  setHoverDay]  = useState(null)
 
   const quickBtns = [
@@ -75,13 +70,11 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
     ['month', 'Ce mois'],
   ]
 
-  // Génère les 12 mois de l'année courante
   const months = Array.from({ length: 12 }, (_, i) => new Date(yearStart, i, 1))
 
-  // Génère les jours d'un mois pour la grille calendrier
   function daysInMonth(year, month) {
     const first   = new Date(year, month, 1)
-    const firstDow = (first.getDay() + 6) % 7 // lundi = 0
+    const firstDow = (first.getDay() + 6) % 7
     const total   = new Date(year, month + 1, 0).getDate()
     const cells   = []
     for (let i = 0; i < firstDow; i++) cells.push(null)
@@ -89,7 +82,6 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
     return cells
   }
 
-  // Détermine si un jour est dans la sélection courante
   function isDaySelected(d) {
     if (!d) return false
     const r = computeRange(mode, customStart, customEnd)
@@ -107,15 +99,8 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
   }
 
   function handleDayClick(d) {
-    if (calMode === 'day') {
-      onMode({ type: 'calDay', ts: d.getTime() })
-      return
-    }
-    if (calMode === 'week') {
-      onMode({ type: 'calWeek', ts: d.getTime() })
-      return
-    }
-    // mode intervalle custom : clic 1 = start, clic 2 = end
+    if (calMode === 'day') { onMode({ type: 'calDay', ts: d.getTime() }); return }
+    if (calMode === 'week') { onMode({ type: 'calWeek', ts: d.getTime() }); return }
     if (!picking || picking === 'start') {
       onCustom(startOfDay(d).getTime(), null)
       setPicking('end')
@@ -130,12 +115,9 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
   }
 
   function handleMonthClick(d) {
-    if (calMode === 'month') {
-      onMode({ type: 'calMonth', ts: d.getTime() })
-    }
+    if (calMode === 'month') onMode({ type: 'calMonth', ts: d.getTime() })
   }
 
-  // Label du mode actif
   function modeLabel() {
     if (mode === 'all')   return 'All time'
     if (mode === 'day')   return "Aujourd'hui"
@@ -152,7 +134,6 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
 
   return (
     <div className="drp">
-      {/* Boutons rapides */}
       <div className="drp__quick">
         {quickBtns.map(([v, l]) => (
           <button key={v}
@@ -160,8 +141,6 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
             onClick={() => { onMode(v); setPicking(null) }}>{l}</button>
         ))}
       </div>
-
-      {/* Sélection mode calendrier */}
       <div className="drp__calmodes">
         <span className="stats-filter-label" style={{ marginBottom: 0 }}>Calendrier :</span>
         {[['day','Jour'],['week','Semaine'],['month','Mois'],['custom','Intervalle']].map(([v,l]) => (
@@ -172,8 +151,6 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
           </button>
         ))}
       </div>
-
-      {/* Grille calendrier annuel */}
       <div className="drp__year-grid">
         {months.map((mDate, mi) => {
           const cells = daysInMonth(yearStart, mi)
@@ -224,8 +201,6 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
           )
         })}
       </div>
-
-      {/* Saisie manuelle pour intervalle custom */}
       {calMode === 'custom' && (
         <div className="drp__custom-inputs">
           <div className="drp__custom-row">
@@ -250,8 +225,6 @@ function DateRangePicker({ mode, onMode, customStart, customEnd, onCustom }) {
           )}
         </div>
       )}
-
-      {/* Label récapitulatif */}
       <div className="drp__summary">
         <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
@@ -310,7 +283,7 @@ const STATS_COLORS_FULL = {
   nado: '#e1ac83',
 }
 
-const STORAGE_KEY   = 'stats_options_v5'
+const STORAGE_KEY    = 'stats_options_v5'
 const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
 
 // ─── HL fetch ─────────────────────────────────────────────────────────────────
@@ -426,13 +399,15 @@ function aggregateNado(matches) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function StatsPage() {
+  const wallet = useWallet()
   const {
     hlAddress,
     hlVaultAddress,
     extApiKey,
+    extMainApiKey,
     nadoAddress,
     nadoSubaccount,
-  } = useWallet()
+  } = wallet
 
   const savedOpts = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
 
@@ -445,11 +420,8 @@ export default function StatsPage() {
   const [viewMode,       setViewMode]       = useState(savedOpts?.viewMode       ?? 'unified')
   const [feesInPnl,      setFeesInPnl]      = useState(savedOpts?.feesInPnl      ?? true)
   const [platforms,      setPlatforms]      = useState(savedOpts?.platforms      ?? defaultPlatforms)
-  // accounts : { [address]: boolean }
   const [accounts,       setAccounts]       = useState(savedOpts?.accounts       ?? {})
-  // extraAddresses : [{ address, platformId }]
   const [extraAddresses, setExtraAddresses] = useState(savedOpts?.extraAddresses ?? [])
-  // newAddress : { [platformId]: string }
   const [newAddress,     setNewAddress]     = useState({})
   const [filtersOpen,    setFiltersOpen]    = useState(true)
 
@@ -461,27 +433,28 @@ export default function StatsPage() {
 
   // ── Adresses HL ──
   const hlEffectiveAddress = hlVaultAddress?.trim() || hlAddress?.trim() || null
-  // On garde les deux séparément pour affichage
-  const hlPrincipalAddress = hlAddress?.trim()    || null
-  const hlVaultAddr        = hlVaultAddress?.trim() || null
+  const hlPrincipalAddress = hlAddress?.trim()      || null
+  const hlVaultAddr        = hlVaultAddress?.trim()  || null
 
   // ── Disponibilité des keysField ──
   const keysFieldAvailable = {
     hl:   !!hlEffectiveAddress,
-    ext:  !!extApiKey?.trim(),
+    ext:  !!extApiKey?.trim() || !!extMainApiKey?.trim(),
     nado: !!nadoAddress?.trim(),
   }
 
-  // ── Initialiser accounts dès que les adresses principales sont connues ──
+  // ── Initialiser accounts dès que les adresses sont connues ──
   useEffect(() => {
     setAccounts(prev => {
       const next = { ...prev }
       if (hlPrincipalAddress && !(hlPrincipalAddress in next)) next[hlPrincipalAddress] = true
       if (hlVaultAddr        && !(hlVaultAddr        in next)) next[hlVaultAddr]        = true
+      if (extMainApiKey?.trim() && !('ext-main' in next)) next['ext-main'] = true
+      if (extApiKey?.trim()     && !('ext-sub'  in next)) next['ext-sub']  = true
       for (const e of extraAddresses) if (!(e.address in next)) next[e.address] = true
       return next
     })
-  }, [hlPrincipalAddress, hlVaultAddr])
+  }, [hlPrincipalAddress, hlVaultAddr, extMainApiKey, extApiKey])
 
   // ── Charger les sous-comptes HL ──
   useEffect(() => {
@@ -516,41 +489,27 @@ export default function StatsPage() {
 
     if (plat.keysField === 'hl') {
       const list = []
-      // Compte principal (adresse wallet)
       if (hlPrincipalAddress) {
         list.push({ address: hlPrincipalAddress, name: 'Principal', badge: 'HL', removable: false })
       }
-      // Vault si différente
       if (hlVaultAddr && hlVaultAddr !== hlPrincipalAddress) {
         list.push({ address: hlVaultAddr, name: 'Vault', badge: 'HL', removable: false })
       }
-      // Sous-comptes (uniquement pour Hyperliquid, pas trade.xyz / hyena)
       if (platformId === 'hyperliquid') {
         subAccounts.forEach(s => list.push({ address: s.address, name: s.name, badge: 'sub', removable: false }))
       }
-      // Adresses extra spécifiques à cette plateforme
       extraAddresses
         .filter(e => e.platformId === platformId)
         .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
       return list
     }
 
-    /*
-    if (plat.keysField === 'ext') {
-      return extApiKey?.trim()
-        ? [{ address: null, name: 'Clé API configurée', badge: 'API', removable: false, apiOnly: true }]
-        : []
-    }
-    */
-
-    // Dans savedAddressesFor('ext') :
     if (plat.keysField === 'ext') {
       const list = []
-      if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', removable: false })
-      if (wallet.extApiKey?.trim())     list.push({ address: 'ext-sub',  name: 'Sous-compte',      removable: false })
+      if (extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
+      if (extApiKey?.trim())     list.push({ address: 'ext-sub',  name: 'Sous-compte',      badge: 'sub',  removable: false })
       return list
     }
-
 
     if (plat.keysField === 'nado') {
       const addr = nadoAddress?.trim()
@@ -590,7 +549,6 @@ export default function StatsPage() {
     try {
       const { start, end } = computeRange(periodMode, customStart, customEnd)
 
-      // Quelles plateformes sont actives par id
       const hlPerpsActive = !!platforms['hyperliquid']
       const xyzActive     = !!platforms['xyz']
       const hyenaActive   = !!platforms['hyena']
@@ -599,7 +557,6 @@ export default function StatsPage() {
       const extActive     = PLATFORMS.filter(p => p.keysField === 'ext').some(p => platforms[p.id])
       const nadoActive    = PLATFORMS.filter(p => p.keysField === 'nado').some(p => platforms[p.id])
 
-      // Toutes les adresses HL possibles
       const allHLAddresses = [
         hlPrincipalAddress,
         hlVaultAddr,
@@ -607,9 +564,7 @@ export default function StatsPage() {
         ...extraAddresses.filter(e => ['hyperliquid','xyz','hyena'].includes(e.platformId)).map(e => e.address),
       ].filter(Boolean)
 
-      // On déduplique
       const uniqueHLAddresses = [...new Set(allHLAddresses)]
-      // On ne garde que celles dont la checkbox est cochée
       const activeHLAddresses = uniqueHLAddresses.filter(a => accounts[a] !== false)
 
       const res = {
@@ -640,16 +595,41 @@ export default function StatsPage() {
       }
 
       // ── Extended ──
-      if (extActive && extApiKey?.trim()) {
-        try {
-          const base = 'https://api.starknet.extended.exchange'
-          const [positions, trades] = await Promise.all([
-            fetchExtendedPositions(extApiKey, base, start, end),
-            fetchExtendedTrades(extApiKey, base, start, end),
-          ])
-          res.ext = aggregateExtended(positions, trades)
-        } catch (e) {
-          console.warn('Extended error:', e.message)
+      if (extActive) {
+        const BASE = 'https://api.starknet.extended.exchange'
+
+        // Compte principal
+        if (extMainApiKey?.trim() && accounts['ext-main'] !== false) {
+          try {
+            const [positions, trades] = await Promise.all([
+              fetchExtendedPositions(extMainApiKey, BASE, start, end),
+              fetchExtendedTrades(extMainApiKey, BASE, start, end),
+            ])
+            const part = aggregateExtended(positions, trades)
+            res.ext.pnlGross += part.pnlGross
+            res.ext.fees     += part.fees
+            res.ext.volume   += part.volume
+            res.ext.trades   += part.trades
+          } catch (e) {
+            console.warn('Extended main error:', e.message)
+          }
+        }
+
+        // Sous-compte
+        if (extApiKey?.trim() && accounts['ext-sub'] !== false) {
+          try {
+            const [positions, trades] = await Promise.all([
+              fetchExtendedPositions(extApiKey, BASE, start, end),
+              fetchExtendedTrades(extApiKey, BASE, start, end),
+            ])
+            const part = aggregateExtended(positions, trades)
+            res.ext.pnlGross += part.pnlGross
+            res.ext.fees     += part.fees
+            res.ext.volume   += part.volume
+            res.ext.trades   += part.trades
+          } catch (e) {
+            console.warn('Extended sub error:', e.message)
+          }
         }
       }
 
@@ -688,7 +668,9 @@ export default function StatsPage() {
       setLoading(false)
     }
   }, [periodMode, customStart, customEnd, platforms, accounts, extraAddresses,
-      hlPrincipalAddress, hlVaultAddr, subAccounts, extApiKey, nadoAddress, nadoSubaccount])
+      hlPrincipalAddress, hlVaultAddr, subAccounts,
+      extApiKey, extMainApiKey,
+      nadoAddress, nadoSubaccount])
 
   useEffect(() => { compute() }, [compute])
 
@@ -698,7 +680,7 @@ export default function StatsPage() {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const nothingConfigured = !hlEffectiveAddress && !extApiKey?.trim() && !nadoAddress?.trim()
+  const nothingConfigured = !hlEffectiveAddress && !extApiKey?.trim() && !extMainApiKey?.trim() && !nadoAddress?.trim()
 
   if (nothingConfigured) {
     return (
@@ -736,7 +718,7 @@ export default function StatsPage() {
         {filtersOpen && (
           <div className="stats-filters__body">
 
-            {/* ── Période — DateRangePicker ── */}
+            {/* ── Période ── */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Période</div>
               <DateRangePicker
@@ -790,15 +772,15 @@ export default function StatsPage() {
               </label>
             </div>
 
-            {/* ── Comptes — une section par plateforme ── */}
+            {/* ── Comptes ── */}
             <div className="stats-filter-section">
               <div className="stats-filter-label">Comptes</div>
               <div className="stats-accounts-platforms">
                 {PLATFORMS.map(plat => {
-                  const color    = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
-                  const available= keysFieldAvailable[plat.keysField] ?? false
-                  const addrs    = savedAddressesFor(plat.id)
-                  const hasAddrs = addrs.length > 0
+                  const color     = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
+                  const available = keysFieldAvailable[plat.keysField] ?? false
+                  const addrs     = savedAddressesFor(plat.id)
+                  const hasAddrs  = addrs.length > 0
 
                   return (
                     <div key={plat.id} className="stats-accounts-platform">
@@ -834,7 +816,7 @@ export default function StatsPage() {
                                 style={!entry.name ? { color: 'var(--color-text-muted)' } : {}}>
                                 {entry.name ?? '—'}
                               </span>
-                              {entry.address && !entry.apiOnly && (
+                              {entry.address && !entry.apiOnly && plat.keysField !== 'ext' && (
                                 <span className="stats-account-addr">
                                   {entry.address.slice(0,6)}…{entry.address.slice(-4)}
                                 </span>
@@ -854,7 +836,7 @@ export default function StatsPage() {
                         </div>
                       )}
 
-                      {/* Champ ajout adresse — pas pour Extended (API key only) */}
+                      {/* Champ ajout adresse — pas pour Extended */}
                       {plat.keysField !== 'ext' && (
                         <div className="stats-add-addr">
                           <input className="wc-input"
