@@ -776,6 +776,8 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
 }
 */
 
+//avant correction filtre date
+/*
 async function fetchMatches(subaccountBytes32, startTime, endTime) {
   let cursor = null, all = []
   while (true) {
@@ -806,6 +808,44 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
   }
   return all
 }
+*/
+
+async function fetchMatches(subaccountBytes32, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const body = { matches: { subaccounts: [subaccountBytes32], limit: 500 } }
+    if (cursor) body.matches.cursor = cursor
+
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) {
+      console.error('[fetchMatches] HTTP', res.status, await res.text())
+      break
+    }
+    const json = await res.json()
+    const matches = json.matches || []
+
+    // ← AJOUT TEMPORAIRE : affiche le premier match brut pour voir le format
+    if (all.length === 0 && matches.length > 0) {
+      console.log('[fetchMatches] premier match brut:', JSON.stringify(matches[0], null, 2))
+      console.log('[fetchMatches] startTime (ms):', startTime, '| endTime (ms):', endTime)
+    }
+
+    for (const m of matches) {
+      const ts = (m.timestamp || 0) * 1000  // si secondes → ×1000
+      if (ts >= startTime && ts <= endTime) all.push(m)
+    }
+
+    const lastTs = (matches.at(-1)?.timestamp || 0) * 1000
+    if (!json.cursor || matches.length < 500 || lastTs < startTime) break
+    cursor = json.cursor
+  }
+  return all
+}
+
 /*
 export async function fetchStats(address, subaccountName, startTime, endTime) {
   const subBytes = addressToSubaccount(address, subaccountName || 'default')
