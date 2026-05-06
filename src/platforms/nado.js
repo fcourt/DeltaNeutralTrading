@@ -750,7 +750,7 @@ function addressToSubaccount(address, name = 'default') {
   const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
   return '0x' + addrHex + namePadded
 }
-
+/*
 async function fetchMatches(subaccountBytes32, startTime, endTime) {
   let cursor = null, all = []
   while (true) {
@@ -774,7 +774,39 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
   }
   return all
 }
+*/
 
+async function fetchMatches(subaccountBytes32, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    // ✅ Format archive : clé racine = nom de la requête
+    const body = { matches: { subaccounts: [subaccountBytes32], limit: 500 } }
+    if (cursor) body.matches.cursor = cursor  // cursor DANS l'objet matches
+
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) break
+    const json = await res.json()
+
+    // La réponse est aussi enveloppée : json.matches (array)
+    const matches = json.matches || []
+    const filtered = matches.filter(m => {
+      const ts = (m.timestamp || 0) * 1000
+      return ts >= startTime && ts <= endTime
+    })
+    all = all.concat(filtered)
+
+    // Stop si pas de cursor, batch incomplet, ou dernier match avant la plage
+    const lastTs = (matches.at(-1)?.timestamp || 0) * 1000
+    if (!json.cursor || matches.length < 500 || lastTs < startTime) break
+    cursor = json.cursor
+  }
+  return all
+}
+/*
 export async function fetchStats(address, subaccountName, startTime, endTime) {
   const subBytes = addressToSubaccount(address, subaccountName || 'default')
   const matches  = await fetchMatches(subBytes, startTime, endTime)
@@ -782,6 +814,19 @@ export async function fetchStats(address, subaccountName, startTime, endTime) {
     pnlGross: matches.reduce((s, m) => s + parseFloat(m.closednetentry || 0) / 1e18, 0),
     fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee   || 0) / 1e18), 0),
     volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0),
+    trades:   matches.length,
+  }
+}
+*/
+export async function fetchStats(address, subaccountName, startTime, endTime) {
+  const subBytes = addressToSubaccount(address, subaccountName || 'default')
+  const matches  = await fetchMatches(subBytes, startTime, endTime)
+  return {
+    // quote_filled est négatif pour un achat, positif pour une vente
+    // Le PnL brut = somme des quote_filled (hors fees) sur positions clôturées
+    pnlGross: matches.reduce((s, m) => s + parseFloat(m.quote_filled || m.quotefilled || 0) / 1e18, 0),
+    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee || 0) / 1e18), 0),
+    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || m.quotefilled || 0) / 1e18), 0),
     trades:   matches.length,
   }
 }
