@@ -684,3 +684,54 @@ export async function placeOrder(order, credentials) {
 
   return data
 }
+
+// ─── Stats fetch ──────────────────────────────────────────────────────────────
+
+const BASE_URL = 'https://api.starknet.extended.exchange'
+
+async function fetchPositions(apiKey, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
+    if (cursor) params.set('cursor', cursor)
+    const res = await fetch(`${BASE_URL}/api/v1/user/positions/history?${params}`, {
+      headers: { 'X-Api-Key': apiKey }
+    })
+    if (!res.ok) break
+    const json = await res.json()
+    if (json.data) all = all.concat(json.data)
+    if (!json.pagination?.cursor || json.data?.length < 500) break
+    cursor = json.pagination.cursor
+  }
+  return all
+}
+
+async function fetchTrades(apiKey, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
+    if (cursor) params.set('cursor', cursor)
+    const res = await fetch(`${BASE_URL}/api/v1/user/trades?${params}`, {
+      headers: { 'X-Api-Key': apiKey }
+    })
+    if (!res.ok) break
+    const json = await res.json()
+    if (json.data) all = all.concat(json.data)
+    if (!json.pagination?.cursor || json.data?.length < 500) break
+    cursor = json.pagination.cursor
+  }
+  return all
+}
+
+export async function fetchStats(apiKey, startTime, endTime) {
+  const [positions, trades] = await Promise.all([
+    fetchPositions(apiKey, startTime, endTime),
+    fetchTrades(apiKey, startTime, endTime),
+  ])
+  return {
+    pnlGross: positions.reduce((s, p) => s + parseFloat(p.realisedPnl || 0), 0),
+    fees:     trades.reduce((s, t) => s + parseFloat(t.payedFee || 0), 0),
+    volume:   trades.reduce((s, t) => s + parseFloat(t.value    || 0), 0),
+    trades:   trades.length,
+  }
+}
