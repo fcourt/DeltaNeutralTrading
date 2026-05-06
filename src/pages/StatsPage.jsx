@@ -535,11 +535,22 @@ export default function StatsPage() {
       return list
     }
 
+    /*
     if (plat.keysField === 'ext') {
       return extApiKey?.trim()
         ? [{ address: null, name: 'Clé API configurée', badge: 'API', removable: false, apiOnly: true }]
         : []
     }
+    */
+
+    // Dans savedAddressesFor('ext') :
+    if (plat.keysField === 'ext') {
+      const list = []
+      if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', removable: false })
+      if (wallet.extApiKey?.trim())     list.push({ address: 'ext-sub',  name: 'Sous-compte',      removable: false })
+      return list
+    }
+
 
     if (plat.keysField === 'nado') {
       const addr = nadoAddress?.trim()
