@@ -729,10 +729,13 @@ async function fetchTrades(apiKey, startTime, endTime) {
 async function fetchPositions(apiKey, startTime, endTime) {
   let cursor = null, all = []
   while (true) {
+    // ✅ Les params font partie de l'endpoint, pas du proxy
     const params = new URLSearchParams({ startTime, endTime, limit: 500 })
     if (cursor) params.set('cursor', cursor)
+    const endpoint = `/user/positions/history?${params}`
+
     const res = await fetch(
-      `${EXT_PROXY}?endpoint=/user/positions/history&${params}`,
+      `${EXT_PROXY}?endpoint=${encodeURIComponent(endpoint)}`,
       { headers: { 'X-Api-Key': apiKey } }
     )
     if (!res.ok) break
@@ -749,8 +752,10 @@ async function fetchTrades(apiKey, startTime, endTime) {
   while (true) {
     const params = new URLSearchParams({ startTime, endTime, limit: 500 })
     if (cursor) params.set('cursor', cursor)
+    const endpoint = `/user/trades?${params}`
+
     const res = await fetch(
-      `${EXT_PROXY}?endpoint=/user/trades&${params}`,
+      `${EXT_PROXY}?endpoint=${encodeURIComponent(endpoint)}`,
       { headers: { 'X-Api-Key': apiKey } }
     )
     if (!res.ok) break
@@ -761,7 +766,6 @@ async function fetchTrades(apiKey, startTime, endTime) {
   }
   return all
 }
-
 export async function fetchStats(apiKey, startTime, endTime) {
   const [positions, trades] = await Promise.all([
     fetchPositions(apiKey, startTime, endTime),
