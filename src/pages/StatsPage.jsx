@@ -276,7 +276,8 @@ export default function StatsPage() {
   // ── Data ──
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState(null)
-  const [subAccounts, setSubAccounts] = useState([])
+  //const [subAccounts, setSubAccounts] = useState([])
+  const [subAccounts, setSubAccounts] = useState({})
   const [stats,       setStats]       = useState(null)
 
   const keysFieldAvailable = Object.fromEntries(
