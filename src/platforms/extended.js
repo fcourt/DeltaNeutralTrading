@@ -821,6 +821,7 @@ export async function fetchStats(apiKey, startTime, endTime) {
 }
 */
 
+/*
 export async function fetchStats(apiKey, startTime, endTime) {
   const trades = await fetchTrades(apiKey, startTime, endTime)
   console.log('[Extended fetchStats] trades:', trades.length, 
@@ -842,6 +843,37 @@ export async function fetchStats(apiKey, startTime, endTime) {
   const volume = trades.reduce((s, t) => {
     return s + Math.abs(parseFloat(t.value ?? 0))
   }, 0)
+
+  return { pnlGross, fees, volume, trades: trades.length }
+}
+*/
+
+export async function fetchStats(apiKey, startTime, endTime) {
+  const allTrades = await fetchTrades(apiKey, startTime, endTime)
+
+  // ← ICI, juste après fetchTrades
+  if (allTrades.length > 0) {
+    const t = allTrades[0]
+    console.log('[Extended trade keys]', Object.keys(t))
+    console.log('[Extended trade sample]', JSON.stringify(t))
+  }
+  
+  // Filtrage client — l'API ignore parfois startTime/endTime
+  const trades = allTrades.filter(t => {
+    const ts = parseInt(t.createdAt ?? t.timestamp ?? t.time ?? 0)
+    if (!ts) return true // si pas de timestamp, on garde
+    return ts >= startTime && ts <= endTime
+  })
+
+  console.log(`[Extended fetchStats] brut: ${allTrades.length} → filtré: ${trades.length}`)
+
+  // PnL : Extended utilise "realisedPnl" (pas "fee")
+  const pnlGross = trades.reduce((s, t) => s + parseFloat(t.realisedPnl ?? t.realizedPnl ?? 0), 0)
+
+  // Fees : toujours à 0 dans /user/trades — on met 0 en attendant l'endpoint dédié
+  const fees = trades.reduce((s, t) => s + Math.abs(parseFloat(t.payedFee ?? t.fee ?? 0)), 0)
+
+  const volume = trades.reduce((s, t) => s + Math.abs(parseFloat(t.value ?? 0)), 0)
 
   return { pnlGross, fees, volume, trades: trades.length }
 }
