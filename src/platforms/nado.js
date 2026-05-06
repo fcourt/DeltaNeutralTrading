@@ -839,6 +839,7 @@ async function getSubmissionIdxAtTime(timestampMs) {
   } catch { return null }
 }
 
+/*
 async function fetchMatches(subaccountBytes32, startTime, endTime) {
   // Convertit les timestamps ms → submission_idx
   const startIdx = startTime > 0 ? await getSubmissionIdxAtTime(startTime) : null
@@ -876,6 +877,48 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
     if (!json.cursor || matches.length < 500) break
     cursor = json.cursor
   }
+  return all
+}
+*/
+
+// Décode le timestamp (ms) encodé dans le nonce Nado
+// nonce = (recvTime_ms << 20) | rand_10bit
+function nonceToMs(nonce) {
+  try {
+    return Number(BigInt(nonce) >> 20n)
+  } catch { return 0 }
+}
+
+async function fetchMatches(subaccountBytes32, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const query = { subaccounts: [subaccountBytes32], limit: 500 }
+    if (cursor) query.cursor = cursor
+
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: query })
+    })
+    if (!res.ok) break
+
+    const json    = await res.json()
+    const matches = json.matches || []
+    if (matches.length === 0) break
+
+    let reachedStart = false
+    for (const m of matches) {
+      const ts = nonceToMs(m.order?.nonce)
+      if (ts === 0 || (endTime > 0 && ts > endTime)) continue  // trop récent, skip
+      if (startTime > 0 && ts < startTime) { reachedStart = true; break }  // trop ancien, stop
+      all.push(m)
+    }
+
+    if (reachedStart) break  // plus rien d'utile dans les pages suivantes
+    if (!json.cursor || matches.length < 500) break
+    cursor = json.cursor
+  }
+  console.log(`[fetchMatches] ${all.length} matches dans la plage`)
   return all
 }
 
