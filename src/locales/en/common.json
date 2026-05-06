@@ -135,12 +135,14 @@
     "vaultHint":   "Optional — leave empty for main account"
   },
   "ext": {
-    "apiKey":      "API Key (read)",
-    "apiKeyHint":  "Margin, positions, funding rates",
-    "starkPk":     "Stark Private Key",
-    "starkPkHint": "⚠️ Set once at creation — can only trade",
-    "l2Vault":     "l2Vault (position ID)",
-    "l2VaultHint": "Extended › Account › API Management"
+    "mainApiKey":      "API Key (main account)",
+    "mainApiKeyHint":  "API key for the main account. Used only for viewing statistics, without access to trading."
+    "apiKey":          "API Key (read)",
+    "apiKeyHint":      "Margin, positions, funding rates",
+    "starkPk":         "Stark Private Key",
+    "starkPkHint":     "⚠️ Set once at creation — can only trade",
+    "l2Vault":         "l2Vault (position ID)",
+    "l2VaultHint":     "Extended › Account › API Management"
   },
   "nado": {
     "address":        "Main account address",
