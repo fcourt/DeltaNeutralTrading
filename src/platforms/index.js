@@ -143,7 +143,6 @@ export const PLATFORMS = [
     },
   },
 
-  },
   {
     id:          'xyz',
     label:       'trade.xyz',
