@@ -678,7 +678,7 @@ const compute = useCallback(async () => {
             </div>
 
             {viewMode === 'split' ? (
-              <div className="stats-platform-grid">
+              <div className="stats-platform-grid" style={{ '--card-count': stats.activeStatsKeys.length }}>
                 {stats.activeStatsKeys.map(k => {
                   const d     = stats.byPlatform[k] || EMPTY_PLATFORM
                   const pnl   = displayPnl(d.pnlGross, d.fees)
