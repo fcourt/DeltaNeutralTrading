@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useWallet } from '../context/WalletContext'
-import { PLATFORMS } from '../platforms/index'
+import { PLATFORMS, STATS_KEYS } from '../platforms/index'
 
 // ─── Helpers date ─────────────────────────────────────────────────────────────
 
@@ -260,7 +260,7 @@ function addressToSubaccount(address, name = 'default') {
 }
 
 // ─── Couleurs ─────────────────────────────────────────────────────────────────
-
+/*
 const PLATFORM_COLORS_BY_ID = {
   hyperliquid: '#93c5fd',
   xyz:         '#c4b5fd',
@@ -282,7 +282,7 @@ const STATS_COLORS_FULL = {
   ext:  '#6cdfa9',
   nado: '#e1ac83',
 }
-
+*/
 const STORAGE_KEY    = 'stats_options_v5'
 const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
 
@@ -437,11 +437,21 @@ export default function StatsPage() {
   const hlVaultAddr        = hlVaultAddress?.trim()  || null
 
   // ── Disponibilité des keysField ──
+  /*
   const keysFieldAvailable = {
     hl:   !!hlEffectiveAddress,
     ext:  !!extApiKey?.trim() || !!extMainApiKey?.trim(),
     nado: !!nadoAddress?.trim(),
   }
+  */
+
+  const keysFieldAvailable = Object.fromEntries(
+  [...new Set(PLATFORMS.map(p => p.keysField))].map(kf => {
+    const plat = PLATFORMS.find(p => p.keysField === kf)
+    return [kf, plat?.isAvailable(wallet) ?? false]
+  })
+)
+
 
   // ── Initialiser accounts dès que les adresses sont connues ──
   useEffect(() => {
@@ -647,6 +657,7 @@ export default function StatsPage() {
       }
 
       // ── Total ──
+      /*
       const activeStatsKeys = STATS_KEYS.filter(k => {
         if (k === 'hl')   return hlPerpsActive
         if (k === 'hip3') return anyHIP3Active
@@ -654,6 +665,11 @@ export default function StatsPage() {
         if (k === 'nado') return nadoActive
         return false
       })
+      */
+      const activeStatsKeys = STATS_KEYS.filter(k =>
+  PLATFORMS.some(p => p.statsKey === k && platforms[p.id] && p.isAvailable(wallet))
+)
+      
       const total = activeStatsKeys.reduce((acc, k) => ({
         pnlGross: acc.pnlGross + (res[k]?.pnlGross || 0),
         fees:     acc.fees     + (res[k]?.fees     || 0),
@@ -680,8 +696,10 @@ export default function StatsPage() {
   //  RENDER
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const nothingConfigured = !hlEffectiveAddress && !extApiKey?.trim() && !extMainApiKey?.trim() && !nadoAddress?.trim()
+  //const nothingConfigured = !hlEffectiveAddress && !extApiKey?.trim() && !extMainApiKey?.trim() && !nadoAddress?.trim()
+  const nothingConfigured = PLATFORMS.every(p => !p.isAvailable(wallet))
 
+  
   if (nothingConfigured) {
     return (
       <div className="stats-page">
@@ -737,7 +755,8 @@ export default function StatsPage() {
                 {PLATFORMS.map(p => {
                   const available = keysFieldAvailable[p.keysField] ?? false
                   const active    = platforms[p.id] && available
-                  const color     = PLATFORM_COLORS_BY_ID[p.id] ?? '#94a3b8'
+                  //const color     = PLATFORM_COLORS_BY_ID[p.id] ?? '#94a3b8'
+                  const color = p.color ?? '#94a3b8'
                   return (
                     <button key={p.id}
                       className={`stats-chip${active ? ' stats-chip--on' : ''}${!available ? ' stats-chip--disabled' : ''}`}
@@ -777,7 +796,8 @@ export default function StatsPage() {
               <div className="stats-filter-label">Comptes</div>
               <div className="stats-accounts-platforms">
                 {PLATFORMS.map(plat => {
-                  const color     = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
+                  //const color     = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
+                  const color = p.color ?? '#94a3b8'
                   const available = keysFieldAvailable[plat.keysField] ?? false
                   const addrs     = savedAddressesFor(plat.id)
                   const hasAddrs  = addrs.length > 0
@@ -892,8 +912,11 @@ export default function StatsPage() {
                 {stats.activeStatsKeys.map(k => {
                   const d     = stats.byPlatform[k] || EMPTY_PLATFORM
                   const pnl   = displayPnl(d.pnlGross, d.fees)
-                  const color = STATS_COLORS_FULL[k]
-                  const label = STATS_LABELS_FULL[k]
+                  //const color = STATS_COLORS_FULL[k]
+                  //const label = STATS_LABELS_FULL[k]
+                  const meta  = PLATFORMS.find(p => p.statsKey === k)
+                  const color = meta?.color      ?? '#94a3b8'
+                  const label = meta?.statsLabel ?? k
                   return (
                     <div key={k} className="stats-platform-card" style={{ '--plat-color': color }}>
                       <div className="stats-platform-card__header">
@@ -925,8 +948,11 @@ export default function StatsPage() {
                     {stats.activeStatsKeys.map(k => {
                       const d     = stats.byPlatform[k] || EMPTY_PLATFORM
                       const pnl   = displayPnl(d.pnlGross, d.fees)
-                      const color = STATS_COLORS_FULL[k]
-                      const label = STATS_LABELS_FULL[k]
+                      //const color = STATS_COLORS_FULL[k]
+                      //const label = STATS_LABELS_FULL[k]
+                      const meta  = PLATFORMS.find(p => p.statsKey === k)
+                      const color = meta?.color      ?? '#94a3b8'
+                      const label = meta?.statsLabel ?? k
                       return (
                         <tr key={k}>
                           <td><span style={{ color, fontWeight: 600, fontSize: 'var(--text-xs)' }}>{label}</span></td>
