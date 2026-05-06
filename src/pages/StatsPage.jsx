@@ -508,7 +508,8 @@ const compute = useCallback(async () => {
                   const color     = plat.color ?? '#94a3b8' 
                   const available = keysFieldAvailable[plat.keysField] ?? false
                   //const addrs     = savedAddressesFor(plat.id)
-                  const addrs = plat.getAccounts(wallet, subAccounts, extraAddresses)
+                  //const addrs = plat.getAccounts(wallet, subAccounts, extraAddresses)
+                  const addrs = plat.getAccounts(wallet, subAccounts, extraAddresses) ?? []
                   const hasAddrs  = addrs.length > 0
 
                   return (
