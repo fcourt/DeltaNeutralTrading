@@ -746,7 +746,7 @@ async function fetchPositions(apiKey, startTime, endTime) {
   }
   return all
 }
-
+/*
 async function fetchTrades(apiKey, startTime, endTime) {
   let cursor = null, all = []
   while (true) {
@@ -766,6 +766,42 @@ async function fetchTrades(apiKey, startTime, endTime) {
   }
   return all
 }
+*/
+
+async function fetchTrades(apiKey, startTime, endTime) {
+  let cursor = null, all = []
+
+  // ← LOG : vérifie les valeurs reçues
+  console.log('[fetchTrades] startTime:', startTime, '=', new Date(startTime).toLocaleString('fr-FR'))
+  console.log('[fetchTrades] endTime:  ', endTime,   '=', new Date(endTime).toLocaleString('fr-FR'))
+
+  while (true) {
+    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
+    if (cursor) params.set('cursor', cursor)
+    const endpoint = `/user/trades?${params}`
+
+    // ← LOG : vérifie l'URL complète qui part au proxy
+    const fullUrl = `${EXT_PROXY}?endpoint=${encodeURIComponent(endpoint)}`
+    console.log('[fetchTrades] URL proxy:', fullUrl)
+
+    const res = await fetch(fullUrl, { headers: { 'X-Api-Key': apiKey } })
+
+    // ← LOG : vérifie la réponse brute
+    const rawText = await res.text()
+    console.log('[fetchTrades] status:', res.status, '| réponse:', rawText.slice(0, 300))
+
+    if (!res.ok) break
+    let json
+    try { json = JSON.parse(rawText) } catch { break }
+    if (json.data) all = all.concat(json.data)
+    if (!json.pagination?.cursor || json.data?.length < 500) break
+    cursor = json.pagination.cursor
+  }
+
+  console.log('[fetchTrades] total trades:', all.length)
+  return all
+}
+
 export async function fetchStats(apiKey, startTime, endTime) {
   const [positions, trades] = await Promise.all([
     fetchPositions(apiKey, startTime, endTime),
