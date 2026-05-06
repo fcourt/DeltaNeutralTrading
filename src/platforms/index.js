@@ -53,6 +53,9 @@ export const CREDENTIAL_FIELDS = {
     { key: 'hl_vault_address', stateKey: 'hlVaultAddress', label: 'settingKeys.hl.vault',   type: 'text',     hint: 'settingKeys.hl.vaultHint',   trim: true  },
   ],
   ext: [
+    // ── Compte principal (stats uniquement) ──
+    { key: 'ext_main_api_key', stateKey: 'extMainApiKey',  label: 'settingKeys.ext.mainApiKey',  type: 'password', hint: 'settingKeys.ext.mainApiKeyHint',  trim: false },
+    // ── Compte secondaire ── trading ──
     { key: 'ext_api_key',  stateKey: 'extApiKey',  label: 'settingKeys.ext.apiKey',  type: 'password', hint: 'settingKeys.ext.apiKeyHint',  trim: false },
     { key: 'ext_stark_pk', stateKey: 'extStarkPk', label: 'settingKeys.ext.starkPk', type: 'password', hint: 'settingKeys.ext.starkPkHint', trim: false },
     { key: 'ext_l2_vault', stateKey: 'extL2Vault', label: 'settingKeys.ext.l2Vault', type: 'text',     hint: 'settingKeys.ext.l2VaultHint', trim: false },
