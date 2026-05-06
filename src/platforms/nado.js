@@ -808,56 +808,8 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
   }
   return all
 }
-*/
 
-async function fetchMatches(subaccountBytes32, startTime, endTime) {
-  let cursor = null, all = []
-  while (true) {
-    const body = { matches: { subaccounts: [subaccountBytes32], limit: 500 } }
-    if (cursor) body.matches.cursor = cursor
 
-    const res = await fetch(`${BASE_URL}/v1`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) {
-      console.error('[fetchMatches] HTTP', res.status, await res.text())
-      break
-    }
-    const json = await res.json()
-    const matches = json.matches || []
-
-    // ← AJOUT TEMPORAIRE : affiche le premier match brut pour voir le format
-    if (all.length === 0 && matches.length > 0) {
-      console.log('[fetchMatches] premier match brut:', JSON.stringify(matches[0], null, 2))
-      console.log('[fetchMatches] startTime (ms):', startTime, '| endTime (ms):', endTime)
-    }
-
-    for (const m of matches) {
-      const ts = (m.timestamp || 0) * 1000  // si secondes → ×1000
-      if (ts >= startTime && ts <= endTime) all.push(m)
-    }
-
-    const lastTs = (matches.at(-1)?.timestamp || 0) * 1000
-    if (!json.cursor || matches.length < 500 || lastTs < startTime) break
-    cursor = json.cursor
-  }
-  return all
-}
-
-/*
-export async function fetchStats(address, subaccountName, startTime, endTime) {
-  const subBytes = addressToSubaccount(address, subaccountName || 'default')
-  const matches  = await fetchMatches(subBytes, startTime, endTime)
-  return {
-    pnlGross: matches.reduce((s, m) => s + parseFloat(m.closednetentry || 0) / 1e18, 0),
-    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee   || 0) / 1e18), 0),
-    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0),
-    trades:   matches.length,
-  }
-}
-*/
 export async function fetchStats(address, subaccountName, startTime, endTime) {
   const subBytes = addressToSubaccount(address, subaccountName || 'default')
   const matches  = await fetchMatches(subBytes, startTime, endTime)
@@ -867,6 +819,74 @@ export async function fetchStats(address, subaccountName, startTime, endTime) {
     pnlGross: matches.reduce((s, m) => s + parseFloat(m.quote_filled || m.quotefilled || 0) / 1e18, 0),
     fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee || 0) / 1e18), 0),
     volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || m.quotefilled || 0) / 1e18), 0),
+    trades:   matches.length,
+  }
+}
+*/
+
+async function getSubmissionIdxAtTime(timestampMs) {
+  try {
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        indexer: { submission_idx: { timestamp: Math.floor(timestampMs / 1000) } }
+      })
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    return json.indexer?.submission_idx ?? null
+  } catch { return null }
+}
+
+async function fetchMatches(subaccountBytes32, startTime, endTime) {
+  // Convertit les timestamps ms → submission_idx
+  const startIdx = startTime > 0 ? await getSubmissionIdxAtTime(startTime) : null
+  const endIdx   = endTime   > 0 ? await getSubmissionIdxAtTime(endTime)   : null
+
+  let cursor = null, all = []
+  while (true) {
+    const query = { subaccounts: [subaccountBytes32], limit: 500 }
+    if (cursor) query.cursor = cursor
+
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: query })
+    })
+    if (!res.ok) break
+
+    const json    = await res.json()
+    const matches = json.matches || []
+    if (matches.length === 0) break
+
+    for (const m of matches) {
+      const idx = parseInt(m.submission_idx || '0')
+      // Si endIdx défini : ignorer les matches trop récents
+      if (endIdx   !== null && idx > endIdx)   continue
+      // Si startIdx défini : les matches sont ordonnés du plus récent au plus ancien
+      // → dès qu'on passe sous startIdx, on peut arrêter
+      if (startIdx !== null && idx < startIdx) {
+        return all  // ← sortie anticipée
+      }
+      all.push(m)
+    }
+
+    // Arrêt si pas de cursor ou batch incomplet
+    if (!json.cursor || matches.length < 500) break
+    cursor = json.cursor
+  }
+  return all
+}
+
+export async function fetchStats(address, subaccountName, startTime, endTime) {
+  const subBytes = addressToSubaccount(address, subaccountName || 'default')
+  const matches  = await fetchMatches(subBytes, startTime, endTime)
+  console.log(`[Nado fetchStats] ${matches.length} matches trouvés`)
+  return {
+    pnlGross: matches.reduce((s, m) => s + parseFloat(m.realized_pnl || 0) / 1e18, 0),
+    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee  || 0) / 1e18), 0),
+    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || 0) / 1e18), 0),
     trades:   matches.length,
   }
 }
