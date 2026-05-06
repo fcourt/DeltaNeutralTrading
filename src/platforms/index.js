@@ -105,7 +105,9 @@ export const PLATFORMS = [
       const list = []
       if (principal) list.push({ address: principal, name: 'Principal', badge: 'HL', removable: false })
       if (vault && vault !== principal) list.push({ address: vault, name: 'Vault', badge: 'HL', removable: false })
-      subAccounts.forEach(s => list.push({ address: s.address, name: s.name, badge: 'sub', removable: false }))
+      //subAccounts.forEach(s => list.push({ address: s.address, name: s.name, badge: 'sub', removable: false }))
+      const subs = Array.isArray(subAccounts?.['hyperliquid']) ? subAccounts['hyperliquid'] : []
+      subs.forEach(s => list.push({ address: s.address, name: s.name, badge: 'sub', removable: false }))
       extraAddresses.filter(e => e.platformId === 'hyperliquid')
         .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
       return list
@@ -120,7 +122,8 @@ export const PLATFORMS = [
       const allAddrs = [
         wallet.hlAddress?.trim(),
         wallet.hlVaultAddress?.trim(),
-        ...subAccounts.map(s => s.address),
+        //...subAccounts.map(s => s.address),
+        ...(Array.isArray(subAccounts?.['hyperliquid']) ? subAccounts['hyperliquid'] : []).map(s => s.address),
         ...extraAddresses.filter(e => ['hyperliquid','xyz','hyena'].includes(e.platformId)).map(e => e.address),
       ].filter(Boolean)
       const unique = [...new Set(allAddrs)].filter(a => accounts[a] !== false)
