@@ -739,3 +739,49 @@ export async function cancelOrders({ nadoAgentPk, nadoAddress, nadoSubaccount, p
   if (data.status !== 'success') throw new Error(`[Nado] ${data.error ?? 'cancel failed'}`)
   return data
 }
+
+// ─── Stats fetch ──────────────────────────────────────────────────────────────
+
+const BASE_URL = 'https://archive.prod.nado.xyz'
+
+function addressToSubaccount(address, name = 'default') {
+  const addrHex    = address.toLowerCase().replace('0x', '')
+  const nameHex    = Array.from(name).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
+  const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
+  return '0x' + addrHex + namePadded
+}
+
+async function fetchMatches(subaccountBytes32, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const body = { type: 'matches', subaccounts: [subaccountBytes32], limit: 500 }
+    if (cursor) body.cursor = cursor
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) break
+    const json = await res.json()
+    const matches  = json.matches || []
+    const filtered = matches.filter(m => {
+      const ts = (m.timestamp || 0) * 1000
+      return ts >= startTime && ts <= endTime
+    })
+    all = all.concat(filtered)
+    if (!json.cursor || matches.length < 500 || filtered.length < matches.length) break
+    cursor = json.cursor
+  }
+  return all
+}
+
+export async function fetchStats(address, subaccountName, startTime, endTime) {
+  const subBytes = addressToSubaccount(address, subaccountName || 'default')
+  const matches  = await fetchMatches(subBytes, startTime, endTime)
+  return {
+    pnlGross: matches.reduce((s, m) => s + parseFloat(m.closednetentry || 0) / 1e18, 0),
+    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee   || 0) / 1e18), 0),
+    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0),
+    trades:   matches.length,
+  }
+}
