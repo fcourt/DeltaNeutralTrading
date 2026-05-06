@@ -250,153 +250,8 @@ function fmtVol(val) {
   return n.toFixed(2) + ' $'
 }
 
-/*
-// ─── Nado helper ──────────────────────────────────────────────────────────────
-
-function addressToSubaccount(address, name = 'default') {
-  const addrHex    = address.toLowerCase().replace('0x', '')
-  const nameHex    = Array.from(name).map(c => c.charCodeAt(0).toString(16).padStart(2, '0')).join('')
-  const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
-  return '0x' + addrHex + namePadded
-}
-*/
-// ─── Couleurs ─────────────────────────────────────────────────────────────────
-/*
-const PLATFORM_COLORS_BY_ID = {
-  hyperliquid: '#93c5fd',
-  xyz:         '#c4b5fd',
-  hyena:       '#a5b4fc',
-  extended:    '#6cdfa9',
-  nado:        '#e1ac83',
-}
-
-const STATS_KEYS = ['hl', 'hip3', 'ext', 'nado']
-const STATS_LABELS_FULL = {
-  hl:   'Hyperliquid Perps',
-  hip3: 'HIP-3 DEX (trade.xyz / HyENA)',
-  ext:  'Extended',
-  nado: 'Nado',
-}
-const STATS_COLORS_FULL = {
-  hl:   '#93c5fd',
-  hip3: '#c4b5fd',
-  ext:  '#6cdfa9',
-  nado: '#e1ac83',
-}
-*/
 const STORAGE_KEY    = 'stats_options_v5'
 const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
-
-/*
-// ─── HL fetch ─────────────────────────────────────────────────────────────────
-async function fetchHLFills(address, startTime) {
-  const res = await fetch('https://api.hyperliquid.xyz/info', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'userFillsByTime', user: address, startTime, aggregateByTime: false })
-  })
-  if (!res.ok) throw new Error(`HL fills error (${res.status})`)
-  return res.json()
-}
-
-async function fetchHLSubAccounts(address) {
-  const res = await fetch('https://api.hyperliquid.xyz/info', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'subAccounts', user: address })
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  return Array.isArray(data) ? data : []
-}
-
-function aggregateHLFills(fills, startTs, endTs) {
-  const hl   = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
-  const hip3 = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
-  for (const f of fills) {
-    if (f.time < startTs || f.time > endTs) continue
-    const isHip3 = typeof f.coin === 'string' && f.coin.includes('xyz')
-    const t = isHip3 ? hip3 : hl
-    t.pnlGross += parseFloat(f.closedPnl || 0)
-    t.fees     += parseFloat(f.fee       || 0)
-    t.volume   += parseFloat(f.px || 0) * parseFloat(f.sz || 0)
-    t.trades   += 1
-  }
-  return { hl, hip3 }
-}
-
-// ─── Extended fetch ────────────────────────────────────────────────────────────
-
-async function fetchExtendedPositions(apiKey, baseUrl, startTime, endTime) {
-  let cursor = null, all = []
-  while (true) {
-    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
-    if (cursor) params.set('cursor', cursor)
-    const res = await fetch(`${baseUrl}/api/v1/user/positions/history?${params}`, { headers: { 'X-Api-Key': apiKey } })
-    if (!res.ok) break
-    const json = await res.json()
-    if (json.data) all = all.concat(json.data)
-    if (!json.pagination?.cursor || json.data?.length < 500) break
-    cursor = json.pagination.cursor
-  }
-  return all
-}
-
-async function fetchExtendedTrades(apiKey, baseUrl, startTime, endTime) {
-  let cursor = null, all = []
-  while (true) {
-    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
-    if (cursor) params.set('cursor', cursor)
-    const res = await fetch(`${baseUrl}/api/v1/user/trades?${params}`, { headers: { 'X-Api-Key': apiKey } })
-    if (!res.ok) break
-    const json = await res.json()
-    if (json.data) all = all.concat(json.data)
-    if (!json.pagination?.cursor || json.data?.length < 500) break
-    cursor = json.pagination.cursor
-  }
-  return all
-}
-
-function aggregateExtended(positions, trades) {
-  const pnlGross = positions.reduce((s, p) => s + parseFloat(p.realisedPnl || 0), 0)
-  const fees     = trades.reduce((s, t) => s + parseFloat(t.payedFee || 0), 0)
-  const volume   = trades.reduce((s, t) => s + parseFloat(t.value    || 0), 0)
-  return { pnlGross, fees, volume, trades: trades.length }
-}
-
-// ─── Nado fetch ────────────────────────────────────────────────────────────────
-
-async function fetchNadoMatches(subaccountBytes32, baseUrl, startTime, endTime) {
-  let cursor = null, all = []
-  while (true) {
-    const body = { type: 'matches', subaccounts: [subaccountBytes32], limit: 500 }
-    if (cursor) body.cursor = cursor
-    const res = await fetch(`${baseUrl}/v1`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) break
-    const json = await res.json()
-    const matches = json.matches || []
-    const filtered = matches.filter(m => {
-      const ts = (m.timestamp || 0) * 1000
-      return ts >= startTime && ts <= endTime
-    })
-    all = all.concat(filtered)
-    if (!json.cursor || matches.length < 500 || filtered.length < matches.length) break
-    cursor = json.cursor
-  }
-  return all
-}
-
-function aggregateNado(matches) {
-  const pnlGross = matches.reduce((s, m) => s + parseFloat(m.closednetentry || 0) / 1e18, 0)
-  const fees     = matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee  || 0) / 1e18), 0)
-  const volume   = matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0)
-  return { pnlGross, fees, volume, trades: matches.length }
-}
-*/
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function StatsPage() {
@@ -424,42 +279,12 @@ export default function StatsPage() {
   const [subAccounts, setSubAccounts] = useState([])
   const [stats,       setStats]       = useState(null)
 
-  // ── Adresses HL ──
-  //const hlEffectiveAddress = hlVaultAddress?.trim() || hlAddress?.trim() || null
-  //const hlPrincipalAddress = hlAddress?.trim()      || null
-  //const hlVaultAddr        = hlVaultAddress?.trim()  || null
-
-  // ── Disponibilité des keysField ──
-  /*
-  const keysFieldAvailable = {
-    hl:   !!hlEffectiveAddress,
-    ext:  !!extApiKey?.trim() || !!extMainApiKey?.trim(),
-    nado: !!nadoAddress?.trim(),
-  }
-  */
-
   const keysFieldAvailable = Object.fromEntries(
   [...new Set(PLATFORMS.map(p => p.keysField))].map(kf => {
     const plat = PLATFORMS.find(p => p.keysField === kf)
     return [kf, plat?.isAvailable(wallet) ?? false]
   })
 )
-
-
-  // ── Initialiser accounts dès que les adresses sont connues ──
-  /*
-  useEffect(() => {
-    setAccounts(prev => {
-      const next = { ...prev }
-      if (hlPrincipalAddress && !(hlPrincipalAddress in next)) next[hlPrincipalAddress] = true
-      if (hlVaultAddr        && !(hlVaultAddr        in next)) next[hlVaultAddr]        = true
-      if (extMainApiKey?.trim() && !('ext-main' in next)) next['ext-main'] = true
-      if (extApiKey?.trim()     && !('ext-sub'  in next)) next['ext-sub']  = true
-      for (const e of extraAddresses) if (!(e.address in next)) next[e.address] = true
-      return next
-    })
-  }, [hlPrincipalAddress, hlVaultAddr, extMainApiKey, extApiKey])
-  */
 
   useEffect(() => {
   setAccounts(prev => {
@@ -473,24 +298,7 @@ export default function StatsPage() {
   })
 }, [wallet, subAccounts, extraAddresses])
 
-  // ── Charger les sous-comptes HL ──
-  /*
-  useEffect(() => {
-    if (!hlEffectiveAddress) return
-    fetchHLSubAccounts(hlEffectiveAddress).then(subs => {
-      const list = subs.map(s => ({
-        address: s.subAccountUser || s.address,
-        name:    s.name || s.subAccountUser || 'Sub-account'
-      }))
-      setSubAccounts(list)
-      setAccounts(prev => {
-        const next = { ...prev }
-        for (const s of list) if (!(s.address in next)) next[s.address] = true
-        return next
-      })
-    }).catch(() => {})
-  }, [hlEffectiveAddress])
-  */
+  
   useEffect(() => {
   for (const plat of PLATFORMS) {
     if (!plat.fetchSubAccounts)    continue
@@ -515,51 +323,6 @@ export default function StatsPage() {
     } catch {}
   }, [periodMode, customStart, customEnd, viewMode, feesInPnl, platforms, accounts, extraAddresses])
 
-/*
-    // ── Adresses sauvegardées par platformId ──────────────────────────────────────
-  function savedAddressesFor(platformId) {
-    const plat = PLATFORMS.find(p => p.id === platformId)
-    if (!plat) return []
-
-    if (plat.keysField === 'hl') {
-      const list = []
-      if (hlPrincipalAddress) {
-        list.push({ address: hlPrincipalAddress, name: 'Principal', badge: 'HL', removable: false })
-      }
-      if (hlVaultAddr && hlVaultAddr !== hlPrincipalAddress) {
-        list.push({ address: hlVaultAddr, name: 'Vault', badge: 'HL', removable: false })
-      }
-      if (platformId === 'hyperliquid') {
-        subAccounts.forEach(s => list.push({ address: s.address, name: s.name, badge: 'sub', removable: false }))
-      }
-      extraAddresses
-        .filter(e => e.platformId === platformId)
-        .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
-      return list
-    }
-
-    if (plat.keysField === 'ext') {
-      const list = []
-      if (extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
-      if (extApiKey?.trim())     list.push({ address: 'ext-sub',  name: 'Sous-compte',      badge: 'sub',  removable: false })
-      return list
-    }
-
-    if (plat.keysField === 'nado') {
-      const addr = nadoAddress?.trim()
-      const list = []
-      if (addr) {
-        list.push({ address: addr, name: nadoSubaccount?.trim() || 'default', badge: 'nado', removable: false })
-      }
-      extraAddresses
-        .filter(e => e.platformId === platformId)
-        .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
-      return list
-    }
-
-    return []
-  }
-  */
 
   // ── Handlers ──
   const togglePlatform = id => setPlatforms(prev => ({ ...prev, [id]: !prev[id] }))
