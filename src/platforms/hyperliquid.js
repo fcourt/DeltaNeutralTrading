@@ -625,6 +625,44 @@ export async function enableAgentDexAbstraction(agentPrivateKey, vaultAddress = 
   return result
 }
 
+// ─── Stats fetch ──────────────────────────────────────────────────────────────
+
+export async function fetchSubAccounts(address) {
+  const res = await fetch('https://api.hyperliquid.xyz/info', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'subAccounts', user: address })
+  })
+  if (!res.ok) return []
+  const data = await res.json()
+  return Array.isArray(data) ? data : []
+}
+
+export async function fetchFills(address, startTime) {
+  const res = await fetch('https://api.hyperliquid.xyz/info', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'userFillsByTime', user: address, startTime, aggregateByTime: false })
+  })
+  if (!res.ok) throw new Error(`HL fills error (${res.status})`)
+  return res.json()
+}
+
+export function aggregateFills(fills, startTs, endTs) {
+  const hl   = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
+  const hip3 = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
+  for (const f of fills) {
+    if (f.time < startTs || f.time > endTs) continue
+    const isHip3 = typeof f.coin === 'string' && f.coin.includes('xyz')
+    const t = isHip3 ? hip3 : hl
+    t.pnlGross += parseFloat(f.closedPnl || 0)
+    t.fees     += parseFloat(f.fee       || 0)
+    t.volume   += parseFloat(f.px || 0) * parseFloat(f.sz || 0)
+    t.trades   += 1
+  }
+  return { hl, hip3 }
+}
+
 /*
 Les champs hlKey, extKey, nadoKey sont conservés en rétrocompat pendant la migration.
 Une fois tous les consommateurs migrés vers market.keys?.hl etc.,
