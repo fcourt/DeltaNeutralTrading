@@ -250,6 +250,7 @@ function fmtVol(val) {
   return n.toFixed(2) + ' $'
 }
 
+/*
 // ─── Nado helper ──────────────────────────────────────────────────────────────
 
 function addressToSubaccount(address, name = 'default') {
@@ -258,7 +259,7 @@ function addressToSubaccount(address, name = 'default') {
   const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
   return '0x' + addrHex + namePadded
 }
-
+*/
 // ─── Couleurs ─────────────────────────────────────────────────────────────────
 /*
 const PLATFORM_COLORS_BY_ID = {
@@ -286,8 +287,8 @@ const STATS_COLORS_FULL = {
 const STORAGE_KEY    = 'stats_options_v5'
 const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
 
+/*
 // ─── HL fetch ─────────────────────────────────────────────────────────────────
-
 async function fetchHLFills(address, startTime) {
   const res = await fetch('https://api.hyperliquid.xyz/info', {
     method: 'POST',
@@ -395,9 +396,10 @@ function aggregateNado(matches) {
   const volume   = matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0)
   return { pnlGross, fees, volume, trades: matches.length }
 }
+*/
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-
+/*
 export default function StatsPage() {
   const wallet = useWallet()
   const {
@@ -407,6 +409,11 @@ export default function StatsPage() {
     extMainApiKey,
     nadoAddress,
     nadoSubaccount,
+  } = wallet
+  */
+
+  export default function StatsPage() {
+    const wallet = useWallet()
   } = wallet
 
   const savedOpts = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
@@ -432,9 +439,9 @@ export default function StatsPage() {
   const [stats,       setStats]       = useState(null)
 
   // ── Adresses HL ──
-  const hlEffectiveAddress = hlVaultAddress?.trim() || hlAddress?.trim() || null
-  const hlPrincipalAddress = hlAddress?.trim()      || null
-  const hlVaultAddr        = hlVaultAddress?.trim()  || null
+  //const hlEffectiveAddress = hlVaultAddress?.trim() || hlAddress?.trim() || null
+  //const hlPrincipalAddress = hlAddress?.trim()      || null
+  //const hlVaultAddr        = hlVaultAddress?.trim()  || null
 
   // ── Disponibilité des keysField ──
   /*
@@ -481,6 +488,7 @@ export default function StatsPage() {
 }, [wallet, subAccounts, extraAddresses])
 
   // ── Charger les sous-comptes HL ──
+  /*
   useEffect(() => {
     if (!hlEffectiveAddress) return
     fetchHLSubAccounts(hlEffectiveAddress).then(subs => {
@@ -496,7 +504,22 @@ export default function StatsPage() {
       })
     }).catch(() => {})
   }, [hlEffectiveAddress])
-
+  */
+  useEffect(() => {
+  for (const plat of PLATFORMS) {
+    if (!plat.fetchSubAccounts)    continue
+    if (!plat.isAvailable(wallet)) continue
+    plat.fetchSubAccounts(wallet).then(list => {
+      setSubAccounts(prev => ({ ...prev, [plat.id]: list }))
+      setAccounts(prev => {
+        const next = { ...prev }
+        for (const s of list) if (!(s.address in next)) next[s.address] = true
+        return next
+      })
+    }).catch(() => {})
+  }
+}, [wallet])
+  
   // ── Persist options ──
   useEffect(() => {
     try {
@@ -568,139 +591,58 @@ export default function StatsPage() {
   }
 
   // ── Compute stats ──────────────────────────────────────────────────────────────
-  const compute = useCallback(async () => {
-    setLoading(true); setError(null); setStats(null)
-    try {
-      const { start, end } = computeRange(periodMode, customStart, customEnd)
+  
+const compute = useCallback(async () => {
+  setLoading(true); setError(null); setStats(null)
+  try {
+    const { start, end } = computeRange(periodMode, customStart, customEnd)
 
-      const hlPerpsActive = !!platforms['hyperliquid']
-      const xyzActive     = !!platforms['xyz']
-      const hyenaActive   = !!platforms['hyena']
-      const anyHLActive   = hlPerpsActive || xyzActive || hyenaActive
-      const anyHIP3Active = xyzActive || hyenaActive
-      const extActive     = PLATFORMS.filter(p => p.keysField === 'ext').some(p => platforms[p.id])
-      const nadoActive    = PLATFORMS.filter(p => p.keysField === 'nado').some(p => platforms[p.id])
+    // Initialiser tous les buckets à zéro
+    const res = Object.fromEntries(STATS_KEYS.map(k => [k, { pnlGross:0, fees:0, volume:0, trades:0 }]))
 
-      const allHLAddresses = [
-        hlPrincipalAddress,
-        hlVaultAddr,
-        ...subAccounts.map(s => s.address),
-        ...extraAddresses.filter(e => ['hyperliquid','xyz','hyena'].includes(e.platformId)).map(e => e.address),
-      ].filter(Boolean)
+    // Plateformes déjà traitées (évite le double fetch pour hl/xyz/hyena)
+    const done = new Set()
 
-      const uniqueHLAddresses = [...new Set(allHLAddresses)]
-      const activeHLAddresses = uniqueHLAddresses.filter(a => accounts[a] !== false)
+    for (const plat of PLATFORMS) {
+      if (!platforms[plat.id])        continue  // checkbox off
+      if (!plat.isAvailable(wallet))  continue  // clés manquantes
+      if (!plat.fetchStats)           continue  // délégué à une autre plateforme (xyz, hyena)
+      if (done.has(plat.id))          continue
 
-      const res = {
-        hl:   { ...EMPTY_PLATFORM },
-        hip3: { ...EMPTY_PLATFORM },
-        ext:  { ...EMPTY_PLATFORM },
-        nado: { ...EMPTY_PLATFORM },
-      }
-
-      // ── HL + HIP-3 ──
-      if (anyHLActive && activeHLAddresses.length > 0) {
-        for (const addr of activeHLAddresses) {
-          try {
-            const fills = await fetchHLFills(addr, start)
-            const { hl, hip3 } = aggregateHLFills(fills, start, end)
-            if (hlPerpsActive) {
-              res.hl.pnlGross += hl.pnlGross; res.hl.fees += hl.fees
-              res.hl.volume   += hl.volume;   res.hl.trades += hl.trades
-            }
-            if (anyHIP3Active) {
-              res.hip3.pnlGross += hip3.pnlGross; res.hip3.fees += hip3.fees
-              res.hip3.volume   += hip3.volume;   res.hip3.trades += hip3.trades
-            }
-          } catch (e) {
-            console.warn(`HL fills error for ${addr}:`, e.message)
-          }
+      try {
+        const parts = await plat.fetchStats(wallet, accounts, extraAddresses, subAccounts, start, end)
+        // parts = { hl: {...}, hip3: {...} } ou { ext: {...} } ou { nado: {...} }
+        for (const [k, v] of Object.entries(parts)) {
+          if (!res[k]) continue
+          res[k].pnlGross += v.pnlGross
+          res[k].fees     += v.fees
+          res[k].volume   += v.volume
+          res[k].trades   += v.trades
         }
+      } catch (e) {
+        console.warn(`[${plat.id}] fetchStats:`, e.message)
       }
-
-      // ── Extended ──
-      if (extActive) {
-        const BASE = 'https://api.starknet.extended.exchange'
-
-        // Compte principal
-        if (extMainApiKey?.trim() && accounts['ext-main'] !== false) {
-          try {
-            const [positions, trades] = await Promise.all([
-              fetchExtendedPositions(extMainApiKey, BASE, start, end),
-              fetchExtendedTrades(extMainApiKey, BASE, start, end),
-            ])
-            const part = aggregateExtended(positions, trades)
-            res.ext.pnlGross += part.pnlGross
-            res.ext.fees     += part.fees
-            res.ext.volume   += part.volume
-            res.ext.trades   += part.trades
-          } catch (e) {
-            console.warn('Extended main error:', e.message)
-          }
-        }
-
-        // Sous-compte
-        if (extApiKey?.trim() && accounts['ext-sub'] !== false) {
-          try {
-            const [positions, trades] = await Promise.all([
-              fetchExtendedPositions(extApiKey, BASE, start, end),
-              fetchExtendedTrades(extApiKey, BASE, start, end),
-            ])
-            const part = aggregateExtended(positions, trades)
-            res.ext.pnlGross += part.pnlGross
-            res.ext.fees     += part.fees
-            res.ext.volume   += part.volume
-            res.ext.trades   += part.trades
-          } catch (e) {
-            console.warn('Extended sub error:', e.message)
-          }
-        }
-      }
-
-      // ── Nado ──
-      if (nadoActive && nadoAddress?.trim()) {
-        try {
-          const base     = 'https://archive.prod.nado.xyz'
-          const subName  = nadoSubaccount?.trim() || 'default'
-          const subBytes = addressToSubaccount(nadoAddress.trim(), subName)
-          const matches  = await fetchNadoMatches(subBytes, base, start, end)
-          res.nado = aggregateNado(matches)
-        } catch (e) {
-          console.warn('Nado error:', e.message)
-        }
-      }
-
-      // ── Total ──
-      /*
-      const activeStatsKeys = STATS_KEYS.filter(k => {
-        if (k === 'hl')   return hlPerpsActive
-        if (k === 'hip3') return anyHIP3Active
-        if (k === 'ext')  return extActive
-        if (k === 'nado') return nadoActive
-        return false
-      })
-      */
-      const activeStatsKeys = STATS_KEYS.filter(k =>
-  PLATFORMS.some(p => p.statsKey === k && platforms[p.id] && p.isAvailable(wallet))
-)
-      
-      const total = activeStatsKeys.reduce((acc, k) => ({
-        pnlGross: acc.pnlGross + (res[k]?.pnlGross || 0),
-        fees:     acc.fees     + (res[k]?.fees     || 0),
-        volume:   acc.volume   + (res[k]?.volume   || 0),
-        trades:   acc.trades   + (res[k]?.trades   || 0),
-      }), { ...EMPTY_PLATFORM })
-
-      setStats({ total, byPlatform: res, activeStatsKeys })
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
+      done.add(plat.id)
     }
-  }, [periodMode, customStart, customEnd, platforms, accounts, extraAddresses,
-      hlPrincipalAddress, hlVaultAddr, subAccounts,
-      extApiKey, extMainApiKey,
-      nadoAddress, nadoSubaccount])
+
+    const activeStatsKeys = STATS_KEYS.filter(k =>
+      PLATFORMS.some(p => p.statsKey === k && platforms[p.id] && p.isAvailable(wallet))
+    )
+
+    const total = activeStatsKeys.reduce((acc, k) => ({
+      pnlGross: acc.pnlGross + (res[k]?.pnlGross || 0),
+      fees:     acc.fees     + (res[k]?.fees     || 0),
+      volume:   acc.volume   + (res[k]?.volume   || 0),
+      trades:   acc.trades   + (res[k]?.trades   || 0),
+    }), { pnlGross:0, fees:0, volume:0, trades:0 })
+
+    setStats({ total, byPlatform: res, activeStatsKeys })
+  } catch (e) {
+    setError(e.message)
+  } finally {
+    setLoading(false)
+  }
+}, [periodMode, customStart, customEnd, platforms, accounts, extraAddresses, subAccounts, wallet])
 
   useEffect(() => { compute() }, [compute])
 
