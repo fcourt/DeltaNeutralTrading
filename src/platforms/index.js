@@ -110,6 +110,39 @@ export const PLATFORMS = [
         .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
       return list
     },
+    fetchSubAccounts: async (wallet) => {
+      const addr = wallet.hlVaultAddress?.trim() || wallet.hlAddress?.trim()
+      if (!addr) return []
+      const subs = await hyperliquid.fetchSubAccounts(addr)
+      return subs.map(s => ({ address: s.subAccountUser || s.address, name: s.name || 'Sub-account' }))
+    },
+    fetchStats: async (wallet, accounts, extraAddresses, subAccounts, start, end) => {
+      const allAddrs = [
+        wallet.hlAddress?.trim(),
+        wallet.hlVaultAddress?.trim(),
+        ...subAccounts.map(s => s.address),
+        ...extraAddresses.filter(e => ['hyperliquid','xyz','hyena'].includes(e.platformId)).map(e => e.address),
+      ].filter(Boolean)
+      const unique = [...new Set(allAddrs)].filter(a => accounts[a] !== false)
+
+      const res = { hl: { pnlGross:0, fees:0, volume:0, trades:0 }, hip3: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      for (const addr of unique) {
+        try {
+          const fills = await hyperliquid.fetchFills(addr, start)
+          const { hl, hip3 } = hyperliquid.aggregateFills(fills, start, end)
+          // Chaque statsKey n'est accumulé que si sa plateforme est active
+          ;['hl','hip3'].forEach(k => {
+            res[k].pnlGross += k === 'hl' ? hl.pnlGross : hip3.pnlGross
+            res[k].fees     += k === 'hl' ? hl.fees     : hip3.fees
+            res[k].volume   += k === 'hl' ? hl.volume   : hip3.volume
+            res[k].trades   += k === 'hl' ? hl.trades   : hip3.trades
+          })
+        } catch (e) { console.warn(`[hyperliquid] ${addr}:`, e.message) }
+      }
+      return res  // retourne { hl: {...}, hip3: {...} } — plusieurs statsKey possibles
+    },
+  },
+
   },
   {
     id:          'xyz',
@@ -133,6 +166,8 @@ export const PLATFORMS = [
         .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
       return list
     },
+    fetchSubAccounts: undefined,
+    fetchStats: undefined,  // xyz et hyena sont couverts par hyperliquid.fetchStats ci-dessus
   },
   {
     id:          'hyena',
@@ -156,6 +191,8 @@ export const PLATFORMS = [
         .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
       return list
     },
+    fetchSubAccounts: undefined,
+    fetchStats: undefined,  // xyz et hyena sont couverts par hyperliquid.fetchStats ci-dessus
   },
   {
     id:          'extended',
@@ -174,6 +211,19 @@ export const PLATFORMS = [
       if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
       if (wallet.extApiKey?.trim())     list.push({ address: 'ext-sub',  name: 'Sous-compte',      badge: 'sub',  removable: false })
       return list
+    },
+    fetchSubAccounts: undefined,
+    fetchStats: async (wallet, accounts, _extras, _subs, start, end) => {
+      const res = { pnlGross:0, fees:0, volume:0, trades:0 }
+      for (const [key, addr] of [['ext-main', wallet.extMainApiKey], ['ext-sub', wallet.extApiKey]]) {
+        if (!addr?.trim() || accounts[key] === false) continue
+        try {
+          const part = await extended.fetchStats(addr.trim(), start, end)
+          res.pnlGross += part.pnlGross; res.fees += part.fees
+          res.volume   += part.volume;   res.trades += part.trades
+        } catch (e) { console.warn(`[extended] ${key}:`, e.message) }
+      }
+      return { ext: res }
     },
   },
   {
@@ -195,6 +245,18 @@ export const PLATFORMS = [
       extraAddresses.filter(e => e.platformId === 'nado')
         .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
       return list
+    },
+    fetchSubAccounts: undefined,
+    fetchStats: async (wallet, _accounts, _extras, _subs, start, end) => {
+      const addr = wallet.nadoAddress?.trim()
+      if (!addr) return { nado: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      try {
+        const part = await nado.fetchStats(addr, wallet.nadoSubaccount, start, end)
+        return { nado: part }
+      } catch (e) {
+        console.warn('[nado]', e.message)
+        return { nado: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      }
     },
   },
   // ── Nouvelle plateforme — template ──
