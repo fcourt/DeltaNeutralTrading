@@ -398,21 +398,8 @@ function aggregateNado(matches) {
 }
 */
 
-// ─── Main Component ────────────────────────────────────────────────────────────
-/*
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function StatsPage() {
-  const wallet = useWallet()
-  const {
-    hlAddress,
-    hlVaultAddress,
-    extApiKey,
-    extMainApiKey,
-    nadoAddress,
-    nadoSubaccount,
-  } = wallet
-  */
-
-  export default function StatsPage() {
   const wallet = useWallet()
 
   const savedOpts = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
