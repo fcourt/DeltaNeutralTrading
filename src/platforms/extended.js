@@ -726,6 +726,8 @@ async function fetchTrades(apiKey, startTime, endTime) {
 */
 
 // ✅ REMPLACER PAR — utilise EXT_PROXY comme partout ailleurs dans le fichier
+//plus utile ??? à garder pour retrouver les positions ouvertes ?
+/*
 async function fetchPositions(apiKey, startTime, endTime) {
   let cursor = null, all = []
   while (true) {
@@ -746,6 +748,8 @@ async function fetchPositions(apiKey, startTime, endTime) {
   }
   return all
 }
+
+*/
 /*
 async function fetchTrades(apiKey, startTime, endTime) {
   let cursor = null, all = []
@@ -802,6 +806,7 @@ async function fetchTrades(apiKey, startTime, endTime) {
   return all
 }
 
+/*
 export async function fetchStats(apiKey, startTime, endTime) {
   const [positions, trades] = await Promise.all([
     fetchPositions(apiKey, startTime, endTime),
@@ -813,4 +818,30 @@ export async function fetchStats(apiKey, startTime, endTime) {
     volume:   trades.reduce((s, t) => s + parseFloat(t.value    || 0), 0),
     trades:   trades.length,
   }
+}
+*/
+
+export async function fetchStats(apiKey, startTime, endTime) {
+  const trades = await fetchTrades(apiKey, startTime, endTime)
+  console.log('[Extended fetchStats] trades:', trades.length, 
+    '| premier trade:', trades[0] ? JSON.stringify(trades[0]).slice(0, 200) : 'aucun')
+  
+  // PnL réalisé = somme des (value × sign) selon le côté
+  // Pour une vente : valeur positive (encaissement)
+  // Pour un achat  : valeur négative (décaissement)
+  // Extended expose directement realisedPnl dans les trades fermés
+  const pnlGross = trades.reduce((s, t) => {
+    const pnl = parseFloat(t.realisedPnl ?? t.realizedPnl ?? 0)
+    return s + pnl
+  }, 0)
+
+  const fees = trades.reduce((s, t) => {
+    return s + Math.abs(parseFloat(t.payedFee ?? t.fee ?? 0))
+  }, 0)
+
+  const volume = trades.reduce((s, t) => {
+    return s + Math.abs(parseFloat(t.value ?? 0))
+  }, 0)
+
+  return { pnlGross, fees, volume, trades: trades.length }
 }
