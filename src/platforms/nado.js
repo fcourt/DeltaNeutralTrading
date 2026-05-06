@@ -890,7 +890,7 @@ function nonceToMs(nonce) {
 }
 
 async function fetchMatches(subaccountBytes32, startTime, endTime) {
-  let cursor = null, all = []
+  let cursor = null, all = [], json = null
   while (true) {
     const query = { subaccounts: [subaccountBytes32], limit: 500 }
     if (cursor) query.cursor = cursor
@@ -902,30 +902,33 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
     })
     if (!res.ok) break
 
-    const json    = await res.json()
+    json = await res.json()
     const matches = json.matches || []
     if (matches.length === 0) break
+
+    // ← log ici, dans la boucle, sur le premier batch uniquement
+    if (all.length === 0 && matches.length > 0) {
+      const m0 = matches[0]
+      const ts = nonceToMs(m0.order?.nonce)
+      console.log('[nonce→ts] brut:', m0.order?.nonce, '→', ts, '=', new Date(ts).toLocaleString('fr-FR'))
+      console.log('[fetchMatches] startTime:', new Date(startTime).toLocaleString('fr-FR'))
+      console.log('[fetchMatches] endTime:  ', new Date(endTime).toLocaleString('fr-FR'))
+    }
 
     let reachedStart = false
     for (const m of matches) {
       const ts = nonceToMs(m.order?.nonce)
-      if (ts === 0 || (endTime > 0 && ts > endTime)) continue  // trop récent, skip
-      if (startTime > 0 && ts < startTime) { reachedStart = true; break }  // trop ancien, stop
+      if (ts === 0 || (endTime > 0 && ts > endTime)) continue
+      if (startTime > 0 && ts < startTime) { reachedStart = true; break }
       all.push(m)
     }
 
-    if (reachedStart) break  // plus rien d'utile dans les pages suivantes
+    if (reachedStart) break
     if (!json.cursor || matches.length < 500) break
     cursor = json.cursor
   }
 
-  // juste pour vérifier, à supprimer après
-  const m0 = json.matches?.[0]
-  if (m0) console.log('[nonce→ts]', nonceToMs(m0.order?.nonce), '=', 
-                      new Date(nonceToMs(m0.order?.nonce)).toLocaleString('fr-FR'))
-  
   console.log(`[fetchMatches] ${all.length} matches dans la plage`)
-  
   return all
 }
 
