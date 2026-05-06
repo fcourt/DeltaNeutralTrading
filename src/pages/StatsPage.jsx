@@ -454,6 +454,7 @@ export default function StatsPage() {
 
 
   // ── Initialiser accounts dès que les adresses sont connues ──
+  /*
   useEffect(() => {
     setAccounts(prev => {
       const next = { ...prev }
@@ -465,6 +466,19 @@ export default function StatsPage() {
       return next
     })
   }, [hlPrincipalAddress, hlVaultAddr, extMainApiKey, extApiKey])
+  */
+
+  useEffect(() => {
+  setAccounts(prev => {
+    const next = { ...prev }
+    for (const plat of PLATFORMS) {
+      for (const entry of plat.getAccounts(wallet, subAccounts, extraAddresses)) {
+        if (entry.address && !(entry.address in next)) next[entry.address] = true
+      }
+    }
+    return next
+  })
+}, [wallet, subAccounts, extraAddresses])
 
   // ── Charger les sous-comptes HL ──
   useEffect(() => {
@@ -756,7 +770,8 @@ export default function StatsPage() {
                   const available = keysFieldAvailable[p.keysField] ?? false
                   const active    = platforms[p.id] && available
                   //const color     = PLATFORM_COLORS_BY_ID[p.id] ?? '#94a3b8'
-                  const color = p.color ?? '#94a3b8'
+                  //const color = p.color ?? '#94a3b8'
+                  const color     = plat.color ?? '#94a3b8' 
                   return (
                     <button key={p.id}
                       className={`stats-chip${active ? ' stats-chip--on' : ''}${!available ? ' stats-chip--disabled' : ''}`}
@@ -797,7 +812,7 @@ export default function StatsPage() {
               <div className="stats-accounts-platforms">
                 {PLATFORMS.map(plat => {
                   //const color     = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
-                  const color = p.color ?? '#94a3b8'
+                  const color     = plat.color ?? '#94a3b8' 
                   const available = keysFieldAvailable[plat.keysField] ?? false
                   const addrs     = savedAddressesFor(plat.id)
                   const hasAddrs  = addrs.length > 0
@@ -857,7 +872,7 @@ export default function StatsPage() {
                       )}
 
                       {/* Champ ajout adresse — pas pour Extended */}
-                      {plat.keysField !== 'ext' && (
+                      {plat.hasAddressField && (
                         <div className="stats-add-addr">
                           <input className="wc-input"
                             placeholder={`Ajouter une adresse ${plat.label}…`}
