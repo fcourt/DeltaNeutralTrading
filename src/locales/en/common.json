@@ -136,7 +136,7 @@
   },
   "ext": {
     "mainApiKey":      "API Key (main account)",
-    "mainApiKeyHint":  "API key for the main account. Used only for viewing statistics, without access to trading."
+    "mainApiKeyHint":  "API key for the main account. Used only for viewing statistics, without access to trading.",
     "apiKey":          "API Key (read)",
     "apiKeyHint":      "Margin, positions, funding rates",
     "starkPk":         "Stark Private Key",
