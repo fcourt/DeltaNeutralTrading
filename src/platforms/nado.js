@@ -918,7 +918,14 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
     if (!json.cursor || matches.length < 500) break
     cursor = json.cursor
   }
+
+  // juste pour vérifier, à supprimer après
+  const m0 = json.matches?.[0]
+  if (m0) console.log('[nonce→ts]', nonceToMs(m0.order?.nonce), '=', 
+                      new Date(nonceToMs(m0.order?.nonce)).toLocaleString('fr-FR'))
+  
   console.log(`[fetchMatches] ${all.length} matches dans la plage`)
+  
   return all
 }
 
