@@ -135,12 +135,14 @@
     "vaultHint":   "Optionnel — laisser vide pour compte principal"
   },
   "ext": {
-    "apiKey":      "Clé API (lecture)",
-    "apiKeyHint":  "Marge, positions, funding rates",
-    "starkPk":     "Stark Private Key",
-    "starkPkHint": "⚠️ Une seule fois à la création — ne peut que trader",
-    "l2Vault":     "l2Vault (ID position)",
-    "l2VaultHint": "Extended › Account › API Management"
+    "mainApiKey":      "Clé API (compte principal)",
+    "mainApiKeyHint":  "Clé API du compte principal. Utilisée uniquement pour la lecture des statistiques, sans accès au trading."
+    "apiKey":          "Clé API (lecture)",
+    "apiKeyHint":      "Marge, positions, funding rates",
+    "starkPk":         "Stark Private Key",
+    "starkPkHint":     "⚠️ Une seule fois à la création — ne peut que trader",
+    "l2Vault":         "l2Vault (ID position)",
+    "l2VaultHint":     "Extended › Account › API Management"
   },
   "nado": {
     "address":        "Adresse compte principal",
