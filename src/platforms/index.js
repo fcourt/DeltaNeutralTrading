@@ -3,6 +3,7 @@ import * as hyperliquid from './hyperliquid.js'
 import * as extended    from './extended.js'
 import * as nado        from './nado.js'
 
+/*
 export const PLATFORMS = [
   {
     id:          'hyperliquid',
@@ -83,6 +84,132 @@ export const PLATFORMS = [
   //   isAvailable: (values) => !!values.maPfApiKey?.trim(),
   // },
 ]
+*/
+
+export const PLATFORMS = [
+  {
+    id:          'hyperliquid',
+    label:       'Hyperliquid',
+    source:      'hl',
+    adapter:     hyperliquid,
+    keysField:   'hl',
+    keyFallback: null,
+    color:       '#93c5fd',
+    statsKey:    'hl',
+    statsLabel:  'Hyperliquid Perps',
+    isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
+    hasAddressField: true,
+    getAccounts: (wallet, subAccounts, extraAddresses) => {
+      const principal = wallet.hlAddress?.trim()      || null
+      const vault     = wallet.hlVaultAddress?.trim() || null
+      const list = []
+      if (principal) list.push({ address: principal, name: 'Principal', badge: 'HL', removable: false })
+      if (vault && vault !== principal) list.push({ address: vault, name: 'Vault', badge: 'HL', removable: false })
+      subAccounts.forEach(s => list.push({ address: s.address, name: s.name, badge: 'sub', removable: false }))
+      extraAddresses.filter(e => e.platformId === 'hyperliquid')
+        .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
+      return list
+    },
+  },
+  {
+    id:          'xyz',
+    label:       'trade.xyz',
+    source:      'hl',
+    adapter:     hyperliquid,
+    keysField:   'hl',
+    keyFallback: null,
+    color:       '#c4b5fd',
+    statsKey:    'hip3',
+    statsLabel:  'HIP-3 DEX (trade.xyz / HyENA)',
+    isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
+    hasAddressField: true,
+    getAccounts: (wallet, _subAccounts, extraAddresses) => {
+      const principal = wallet.hlAddress?.trim()      || null
+      const vault     = wallet.hlVaultAddress?.trim() || null
+      const list = []
+      if (principal) list.push({ address: principal, name: 'Principal', badge: 'HL', removable: false })
+      if (vault && vault !== principal) list.push({ address: vault, name: 'Vault', badge: 'HL', removable: false })
+      extraAddresses.filter(e => e.platformId === 'xyz')
+        .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
+      return list
+    },
+  },
+  {
+    id:          'hyena',
+    label:       'HyENA',
+    source:      'hl',
+    adapter:     hyperliquid,
+    keysField:   'hl',
+    keyFallback: null,
+    color:       '#a5b4fc',
+    statsKey:    'hip3',
+    statsLabel:  'HIP-3 DEX (trade.xyz / HyENA)',
+    isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
+    hasAddressField: true,
+    getAccounts: (wallet, _subAccounts, extraAddresses) => {
+      const principal = wallet.hlAddress?.trim()      || null
+      const vault     = wallet.hlVaultAddress?.trim() || null
+      const list = []
+      if (principal) list.push({ address: principal, name: 'Principal', badge: 'HL', removable: false })
+      if (vault && vault !== principal) list.push({ address: vault, name: 'Vault', badge: 'HL', removable: false })
+      extraAddresses.filter(e => e.platformId === 'hyena')
+        .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
+      return list
+    },
+  },
+  {
+    id:          'extended',
+    label:       'Extended',
+    source:      'ext',
+    adapter:     extended,
+    keysField:   'ext',
+    keyFallback: (id) => `${id}-USD`,
+    color:       '#6cdfa9',
+    statsKey:    'ext',
+    statsLabel:  'Extended',
+    isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
+    hasAddressField: false,
+    getAccounts: (wallet, _subAccounts, _extraAddresses) => {
+      const list = []
+      if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
+      if (wallet.extApiKey?.trim())     list.push({ address: 'ext-sub',  name: 'Sous-compte',      badge: 'sub',  removable: false })
+      return list
+    },
+  },
+  {
+    id:          'nado',
+    label:       'Nado',
+    source:      'nado',
+    adapter:     nado,
+    keysField:   'nado',
+    keyFallback: (id) => id,
+    color:       '#e1ac83',
+    statsKey:    'nado',
+    statsLabel:  'Nado',
+    isAvailable: (values) => !!values.nadoAddress?.trim(),
+    hasAddressField: true,
+    getAccounts: (wallet, _subAccounts, extraAddresses) => {
+      const addr = wallet.nadoAddress?.trim()
+      const list = []
+      if (addr) list.push({ address: addr, name: wallet.nadoSubaccount?.trim() || 'default', badge: 'nado', removable: false })
+      extraAddresses.filter(e => e.platformId === 'nado')
+        .forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
+      return list
+    },
+  },
+  // ── Nouvelle plateforme — template ──
+  // {
+  //   id: 'maPf', label: 'Ma Plateforme', ...,
+  //   hasAddressField: true,  // ou false si clé API uniquement
+  //   getAccounts: (wallet, _subAccounts, extraAddresses) => {
+  //     const list = []
+  //     if (wallet.maPfApiKey?.trim()) list.push({ address: 'mapf-main', name: 'Compte', badge: 'API', removable: false })
+  //     extraAddresses.filter(e => e.platformId === 'maPf').forEach(e => list.push({ address: e.address, name: null, badge: 'extra', removable: true }))
+  //     return list
+  //   },
+  // },
+]
+
 
 /**
  * Chaque groupe de credentials est lié à un keysField de PLATFORMS.
