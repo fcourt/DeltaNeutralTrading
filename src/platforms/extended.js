@@ -849,44 +849,42 @@ export async function fetchStats(apiKey, startTime, endTime) {
 */
 
 export async function fetchStats(apiKey, startTime, endTime) {
-  // ── Trades → volume + count ───────────────────────────────────────────────
+  // ── Trades → volume + count uniquement ───────────────────────────────────
   const allTrades = await fetchTrades(apiKey, startTime, endTime)
   const trades = allTrades.filter(t => {
     const ts = parseInt(t.createdTime ?? 0)
     return ts >= startTime && ts <= endTime
   })
-  console.log(`[Extended fetchStats] trades: ${allTrades.length} → filtré: ${trades.length}`)
-
   const volume = trades.reduce((s, t) => s + Math.abs(parseFloat(t.value ?? 0)), 0)
-  const fees   = trades.reduce((s, t) => s + Math.abs(parseFloat(t.builderFee ?? t.fee ?? 0)), 0)
 
-  // ── Positions → PnL réalisé ───────────────────────────────────────────────
+  // ── Positions fermées → PnL + fees ───────────────────────────────────────
   let pnlGross = 0
+  let fees = 0
   try {
     const allPositions = await fetchClosedPositions(apiKey)
 
-    // On ne prend que les positions FERMÉES dans la période (closedTime)
-    // Une position ouverte n'a pas de closedTime — on l'exclut
     const closedInRange = allPositions.filter(p => {
       const closedTs = parseInt(p.closedTime ?? 0)
       return closedTs > 0 && closedTs >= startTime && closedTs <= endTime
     })
 
-    console.log(`[Extended] positions fermées dans la période: ${closedInRange.length}`)
+    console.log(`[Extended] positions fermées dans période: ${closedInRange.length}`)
 
-    // PnL = tradePnl + fundingFees + openFees + closeFees (breakdown complet)
-    pnlGross = closedInRange.reduce((s, p) => {
+    closedInRange.forEach(p => {
       const b = p.realisedPnlBreakdown
       if (b) {
-        return s
-          + parseFloat(b.tradePnl     ?? 0)
-         // + parseFloat(b.fundingFees  ?? 0)
-          + parseFloat(b.openFees     ?? 0)
-          + parseFloat(b.closeFees    ?? 0)
-      }
-      return s + parseFloat(p.realisedPnl ?? 0)
-    }, 0)
+        pnlGross += parseFloat(b.tradePnl    ?? 0)
+                  //+ parseFloat(b.fundingFees  ?? 0) // à rajouter plus trad comme option 
+                  //+ parseFloat(b.openFees     ?? 0) // 
+                  //+ parseFloat(b.closeFees    ?? 0) //
 
+        // fees = frais de transaction uniquement (positifs)
+        fees += Math.abs(parseFloat(b.openFees  ?? 0))
+              + Math.abs(parseFloat(b.closeFees ?? 0))
+      } else {
+        pnlGross += parseFloat(p.realisedPnl ?? 0)
+      }
+    })
   } catch (e) {
     console.warn('[Extended] positions/history:', e.message)
   }
