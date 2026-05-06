@@ -136,7 +136,7 @@
   },
   "ext": {
     "mainApiKey":      "Clé API (compte principal)",
-    "mainApiKeyHint":  "Clé API du compte principal. Utilisée uniquement pour la lecture des statistiques, sans accès au trading."
+    "mainApiKeyHint":  "Clé API du compte principal. Utilisée uniquement pour la lecture des statistiques, sans accès au trading.",
     "apiKey":          "Clé API (lecture)",
     "apiKeyHint":      "Marge, positions, funding rates",
     "starkPk":         "Stark Private Key",
