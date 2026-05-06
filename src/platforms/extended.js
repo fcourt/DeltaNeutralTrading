@@ -906,6 +906,10 @@ async function fetchClosedPositions(apiKey) {
     if (!res.ok) break
     const json = await res.json()
     if (json.data?.length) all.push(...json.data)
+
+    // ← log temporaire
+    console.log(`[fetchClosedPositions] page: ${json.data?.length} | cursor: ${json.pagination?.cursor ?? 'fin'} | total: ${all.length}`)
+
     if (!json.pagination?.cursor) break
     cursor = json.pagination.cursor
   }
