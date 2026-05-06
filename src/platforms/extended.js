@@ -687,8 +687,9 @@ export async function placeOrder(order, credentials) {
 
 // ─── Stats fetch ──────────────────────────────────────────────────────────────
 
-const BASE_URL = 'https://api.starknet.extended.exchange'
+//const BASE_URL = 'https://api.starknet.extended.exchange'
 
+/*
 async function fetchPositions(apiKey, startTime, endTime) {
   let cursor = null, all = []
   while (true) {
@@ -714,6 +715,44 @@ async function fetchTrades(apiKey, startTime, endTime) {
     const res = await fetch(`${BASE_URL}/api/v1/user/trades?${params}`, {
       headers: { 'X-Api-Key': apiKey }
     })
+    if (!res.ok) break
+    const json = await res.json()
+    if (json.data) all = all.concat(json.data)
+    if (!json.pagination?.cursor || json.data?.length < 500) break
+    cursor = json.pagination.cursor
+  }
+  return all
+}
+*/
+
+// ✅ REMPLACER PAR — utilise EXT_PROXY comme partout ailleurs dans le fichier
+async function fetchPositions(apiKey, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
+    if (cursor) params.set('cursor', cursor)
+    const res = await fetch(
+      `${EXT_PROXY}?endpoint=/user/positions/history&${params}`,
+      { headers: { 'X-Api-Key': apiKey } }
+    )
+    if (!res.ok) break
+    const json = await res.json()
+    if (json.data) all = all.concat(json.data)
+    if (!json.pagination?.cursor || json.data?.length < 500) break
+    cursor = json.pagination.cursor
+  }
+  return all
+}
+
+async function fetchTrades(apiKey, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const params = new URLSearchParams({ startTime, endTime, limit: 500 })
+    if (cursor) params.set('cursor', cursor)
+    const res = await fetch(
+      `${EXT_PROXY}?endpoint=/user/trades&${params}`,
+      { headers: { 'X-Api-Key': apiKey } }
+    )
     if (!res.ok) break
     const json = await res.json()
     if (json.data) all = all.concat(json.data)
