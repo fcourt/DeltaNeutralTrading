@@ -343,7 +343,7 @@ export default function StatsPage() {
   }
 
   // ── Compute stats ──────────────────────────────────────────────────────────────
-  
+/*  
 const compute = useCallback(async () => {
   setLoading(true); setError(null); setStats(null)
   try {
@@ -395,6 +395,66 @@ const compute = useCallback(async () => {
     setLoading(false)
   }
 }, [periodMode, customStart, customEnd, platforms, accounts, extraAddresses, subAccounts, wallet])
+*/
+
+  const computingRef = useRef(false)
+
+const compute = useCallback(async () => {
+  if (computingRef.current) return  // évite les appels simultanés
+  computingRef.current = true
+  setLoading(true); setError(null); setStats(null)
+  try {
+    
+    const { start, end } = computeRange(periodMode, customStart, customEnd)
+
+    // Initialiser tous les buckets à zéro
+    const res = Object.fromEntries(STATS_KEYS.map(k => [k, { pnlGross:0, fees:0, volume:0, trades:0 }]))
+
+    // Plateformes déjà traitées (évite le double fetch pour hl/xyz/hyena)
+    const done = new Set()
+
+    for (const plat of PLATFORMS) {
+      if (!platforms[plat.id])        continue  // checkbox off
+      if (!plat.isAvailable(wallet))  continue  // clés manquantes
+      if (!plat.fetchStats)           continue  // délégué à une autre plateforme (xyz, hyena)
+      if (done.has(plat.id))          continue
+
+      try {
+        const parts = await plat.fetchStats(wallet, accounts, extraAddresses, subAccounts, start, end)
+        // parts = { hl: {...}, hip3: {...} } ou { ext: {...} } ou { nado: {...} }
+        for (const [k, v] of Object.entries(parts)) {
+          if (!res[k]) continue
+          res[k].pnlGross += v.pnlGross
+          res[k].fees     += v.fees
+          res[k].volume   += v.volume
+          res[k].trades   += v.trades
+        }
+      } catch (e) {
+        console.warn(`[${plat.id}] fetchStats:`, e.message)
+      }
+      done.add(plat.id)
+    }
+
+    const activeStatsKeys = STATS_KEYS.filter(k =>
+      PLATFORMS.some(p => p.statsKey === k && platforms[p.id] && p.isAvailable(wallet))
+    )
+
+    const total = activeStatsKeys.reduce((acc, k) => ({
+      pnlGross: acc.pnlGross + (res[k]?.pnlGross || 0),
+      fees:     acc.fees     + (res[k]?.fees     || 0),
+      volume:   acc.volume   + (res[k]?.volume   || 0),
+      trades:   acc.trades   + (res[k]?.trades   || 0),
+    }), { pnlGross:0, fees:0, volume:0, trades:0 })
+
+    setStats({ total, byPlatform: res, activeStatsKeys })
+  } catch (e) {
+    setError(e.message)
+  } finally {
+    setLoading(false)
+    computingRef.current = false
+  }
+}, [periodMode, customStart, customEnd, platforms, accounts, extraAddresses, subAccounts, wallet])
+
 
   useEffect(() => { compute() }, [compute])
 
