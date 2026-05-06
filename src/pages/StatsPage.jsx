@@ -413,8 +413,7 @@ export default function StatsPage() {
   */
 
   export default function StatsPage() {
-    const wallet = useWallet()
-  } = wallet
+  const wallet = useWallet()
 
   const savedOpts = (() => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null } })()
 
@@ -529,7 +528,8 @@ export default function StatsPage() {
     } catch {}
   }, [periodMode, customStart, customEnd, viewMode, feesInPnl, platforms, accounts, extraAddresses])
 
-  // ── Adresses sauvegardées par platformId ──────────────────────────────────────
+/*
+    // ── Adresses sauvegardées par platformId ──────────────────────────────────────
   function savedAddressesFor(platformId) {
     const plat = PLATFORMS.find(p => p.id === platformId)
     if (!plat) return []
@@ -572,6 +572,7 @@ export default function StatsPage() {
 
     return []
   }
+  */
 
   // ── Handlers ──
   const togglePlatform = id => setPlatforms(prev => ({ ...prev, [id]: !prev[id] }))
@@ -712,8 +713,7 @@ const compute = useCallback(async () => {
                   const available = keysFieldAvailable[p.keysField] ?? false
                   const active    = platforms[p.id] && available
                   //const color     = PLATFORM_COLORS_BY_ID[p.id] ?? '#94a3b8'
-                  //const color = p.color ?? '#94a3b8'
-                  const color     = plat.color ?? '#94a3b8' 
+                  const color = p.color ?? '#94a3b8'
                   return (
                     <button key={p.id}
                       className={`stats-chip${active ? ' stats-chip--on' : ''}${!available ? ' stats-chip--disabled' : ''}`}
@@ -756,7 +756,8 @@ const compute = useCallback(async () => {
                   //const color     = PLATFORM_COLORS_BY_ID[plat.id] ?? '#94a3b8'
                   const color     = plat.color ?? '#94a3b8' 
                   const available = keysFieldAvailable[plat.keysField] ?? false
-                  const addrs     = savedAddressesFor(plat.id)
+                  //const addrs     = savedAddressesFor(plat.id)
+                  const addrs = plat.getAccounts(wallet, subAccounts, extraAddresses)
                   const hasAddrs  = addrs.length > 0
 
                   return (
@@ -793,7 +794,7 @@ const compute = useCallback(async () => {
                                 style={!entry.name ? { color: 'var(--color-text-muted)' } : {}}>
                                 {entry.name ?? '—'}
                               </span>
-                              {entry.address && !entry.apiOnly && plat.keysField !== 'ext' && (
+                              {entry.address && !entry.apiOnly && plat.hasAddressField && (
                                 <span className="stats-account-addr">
                                   {entry.address.slice(0,6)}…{entry.address.slice(-4)}
                                 </span>
