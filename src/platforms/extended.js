@@ -849,42 +849,52 @@ export async function fetchStats(apiKey, startTime, endTime) {
 */
 
 export async function fetchStats(apiKey, startTime, endTime) {
-  // ── 1. Trades → volume + count (avec filtre client par date) ──────────────
+  // ── Trades → volume + count ───────────────────────────────────────────────
   const allTrades = await fetchTrades(apiKey, startTime, endTime)
-
   const trades = allTrades.filter(t => {
     const ts = parseInt(t.createdTime ?? 0)
     return ts >= startTime && ts <= endTime
   })
-  console.log(`[Extended fetchStats] trades brut: ${allTrades.length} → filtré: ${trades.length}`)
+  console.log(`[Extended fetchStats] trades: ${allTrades.length} → filtré: ${trades.length}`)
 
   const volume = trades.reduce((s, t) => s + Math.abs(parseFloat(t.value ?? 0)), 0)
-  // builderFee est présent sur certains comptes — prendre le max des deux
-  const fees = trades.reduce((s, t) => {
-    return s + Math.abs(parseFloat(t.builderFee ?? t.fee ?? 0))
-  }, 0)
+  const fees   = trades.reduce((s, t) => s + Math.abs(parseFloat(t.builderFee ?? t.fee ?? 0)), 0)
 
-  // ── 2. Positions fermées → PnL réalisé (avec filtre client par date) ──────
+  // ── Positions → PnL réalisé ───────────────────────────────────────────────
   let pnlGross = 0
   try {
-    const positions = await fetchClosedPositions(apiKey, startTime, endTime)
-    const filtered = positions.filter(p => {
-      const ts = parseInt(p.closedTime ?? p.updatedTime ?? p.createdTime ?? 0)
-      return ts >= startTime && ts <= endTime
+    const allPositions = await fetchClosedPositions(apiKey)
+
+    // On ne prend que les positions FERMÉES dans la période (closedTime)
+    // Une position ouverte n'a pas de closedTime — on l'exclut
+    const closedInRange = allPositions.filter(p => {
+      const closedTs = parseInt(p.closedTime ?? 0)
+      return closedTs > 0 && closedTs >= startTime && closedTs <= endTime
     })
-    console.log(`[Extended fetchStats] positions fermées brut: ${positions.length} → filtré: ${filtered.length}`)
-    if (filtered.length > 0) {
-      console.log('[Extended position sample]', JSON.stringify(filtered[0]))
-    }
-    pnlGross = filtered.reduce((s, p) => s + parseFloat(p.realisedPnl ?? p.realizedPnl ?? p.pnl ?? 0), 0)
+
+    console.log(`[Extended] positions fermées dans la période: ${closedInRange.length}`)
+
+    // PnL = tradePnl + fundingFees + openFees + closeFees (breakdown complet)
+    pnlGross = closedInRange.reduce((s, p) => {
+      const b = p.realisedPnlBreakdown
+      if (b) {
+        return s
+          + parseFloat(b.tradePnl     ?? 0)
+         // + parseFloat(b.fundingFees  ?? 0)
+          + parseFloat(b.openFees     ?? 0)
+          + parseFloat(b.closeFees    ?? 0)
+      }
+      return s + parseFloat(p.realisedPnl ?? 0)
+    }, 0)
+
   } catch (e) {
-    console.warn('[Extended] positions/history indisponible:', e.message)
+    console.warn('[Extended] positions/history:', e.message)
   }
 
   return { pnlGross, fees, volume, trades: trades.length }
 }
 
-async function fetchClosedPositions(apiKey, startTime, endTime) {
+async function fetchClosedPositions(apiKey) {
   let cursor = null
   const all = []
   while (true) {
