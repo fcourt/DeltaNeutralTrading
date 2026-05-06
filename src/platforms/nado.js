@@ -750,79 +750,7 @@ function addressToSubaccount(address, name = 'default') {
   const namePadded = nameHex.padEnd(24, '0').slice(0, 24)
   return '0x' + addrHex + namePadded
 }
-/*
-async function fetchMatches(subaccountBytes32, startTime, endTime) {
-  let cursor = null, all = []
-  while (true) {
-    const body = { type: 'matches', subaccounts: [subaccountBytes32], limit: 500 }
-    if (cursor) body.cursor = cursor
-    const res = await fetch(`${BASE_URL}/v1`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) break
-    const json = await res.json()
-    const matches  = json.matches || []
-    const filtered = matches.filter(m => {
-      const ts = (m.timestamp || 0) * 1000
-      return ts >= startTime && ts <= endTime
-    })
-    all = all.concat(filtered)
-    if (!json.cursor || matches.length < 500 || filtered.length < matches.length) break
-    cursor = json.cursor
-  }
-  return all
-}
-*/
 
-//avant correction filtre date
-/*
-async function fetchMatches(subaccountBytes32, startTime, endTime) {
-  let cursor = null, all = []
-  while (true) {
-    // ✅ Format archive : clé racine = nom de la requête
-    const body = { matches: { subaccounts: [subaccountBytes32], limit: 500 } }
-    if (cursor) body.matches.cursor = cursor  // cursor DANS l'objet matches
-
-    const res = await fetch(`${BASE_URL}/v1`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) break
-    const json = await res.json()
-
-    // La réponse est aussi enveloppée : json.matches (array)
-    const matches = json.matches || []
-    const filtered = matches.filter(m => {
-      const ts = (m.timestamp || 0) * 1000
-      return ts >= startTime && ts <= endTime
-    })
-    all = all.concat(filtered)
-
-    // Stop si pas de cursor, batch incomplet, ou dernier match avant la plage
-    const lastTs = (matches.at(-1)?.timestamp || 0) * 1000
-    if (!json.cursor || matches.length < 500 || lastTs < startTime) break
-    cursor = json.cursor
-  }
-  return all
-}
-
-
-export async function fetchStats(address, subaccountName, startTime, endTime) {
-  const subBytes = addressToSubaccount(address, subaccountName || 'default')
-  const matches  = await fetchMatches(subBytes, startTime, endTime)
-  return {
-    // quote_filled est négatif pour un achat, positif pour une vente
-    // Le PnL brut = somme des quote_filled (hors fees) sur positions clôturées
-    pnlGross: matches.reduce((s, m) => s + parseFloat(m.quote_filled || m.quotefilled || 0) / 1e18, 0),
-    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee || 0) / 1e18), 0),
-    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || m.quotefilled || 0) / 1e18), 0),
-    trades:   matches.length,
-  }
-}
-*/
 
 async function getSubmissionIdxAtTime(timestampMs) {
   try {
@@ -839,47 +767,6 @@ async function getSubmissionIdxAtTime(timestampMs) {
   } catch { return null }
 }
 
-/*
-async function fetchMatches(subaccountBytes32, startTime, endTime) {
-  // Convertit les timestamps ms → submission_idx
-  const startIdx = startTime > 0 ? await getSubmissionIdxAtTime(startTime) : null
-  const endIdx   = endTime   > 0 ? await getSubmissionIdxAtTime(endTime)   : null
-
-  let cursor = null, all = []
-  while (true) {
-    const query = { subaccounts: [subaccountBytes32], limit: 500 }
-    if (cursor) query.cursor = cursor
-
-    const res = await fetch(`${BASE_URL}/v1`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ matches: query })
-    })
-    if (!res.ok) break
-
-    const json    = await res.json()
-    const matches = json.matches || []
-    if (matches.length === 0) break
-
-    for (const m of matches) {
-      const idx = parseInt(m.submission_idx || '0')
-      // Si endIdx défini : ignorer les matches trop récents
-      if (endIdx   !== null && idx > endIdx)   continue
-      // Si startIdx défini : les matches sont ordonnés du plus récent au plus ancien
-      // → dès qu'on passe sous startIdx, on peut arrêter
-      if (startIdx !== null && idx < startIdx) {
-        return all  // ← sortie anticipée
-      }
-      all.push(m)
-    }
-
-    // Arrêt si pas de cursor ou batch incomplet
-    if (!json.cursor || matches.length < 500) break
-    cursor = json.cursor
-  }
-  return all
-}
-*/
 
 // Décode le timestamp (ms) encodé dans le nonce Nado
 // nonce = (recvTime_ms << 20) | rand_10bit
@@ -889,6 +776,7 @@ function nonceToMs(nonce) {
   } catch { return 0 }
 }
 
+/* avant suppression logs
 async function fetchMatches(subaccountBytes32, startTime, endTime) {
   let cursor = null, all = [], json = null
   while (true) {
@@ -929,6 +817,39 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
   }
 
   console.log(`[fetchMatches] ${all.length} matches dans la plage`)
+  return all
+}
+*/
+
+async function fetchMatches(subaccountBytes32, startTime, endTime) {
+  let cursor = null, all = []
+  while (true) {
+    const query = { subaccounts: [subaccountBytes32], limit: 500 }
+    if (cursor) query.cursor = cursor
+
+    const res = await fetch(`${BASE_URL}/v1`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matches: query })
+    })
+    if (!res.ok) break
+
+    const json    = await res.json()
+    const matches = json.matches || []
+    if (matches.length === 0) break
+
+    let reachedStart = false
+    for (const m of matches) {
+      const ts = nonceToMs(m.order?.nonce)
+      if (ts === 0 || (endTime > 0 && ts > endTime)) continue
+      if (startTime > 0 && ts < startTime) { reachedStart = true; break }
+      all.push(m)
+    }
+
+    if (reachedStart) break
+    if (!json.cursor || matches.length < 500) break
+    cursor = json.cursor
+  }
   return all
 }
 
