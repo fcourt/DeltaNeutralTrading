@@ -3,7 +3,7 @@
 // V1 : matching cross-platform uniquement
 // Style coherent avec le reste de l'app (classes Tailwind dark-first)
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useOpenPositions }     from '../hooks/useOpenPositions.js'
 import { useDeltaNeutralPairs } from '../hooks/useDeltaNeutralPairs.js'
 import { usePlaceOrder }        from '../hooks/usePlaceOrder.js'
@@ -52,10 +52,9 @@ function platformLabel(id) { return PLATFORM_LABELS[id] ?? id }
 function platformColor(id) { return PLATFORM_COLORS[id] ?? 'text-gray-300' }
 
 // ─── Calcul breakeven ─────────────────────────────────────────────────────────
-// Calcule deux prix de fermeture independants (un par leg) tels que
-// PnL_long(tpLong) + PnL_short(slShort) + fees = 0
-// Methode : on fixe le prix du SHORT au mark actuel et on resout le prix du LONG
-// pour equilirer, puis reciproquement.
+// Deux prix independants :
+// tpLong  : prix de fermeture du LONG pour que PnL combiné = 0 (SHORT ferme a son mark)
+// slShort : prix de fermeture du SHORT pour que PnL combiné = 0 (LONG ferme a son mark)
 function computeBreakevenPrices({ long, short, includeFees, feePct = 0.0005 }) {
   const entryL = long.entryPx  || 0
   const entryS = short.entryPx || 0
@@ -64,38 +63,21 @@ function computeBreakevenPrices({ long, short, includeFees, feePct = 0.0005 }) {
   const sziL   = long.szi      || 0
   const sziS   = short.szi     || 0
 
-  // PnL courant de chaque leg au prix mark
-  const pnlL = (markL - entryL) * sziL  // long  : gain si mark > entry
-  const pnlS = (entryS - markS) * sziS  // short : gain si mark < entry
+  const pnlL = (markL - entryL) * sziL
+  const pnlS = (entryS - markS) * sziS
 
-  // Fees estimees de fermeture (taker)
-  const feesL = includeFees ? markL * sziL * feePct : 0
-  const feesS = includeFees ? markS * sziS * feePct : 0
+  const feesL     = includeFees ? markL * sziL * feePct : 0
+  const feesS     = includeFees ? markS * sziS * feePct : 0
   const totalFees = feesL + feesS
+  const pnlNet    = pnlL + pnlS - totalFees
 
-  const pnlNet = pnlL + pnlS - totalFees
-
-  // Prix de fermeture du LONG pour que pnlNet = 0, en gardant le SHORT ferme a markS
-  // (closeL - entryL)*sziL + pnlS - feesS - closeL*sziL*feePct = 0
-  // closeL*(sziL - sziL*feePct) = entryL*sziL - pnlS + feesS
-  // closeL = (entryL*sziL - pnlS + feesS) / (sziL*(1 - feePct))
   const adjFeeL = includeFees ? (1 - feePct) : 1
-  const adjFeeS = includeFees ? (1 - feePct) : 1
+  const adjFeeS = includeFees ? (1 + feePct) : 1
 
-  const tpLong  = sziL > 0
-    ? (entryL * sziL - pnlS + feesS) / (sziL * adjFeeL)
-    : null
+  const tpLong  = sziL > 0 ? (entryL * sziL - pnlS + feesS) / (sziL * adjFeeL) : null
+  const slShort = sziS > 0 ? (entryS * sziS + pnlL - feesL) / (sziS * adjFeeS) : null
 
-  // Prix de fermeture du SHORT pour que pnlNet = 0, en gardant le LONG ferme a markL
-  // pnlL - feesL + (entryS - closeS)*sziS - closeS*sziS*feePct = 0
-  // closeS*(sziS + sziS*feePct) = entryS*sziS + pnlL - feesL
-  // closeS = (entryS*sziS + pnlL - feesL) / (sziS*(1 + feePct))
-  const adjFeeSClose = includeFees ? (1 + feePct) : 1
-  const slShort = sziS > 0
-    ? (entryS * sziS + pnlL - feesL) / (sziS * adjFeeSClose)
-    : null
-
-  return { tpLong, slShort, pnlNet, pnlL, pnlS, totalFees, markL, markS }
+  return { tpLong, slShort, pnlNet, pnlL, pnlS, totalFees }
 }
 
 // ─── LegCard ─────────────────────────────────────────────────────────────────
@@ -161,14 +143,12 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
 
   const doCloseLeg = useCallback(async (leg) => {
     if (!market) throw new Error(`Marché ${pair.marketId} introuvable`)
-    const isBuy    = leg.side === 'SHORT'
-    const markPx   = leg.markPx ?? leg.entryPx
     return placeOrder({
       platformId : leg.platform,
       marketId   : pair.marketId,
-      isBuy,
+      isBuy      : leg.side === 'SHORT',
       size       : leg.szi,
-      limitPrice : markPx,
+      limitPrice : leg.markPx ?? leg.entryPx,
       orderType  : 'taker',
       reduceOnly : true,
       ...credentials,
@@ -183,9 +163,7 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
         doCloseLeg(pair.long),
         doCloseLeg(pair.short),
       ])
-      const errors = results
-        .filter(r => r.status === 'rejected')
-        .map(r => r.reason?.message)
+      const errors = results.filter(r => r.status === 'rejected').map(r => r.reason?.message)
       if (errors.length === 0) {
         onFeedback?.({ ok: true, msg: '✅ Les deux legs fermés avec succès' })
       } else {
@@ -204,7 +182,6 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
 
   return (
     <div className="rounded-2xl border border-indigo-700/40 bg-gray-900/80 shadow-lg overflow-hidden">
-      {/* En-tete */}
       <button
         className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-800/40 transition-colors"
         onClick={() => setOpen(o => !o)}
@@ -231,20 +208,14 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
         </div>
       </button>
 
-      {/* Corps */}
       {open && (
         <div className="px-4 pb-4 space-y-4">
-          {/* Trois cartes */}
           <div className="flex gap-3 items-stretch">
             <LegCard pos={pair.long} />
-
-            {/* Carte centrale */}
             <div className="flex flex-col items-center justify-center gap-1 min-w-[110px]
               bg-gray-800/40 rounded-xl px-3 py-3 border border-indigo-700/30">
               <span className="font-black text-white text-xl tracking-tight">{pair.label}</span>
-              <span className={`text-sm font-bold ${pnlClass(pair.pnlNet)}`}>
-                {fmtUSD(pair.pnlNet)}
-              </span>
+              <span className={`text-sm font-bold ${pnlClass(pair.pnlNet)}`}>{fmtUSD(pair.pnlNet)}</span>
               <span className="text-xs text-gray-500">PnL combiné</span>
               {Math.abs(pair.deltaUsd) > 1 && (
                 <span className="text-xs text-yellow-400 mt-1">
@@ -254,11 +225,9 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
                 </span>
               )}
             </div>
-
             <LegCard pos={pair.short} />
           </div>
 
-          {/* Panneau fermeture */}
           <div className="rounded-xl border border-gray-700/60 bg-gray-800/30 p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-gray-200">⚡ Fermeture simultanée</span>
@@ -273,7 +242,6 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
               </label>
             </div>
 
-            {/* Prix breakeven */}
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="bg-green-900/20 rounded-lg px-3 py-2 border border-green-700/30">
                 <div className="text-gray-400 mb-1">
@@ -297,28 +265,17 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
               </div>
             </div>
 
-            {/* Résumé PnL */}
             <div className="text-xs text-gray-400 flex flex-wrap gap-x-4 gap-y-1">
-              <span>
-                PnL long actuel :{' '}
-                <span className={pnlClass(be.pnlL)}>{fmtUSD(be.pnlL)}</span>
-              </span>
-              <span>
-                PnL short actuel :{' '}
-                <span className={pnlClass(be.pnlS)}>{fmtUSD(be.pnlS)}</span>
-              </span>
+              <span>PnL long actuel : <span className={pnlClass(be.pnlL)}>{fmtUSD(be.pnlL)}</span></span>
+              <span>PnL short actuel : <span className={pnlClass(be.pnlS)}>{fmtUSD(be.pnlS)}</span></span>
               {includeFees && (
-                <span>
-                  Fees estimées :{' '}
-                  <span className="text-yellow-400">{fmtUSD(-be.totalFees)}</span>
-                </span>
+                <span>Fees estimées : <span className="text-yellow-400">{fmtUSD(-be.totalFees)}</span></span>
               )}
               <span className={`font-semibold ${pnlClass(be.pnlNet)}`}>
                 PnL net estimé : {fmtUSD(be.pnlNet)}
               </span>
             </div>
 
-            {/* Bouton */}
             <button
               disabled={!canCloseBoth || sending}
               onClick={doCloseBoth}
@@ -331,9 +288,7 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
             {!canCloseBoth && (
               <p className="text-xs text-yellow-500 text-center">
                 Clés manquantes pour{' '}
-                {!canCloseL
-                  ? platformLabel(pair.long.platform)
-                  : platformLabel(pair.short.platform)}
+                {!canCloseL ? platformLabel(pair.long.platform) : platformLabel(pair.short.platform)}
               </p>
             )}
           </div>
@@ -359,14 +314,12 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
     setSending(true)
     onFeedback?.(null)
     try {
-      const isBuy  = pos.side === 'SHORT'
-      const markPx = pos.markPx ?? pos.entryPx
       await placeOrder({
         platformId : pos.platform,
         marketId   : pos.marketId,
-        isBuy,
+        isBuy      : pos.side === 'SHORT',
         size       : pos.szi,
-        limitPrice : markPx,
+        limitPrice : pos.markPx ?? pos.entryPx,
         orderType,
         reduceOnly : true,
         ...credentials,
@@ -410,14 +363,8 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
       {open && (
         <div className="px-5 pb-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-gray-300">
-            <div>
-              <span className="text-gray-500 block">Entry</span>
-              {fmtPx(pos.entryPx)}
-            </div>
-            <div>
-              <span className="text-gray-500 block">Mark</span>
-              {fmtPx(pos.markPx)}
-            </div>
+            <div><span className="text-gray-500 block">Entry</span>{fmtPx(pos.entryPx)}</div>
+            <div><span className="text-gray-500 block">Mark</span>{fmtPx(pos.markPx)}</div>
             <div>
               <span className="text-gray-500 block">Notionnel</span>
               {fmtUSD(notional).replace(/^[+-]/, '')}
@@ -435,7 +382,6 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
               </div>
             )}
           </div>
-
           <div className="flex gap-2 pt-1">
             <button
               disabled={!canClose || sending}
@@ -473,32 +419,34 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
  * @param {object}   credentials   - cles de toutes les plateformes
  * @param {Array}    markets       - liste unifiee des marches (depuis useLivePrices)
  * @param {Function} getPrice      - (marketId, platformId) => number|null
- * @param {number}   [refreshMs=10000]     - intervalle de rafraichissement en ms
- * @param {number}   [tolerancePct=0.05]   - tolerance notional pour le matching DN
+ * @param {number}   [refreshMs=15000]   - intervalle de rafraichissement des positions en ms
+ * @param {number}   [tolerancePct=0.05] - tolerance notional pour le matching DN
  */
 export default function OpenTradesPanel({
   credentials,
   markets      = [],
   getPrice     = null,
-  refreshMs    = 10_000,
+  refreshMs    = 15_000,
   tolerancePct = 0.05,
 }) {
   const [feedback, setFeedback] = useState(null)
 
-  const { positions, loading, reload } =
-    useOpenPositions(credentials, markets, getPrice)
+  // reload() a une reference stable grace aux refs internes de useOpenPositions
+  const { positions, loading, reload } = useOpenPositions(credentials, markets, getPrice)
 
-  const { pairs, singles } =
-    useDeltaNeutralPairs(positions, getPrice, tolerancePct)
+  const { pairs, singles } = useDeltaNeutralPairs(positions, getPrice, tolerancePct)
 
-  // Chargement initial + auto-refresh
+  // Chargement initial uniquement — l'intervalle utilise une ref pour eviter
+  // de recrer le setInterval si reload change (il ne change pas, mais par securite)
+  const reloadRef = useRef(reload)
+  reloadRef.current = reload
+
   useEffect(() => {
-    reload()
-    const t = setInterval(reload, refreshMs)
+    reloadRef.current()
+    const t = setInterval(() => reloadRef.current(), refreshMs)
     return () => clearInterval(t)
-  }, [reload, refreshMs])
+  }, [refreshMs]) // <- reload absent des deps : l'interval ne redémarre jamais
 
-  // Auto-efface le feedback apres 5s
   useEffect(() => {
     if (!feedback) return
     const t = setTimeout(() => setFeedback(null), 5000)
@@ -507,7 +455,6 @@ export default function OpenTradesPanel({
 
   return (
     <div className="space-y-4">
-      {/* En-tete */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-base font-bold text-white">Positions ouvertes</h2>
@@ -533,18 +480,14 @@ export default function OpenTradesPanel({
         </button>
       </div>
 
-      {/* Feedback */}
       {feedback && (
         <div className={`text-sm px-4 py-2 rounded-lg font-medium ${
-          feedback.ok
-            ? 'bg-green-900/50 text-green-300'
-            : 'bg-red-900/50 text-red-300'
+          feedback.ok ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
         }`}>
           {feedback.msg}
         </div>
       )}
 
-      {/* Etat vide */}
       {!loading && pairs.length === 0 && singles.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           <div className="text-3xl mb-2">📭</div>
@@ -552,7 +495,6 @@ export default function OpenTradesPanel({
         </div>
       )}
 
-      {/* Paires delta-neutral */}
       {pairs.length > 0 && (
         <div className="space-y-3">
           <p className="text-xs text-indigo-400 uppercase tracking-widest font-semibold px-1">
@@ -570,7 +512,6 @@ export default function OpenTradesPanel({
         </div>
       )}
 
-      {/* Positions solo */}
       {singles.length > 0 && (
         <div className="space-y-2">
           {pairs.length > 0 && (
