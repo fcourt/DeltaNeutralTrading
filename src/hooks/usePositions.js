@@ -1,4 +1,3 @@
-/*
 // src/hooks/usePositions.js
 import { useState, useCallback, useRef } from 'react'
 import { getAllPositions } from '../services/accountService.js'
@@ -21,8 +20,8 @@ export function usePositions(credentials, markets = []) {
 
   return { positions, loading, load }
 }
-*/
 
+/*
 // src/hooks/usePositions.js
 // FIX : markets stocke en ref pour que load() soit STABLE
 // et ne relance pas les useEffect parents a chaque tick de useLivePrices
@@ -55,3 +54,4 @@ export function usePositions(credentials, markets) {
 
   return { positions, loading, load }
 }
+*/
