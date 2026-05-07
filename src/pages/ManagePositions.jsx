@@ -8,6 +8,10 @@ import { useOpenPositions }     from '../hooks/useOpenPositions.js'
 import { useDeltaNeutralPairs } from '../hooks/useDeltaNeutralPairs.js'
 import { usePlaceOrder }        from '../hooks/usePlaceOrder.js'
 import { canTrade }             from '../services/orderService.js'
+// ─── Composant principal ─────────────────────────────────────────────────────
+
+import { useWallet }     from '../context/WalletContext.js'
+import { useLivePrices } from '../hooks/useLivePrices.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -423,12 +427,11 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
  * @param {number}   [tolerancePct=0.05] - tolerance notional pour le matching DN
  */
 export default function OpenTradesPanel({
-  credentials,
-  markets      = [],
-  getPrice     = null,
   refreshMs    = 15_000,
   tolerancePct = 0.05,
 }) {
+  const credentials              = useWallet()
+  const { markets, getPrice }    = useLivePrices(3000)
   const [feedback, setFeedback] = useState(null)
 
   // reload() a une reference stable grace aux refs internes de useOpenPositions
