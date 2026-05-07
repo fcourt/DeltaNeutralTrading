@@ -1,4 +1,4 @@
-// src/components/OpenTradesPanel.jsx
+// src/components/ManagePositions.jsx
 // Panel de positions ouvertes avec detection delta-neutral automatique
 // V1 : matching cross-platform uniquement
 // Style coherent avec le reste de l'app (classes Tailwind dark-first)
