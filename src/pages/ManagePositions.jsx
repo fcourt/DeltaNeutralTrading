@@ -10,7 +10,8 @@ import { usePlaceOrder }        from '../hooks/usePlaceOrder.js'
 import { canTrade }             from '../services/orderService.js'
 // ─── Composant principal ─────────────────────────────────────────────────────
 
-import { useWallet }     from '../context/WalletContext.js'
+//import { useWallet }     from '../context/WalletContext.js'
+import { useWallet } from '../context/WalletContext'
 import { useLivePrices } from '../hooks/useLivePrices.js'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
