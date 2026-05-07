@@ -12,7 +12,8 @@ import { canTrade }             from '../services/orderService.js'
 
 //import { useWallet }     from '../context/WalletContext.js'
 import { useWallet } from '../context/WalletContext'
-import { useLivePrices } from '../hooks/useLivePrices.js'
+//import { useLivePrices } from '../hooks/useLivePrices.js'
+import { useLivePrices } from '../hooks/useLivePrices'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
