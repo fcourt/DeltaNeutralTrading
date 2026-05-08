@@ -2824,3 +2824,20 @@ Position individuelle (SingleRow)
 /* ── Spin ── */
 .mp-spin { display: inline-block; animation: spin 1s linear infinite; }
 
+/* ─── DN Groups ─── */
+.dn-groups-list      { display: flex; flex-direction: column; }
+.dn-group            { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-divider); }
+.dn-group--partial   { background: color-mix(in oklch, var(--color-warning) 4%, var(--color-surface)); }
+.dn-group__header    { display: flex; align-items: center; gap: var(--space-3); font-size: var(--text-xs); margin-bottom: var(--space-2); }
+.dn-group__date      { color: var(--color-text-muted); white-space: nowrap; }
+.dn-group__market    { font-weight: 600; color: var(--color-text); }
+.dn-group__pnl       { font-weight: 700; font-size: var(--text-sm); }
+.dn-group__legs      { display: flex; flex-direction: column; gap: var(--space-1); padding-left: var(--space-3); }
+.dn-leg              { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); color: var(--color-text-muted); }
+.dn-leg__dot         { width: 6px; height: 6px; border-radius: var(--radius-full); flex-shrink: 0; }
+.dn-leg__platform    { font-weight: 600; min-width: 70px; }
+.dn-leg__side        { font-weight: 700; min-width: 36px; }
+.dn-leg__side--long  { color: var(--color-success); }
+.dn-leg__side--short { color: var(--color-error); }
+.dn-leg__size        { min-width: 48px; }
+
