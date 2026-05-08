@@ -901,8 +901,9 @@ export async function fetchStats(apiKey, startTime, endTime) {
     fees:       Math.abs(parseFloat(t.payedFee ?? t.fee ?? 0)),
   }))
 
-  return { ext: { pnlGross, fees, volume, trades: trades.length, rawTrades } }
+  //return { ext: { pnlGross, fees, volume, trades: trades.length, rawTrades } }
   //         ↑ clé "ext" — aligné avec STATS_KEYS et le reste de ton système
+  return { pnlGross, fees, volume, trades: trades.length, rawTrades }
 }
 
 async function fetchClosedPositions(apiKey) {
