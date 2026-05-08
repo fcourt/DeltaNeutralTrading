@@ -278,6 +278,14 @@ function matchDnGroups(groups, rawTradesByPlatform, start, end) {
         const plat   = PLATFORMS.find(p => p.id === leg.platformId)
         const trades = rawTradesByPlatform[leg.platformId] ?? []
 
+        // ── DEBUG ──────────────────────────────────────────────────────────
+        console.log(`[matchDn] leg ${leg.platformId} | orderId=${leg.orderId} (${typeof leg.orderId}) | trades dispo: ${trades.length}`)
+        trades.slice(0, 3).forEach(t => {
+          const tid = plat?.normalizeTradeId?.(t)
+          console.log(`  → trade oid=${t.oid} | normalizeTradeId=${tid} (${typeof tid})`)
+        })
+        // ───────────────────────────────────────────────────────────────────
+
         const match = leg.orderId != null && plat?.normalizeTradeId
           ? trades.find(t => plat.normalizeTradeId(t) === leg.orderId)
           : null
