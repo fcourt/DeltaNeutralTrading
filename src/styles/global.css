@@ -2841,3 +2841,13 @@ Position individuelle (SingleRow)
 .dn-leg__side--short { color: var(--color-error); }
 .dn-leg__size        { min-width: 48px; }
 
+/* ← Pleine largeur comme .stats-filters */
+.card--dn {
+  padding: 0;
+  overflow: hidden;
+  margin-inline: calc(-1 * var(--space-6));
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
