@@ -851,7 +851,7 @@ export async function fetchStats(apiKey, startTime, endTime) {
 
   return { pnlGross, fees, volume, trades: trades.length }
 }
-*/
+
 
 export async function fetchStats(apiKey, startTime, endTime) {
   // ── Trades → volume + count uniquement ───────────────────────────────────
@@ -904,6 +904,53 @@ export async function fetchStats(apiKey, startTime, endTime) {
   //return { ext: { pnlGross, fees, volume, trades: trades.length, rawTrades } }
   //         ↑ clé "ext" — aligné avec STATS_KEYS et le reste de ton système
   return { pnlGross, fees, volume, trades: trades.length, rawTrades }
+}
+*/
+
+export async function fetchStats(apiKey, startTime, endTime) {
+  // ── Trades → volume + count ───────────────────────────────────────────────
+  const allTrades = await fetchTrades(apiKey, startTime, endTime)
+  const trades = allTrades.filter(t => {
+    const ts = parseInt(t.createdTime ?? 0)
+    return ts >= startTime && ts <= endTime
+  })
+  const volume = trades.reduce((s, t) => s + Math.abs(parseFloat(t.value ?? 0)), 0)
+
+  // ── Positions fermées → PnL + fees ───────────────────────────────────────
+  let pnlGross = 0, fees = 0
+  try {
+    const allPositions = await fetchClosedPositions(apiKey)
+    const closedInRange = allPositions.filter(p => {
+      const closedTs = parseInt(p.closedTime ?? 0)
+      return closedTs > 0 && closedTs >= startTime && closedTs <= endTime
+    })
+    closedInRange.forEach(p => {
+      const b = p.realisedPnlBreakdown
+      if (b) {
+        pnlGross += parseFloat(b.tradePnl ?? 0)
+        fees += Math.abs(parseFloat(b.openFees ?? 0)) + Math.abs(parseFloat(b.closeFees ?? 0))
+      } else {
+        pnlGross += parseFloat(p.realisedPnl ?? 0)
+      }
+    })
+  } catch (e) { console.warn('[Extended] positions/history:', e.message) }
+
+  // ── ↓↓ COLLER ICI — normalisation rawTrades ──────────────────────────────
+  const rawTrades = []
+  for (const f of trades) {
+    rawTrades.push({
+      ...f,
+      timestamp:  parseInt(f.createdTime ?? 0),
+      market:     f.market,
+      size:       Math.abs(parseFloat(f.qty || 0)),
+      orderId:    f.id?.toString() ?? null,
+      pnlGross:   0,                                    // vient de closedPositions, pas des trades
+      fees:       parseFloat(f.fee ?? f.payedFee ?? 0),
+    })
+  }
+  // ── ↑↑ fin normalisation ─────────────────────────────────────────────────
+
+  return { pnlGross, fees, volume, trades: trades.length, rawTrades }  // ← ajouter rawTrades ici
 }
 
 async function fetchClosedPositions(apiKey) {
