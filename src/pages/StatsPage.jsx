@@ -274,7 +274,7 @@ function DnGroupsSection({ groups, feesInPnl }) {
   const [open, setOpen] = useState(true)
 
   if (!groups.length) return (
-    <div className="card">
+    <div className="card card--dn">
       <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
         <div className="empty-state__title" style={{ fontSize: 'var(--text-sm)' }}>Aucun groupe DN sur cette période</div>
         <div className="empty-state__desc">Les ordres envoyés via "Placer les 2 legs" apparaîtront ici.</div>
@@ -286,7 +286,7 @@ function DnGroupsSection({ groups, feesInPnl }) {
   const totalFees = groups.reduce((s, g) => s + g.fees, 0)
 
   return (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+    <div className="card card--dn">  {
       {/* Header */}
       <button className="stats-filters__toggle" onClick={() => setOpen(o => !o)}
         style={{ padding: 'var(--space-3) var(--space-4)' }}>
