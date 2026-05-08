@@ -865,7 +865,7 @@ export async function fetchStats(address, subaccountName, startTime, endTime) {
     trades:   matches.length,
   }
 }
-*/
+
 
 export async function fetchStats(address, subaccountName, startTime, endTime) {
   const subBytes = addressToSubaccount(address, subaccountName || 'default')
@@ -889,5 +889,27 @@ export async function fetchStats(address, subaccountName, startTime, endTime) {
     volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || 0) / 1e18), 0),
     trades:   matches.length,
     rawTrades,
+  }
+}
+*/
+
+export async function fetchStats(address, subaccountName, startTime, endTime) {
+  const subBytes = addressToSubaccount(address, subaccountName ?? 'default')
+  const matches  = await fetchMatches(subBytes, startTime, endTime)
+
+  return {
+    pnlGross: matches.reduce((s, m) => s + parseFloat(m.realizedpnl || 0) / 1e18, 0),
+    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee || 0) / 1e18), 0),
+    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quotefilled || 0) / 1e18), 0),
+    trades:   matches.length,
+    rawTrades: matches.map(m => ({
+      ...m,
+      timestamp: nonceToMs(m.order?.nonce),          // ← reconstitue le timestamp
+      market:    m.productid ?? m.order?.productid,
+      size:      Math.abs(parseFloat(m.basefilled || 0) / 1e18),
+      orderId:   m.order?.nonce?.toString() ?? null,  // ← clé unique
+      pnlGross:  parseFloat(m.realizedpnl || 0) / 1e18,
+      fees:      Math.abs(parseFloat(m.fee || 0) / 1e18),
+    })),
   }
 }
