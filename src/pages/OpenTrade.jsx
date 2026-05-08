@@ -483,8 +483,11 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
     setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
     try {
       await Promise.all([
-        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, effLev1)),
-        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, effLev2)),
+        //placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, effLev1)),
+        //placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, effLev2)),
+        //appels avec groupID pour tracking du DN
+        placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, effLev1), groupId),
+        placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, effLev2), groupId),
       ])
       setTradeStatus({ type: 'success', msg: '✅ Les 2 legs envoyés simultanément !' })
     } catch (e) {
