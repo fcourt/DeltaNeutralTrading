@@ -243,6 +243,7 @@ const EMPTY_PLATFORM = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
 // Apparie les groupes sauvegardés avec les trades fetchés
 // Chaque plateforme expose normalizeTradeId(trade) dans PLATFORMS
 
+/*
 function matchDnGroups(groups, rawTradesByPlatform, start, end) {
   return groups
     .filter(g => g.createdAt >= start && g.createdAt <= end)
@@ -262,6 +263,31 @@ function matchDnGroups(groups, rawTradesByPlatform, start, end) {
       const fullyMatched = legs.every(l => l.matched)
       const pnlGross     = legs.reduce((s, l) => s + (l.trade?.pnlGross ?? l.trade?.closedPnl ?? 0), 0)
       const fees         = legs.reduce((s, l) => s + (l.trade?.fees ?? l.trade?.fee ?? 0), 0)
+      const pnlNet       = pnlGross - fees
+
+      return { ...group, legs, fullyMatched, pnlGross, fees, pnlNet }
+    })
+}
+*/
+
+function matchDnGroups(groups, rawTradesByPlatform, start, end) {
+  return groups
+    .filter(g => g.createdAt >= start && g.createdAt <= end)
+    .map(group => {
+      const legs = group.legs.map(leg => {
+        const plat   = PLATFORMS.find(p => p.id === leg.platformId)
+        const trades = rawTradesByPlatform[leg.platformId] ?? []
+
+        const match = leg.orderId != null && plat?.normalizeTradeId
+          ? trades.find(t => plat.normalizeTradeId(t) === leg.orderId)
+          : null
+
+        return { ...leg, trade: match ?? null, matched: !!match }
+      })
+
+      const fullyMatched = legs.every(l => l.matched)
+      const pnlGross     = legs.reduce((s, l) => s + parseFloat(l.trade?.pnlGross ?? l.trade?.closedPnl ?? 0), 0)
+      const fees         = legs.reduce((s, l) => s + parseFloat(l.trade?.fees     ?? l.trade?.fee       ?? 0), 0)
       const pnlNet       = pnlGross - fees
 
       return { ...group, legs, fullyMatched, pnlGross, fees, pnlNet }
