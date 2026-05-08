@@ -806,48 +806,8 @@ async function fetchTrades(apiKey, startTime, endTime) {
   return all
 }
 
+//avant rawTrade pour tracking
 /*
-export async function fetchStats(apiKey, startTime, endTime) {
-  const [positions, trades] = await Promise.all([
-    fetchPositions(apiKey, startTime, endTime),
-    fetchTrades(apiKey, startTime, endTime),
-  ])
-  return {
-    pnlGross: positions.reduce((s, p) => s + parseFloat(p.realisedPnl || 0), 0),
-    fees:     trades.reduce((s, t) => s + parseFloat(t.payedFee || 0), 0),
-    volume:   trades.reduce((s, t) => s + parseFloat(t.value    || 0), 0),
-    trades:   trades.length,
-  }
-}
-*/
-
-/*
-export async function fetchStats(apiKey, startTime, endTime) {
-  const trades = await fetchTrades(apiKey, startTime, endTime)
-  console.log('[Extended fetchStats] trades:', trades.length, 
-    '| premier trade:', trades[0] ? JSON.stringify(trades[0]).slice(0, 200) : 'aucun')
-  
-  // PnL réalisé = somme des (value × sign) selon le côté
-  // Pour une vente : valeur positive (encaissement)
-  // Pour un achat  : valeur négative (décaissement)
-  // Extended expose directement realisedPnl dans les trades fermés
-  const pnlGross = trades.reduce((s, t) => {
-    const pnl = parseFloat(t.realisedPnl ?? t.realizedPnl ?? 0)
-    return s + pnl
-  }, 0)
-
-  const fees = trades.reduce((s, t) => {
-    return s + Math.abs(parseFloat(t.payedFee ?? t.fee ?? 0))
-  }, 0)
-
-  const volume = trades.reduce((s, t) => {
-    return s + Math.abs(parseFloat(t.value ?? 0))
-  }, 0)
-
-  return { pnlGross, fees, volume, trades: trades.length }
-}
-*/
-
 export async function fetchStats(apiKey, startTime, endTime) {
   // ── Trades → volume + count uniquement ───────────────────────────────────
   const allTrades = await fetchTrades(apiKey, startTime, endTime)
@@ -890,6 +850,59 @@ export async function fetchStats(apiKey, startTime, endTime) {
   }
 
   return { pnlGross, fees, volume, trades: trades.length }
+}
+*/
+
+export async function fetchStats(apiKey, startTime, endTime) {
+  // ── Trades → volume + count uniquement ───────────────────────────────────
+  const allTrades = await fetchTrades(apiKey, startTime, endTime)
+  const trades = allTrades.filter(t => {
+    const ts = parseInt(t.createdTime ?? 0)
+    return ts >= startTime && ts <= endTime
+  })
+  const volume = trades.reduce((s, t) => s + Math.abs(parseFloat(t.value ?? 0)), 0)
+
+  // ── Positions fermées → PnL + fees ───────────────────────────────────────
+  let pnlGross = 0
+  let fees = 0
+  try {
+    const allPositions = await fetchClosedPositions(apiKey)
+
+    const closedInRange = allPositions.filter(p => {
+      const closedTs = parseInt(p.closedTime ?? 0)
+      return closedTs > 0 && closedTs >= startTime && closedTs <= endTime
+    })
+
+    console.log(`[Extended] positions fermées dans période: ${closedInRange.length}`)
+
+    closedInRange.forEach(p => {
+      const b = p.realisedPnlBreakdown
+      if (b) {
+        pnlGross += parseFloat(b.tradePnl ?? 0)
+        fees += Math.abs(parseFloat(b.openFees  ?? 0))
+              + Math.abs(parseFloat(b.closeFees ?? 0))
+      } else {
+        pnlGross += parseFloat(p.realisedPnl ?? 0)
+      }
+    })
+  } catch (e) {
+    console.warn('[Extended] positions/history:', e.message)
+  }
+
+  // ── rawTrades enrichis pour appariement DN ────────────────────────────────
+  const rawTrades = trades.map(t => ({
+    ...t,
+    // champs normalisés attendus par matchDnGroups
+    timestamp:  parseInt(t.createdTime ?? 0),
+    market:     t.market ?? t.symbol,
+    size:       Math.abs(parseFloat(t.qty ?? t.quantity ?? t.size ?? 0)),
+    orderId:    t.orderId ?? t.id,
+    pnlGross:   0,   // Extended : PnL sur position fermée, pas sur trade
+    fees:       Math.abs(parseFloat(t.payedFee ?? t.fee ?? 0)),
+  }))
+
+  return { ext: { pnlGross, fees, volume, trades: trades.length, rawTrades } }
+  //         ↑ clé "ext" — aligné avec STATS_KEYS et le reste de ton système
 }
 
 async function fetchClosedPositions(apiKey) {
