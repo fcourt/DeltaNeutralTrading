@@ -286,7 +286,7 @@ function DnGroupsSection({ groups, feesInPnl }) {
   const totalFees = groups.reduce((s, g) => s + g.fees, 0)
 
   return (
-    <div className="card card--dn">  {
+    <div className="card card--dn">
       {/* Header */}
       <button className="stats-filters__toggle" onClick={() => setOpen(o => !o)}
         style={{ padding: 'var(--space-3) var(--space-4)' }}>
