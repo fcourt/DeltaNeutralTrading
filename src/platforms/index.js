@@ -62,6 +62,7 @@ export const PLATFORMS = [
             res[k].fees     += k === 'hl' ? hl.fees     : hip3.fees
             res[k].volume   += k === 'hl' ? hl.volume   : hip3.volume
             res[k].trades   += k === 'hl' ? hl.trades   : hip3.trades
+            res[k].rawTrades  = [...res[k].rawTrades, ...src.rawTrades]  // ← ajout pour tracking
           })
         } catch (e) { console.warn(`[hyperliquid] ${addr}:`, e.message) }
       }
