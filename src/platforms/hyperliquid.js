@@ -647,7 +647,8 @@ export async function fetchFills(address, startTime) {
   if (!res.ok) throw new Error(`HL fills error (${res.status})`)
   return res.json()
 }
-
+/*
+//avant tracking ordres
 export function aggregateFills(fills, startTs, endTs) {
   const hl   = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
   const hip3 = { pnlGross: 0, fees: 0, volume: 0, trades: 0 }
@@ -659,6 +660,33 @@ export function aggregateFills(fills, startTs, endTs) {
     t.fees     += parseFloat(f.fee       || 0)
     t.volume   += parseFloat(f.px || 0) * parseFloat(f.sz || 0)
     t.trades   += 1
+  }
+  return { hl, hip3 }
+}
+*/
+
+export function aggregateFills(fills, startTs, endTs) {
+  const hl   = { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] }
+  const hip3 = { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] }
+
+  for (const f of fills) {
+    if (f.time < startTs || f.time > endTs) continue
+    const isHip3 = typeof f.coin === 'string' && f.coin.includes('xyz')
+    const t = isHip3 ? hip3 : hl
+    t.pnlGross += parseFloat(f.closedPnl || 0)
+    t.fees     += parseFloat(f.fee       || 0)
+    t.volume   += parseFloat(f.px || 0) * parseFloat(f.sz || 0)
+    t.trades   += 1
+    // ← normalisation pour matchDnGroups
+    t.rawTrades.push({
+      ...f,
+      timestamp: f.time,
+      market:    f.coin,
+      size:      Math.abs(parseFloat(f.sz || 0)),
+      orderId:   f.oid ?? f.tid,
+      pnlGross:  parseFloat(f.closedPnl || 0),
+      fees:      parseFloat(f.fee       || 0),
+    })
   }
   return { hl, hip3 }
 }
