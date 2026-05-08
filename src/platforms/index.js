@@ -176,8 +176,19 @@ export const PLATFORMS = [
     statsLabel:  'Extended',
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
-    normalizeOrderId: (result) => result?.data?.id ?? null,
-    normalizeTradeId: (trade) => trade?.id?.toString() ?? trade?.orderId?.toString() ?? null,
+    // Extended — utilise externalOrderId (string UUID) ou id string
+normalizeOrderId: (result) => {
+  // result.data peut être un order ou un tableau de fills
+  const id = result?.data?.externalOrderId ?? result?.data?.id?.toString() ?? null
+  return id
+},
+normalizeTradeId: (trade) => {
+  // Préférer externalOrderId (UUID string, pas de perte de précision)
+  // sinon orderId en string
+  return trade?.externalOrderId?.toString()
+    ?? trade?.orderId?.toString()
+    ?? null
+},
     getAccounts: (wallet, _subAccounts, _extraAddresses) => {
       const list = []
       if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
