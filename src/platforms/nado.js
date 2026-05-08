@@ -852,7 +852,8 @@ async function fetchMatches(subaccountBytes32, startTime, endTime) {
   }
   return all
 }
-
+/*
+//avant tracking ordres
 export async function fetchStats(address, subaccountName, startTime, endTime) {
   const subBytes = addressToSubaccount(address, subaccountName || 'default')
   const matches  = await fetchMatches(subBytes, startTime, endTime)
@@ -862,5 +863,31 @@ export async function fetchStats(address, subaccountName, startTime, endTime) {
     fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee  || 0) / 1e18), 0),
     volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || 0) / 1e18), 0),
     trades:   matches.length,
+  }
+}
+*/
+
+export async function fetchStats(address, subaccountName, startTime, endTime) {
+  const subBytes = addressToSubaccount(address, subaccountName || 'default')
+  const matches  = await fetchMatches(subBytes, startTime, endTime)
+  console.log(`[Nado fetchStats] ${matches.length} matches trouvés`)
+
+  const rawTrades = matches.map(m => ({
+    ...m,
+    // champs normalisés pour matchDnGroups
+    timestamp: nonceToMs(m.order?.nonce),
+    market:    m.product_id != null ? String(m.product_id) : null,
+    size:      Math.abs(parseFloat(m.base_filled  ?? 0) / 1e18),
+    orderId:   m.order?.nonce ?? m.digest,
+    pnlGross:  parseFloat(m.realized_pnl ?? 0) / 1e18,
+    fees:      Math.abs(parseFloat(m.fee ?? 0) / 1e18),
+  }))
+
+  return {
+    pnlGross: matches.reduce((s, m) => s + parseFloat(m.realized_pnl || 0) / 1e18, 0),
+    fees:     matches.reduce((s, m) => s + Math.abs(parseFloat(m.fee  || 0) / 1e18), 0),
+    volume:   matches.reduce((s, m) => s + Math.abs(parseFloat(m.quote_filled || 0) / 1e18), 0),
+    trades:   matches.length,
+    rawTrades,
   }
 }
