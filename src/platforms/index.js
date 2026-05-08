@@ -51,7 +51,11 @@ export const PLATFORMS = [
       ].filter(Boolean)
       const unique = [...new Set(allAddrs)].filter(a => accounts[a] !== false)
 
-      const res = { hl: { pnlGross:0, fees:0, volume:0, trades:0 }, hip3: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      //const res = { hl: { pnlGross:0, fees:0, volume:0, trades:0 }, hip3: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      const res = {
+        hl:   { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] },
+        hip3: { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] },
+      }
       for (const addr of unique) {
         try {
           const fills = await hyperliquid.fetchFills(addr, start)
@@ -62,7 +66,7 @@ export const PLATFORMS = [
             res[k].fees     += k === 'hl' ? hl.fees     : hip3.fees
             res[k].volume   += k === 'hl' ? hl.volume   : hip3.volume
             res[k].trades   += k === 'hl' ? hl.trades   : hip3.trades
-            res[k].rawTrades  = [...res[k].rawTrades, ...src.rawTrades]  // ← ajout pour tracking
+            res[k].rawTrades  = [...res[k].rawTrades, ...(src.rawTrades ?? [])]  // ← ajout pour tracking
           })
         } catch (e) { console.warn(`[hyperliquid] ${addr}:`, e.message) }
       }
