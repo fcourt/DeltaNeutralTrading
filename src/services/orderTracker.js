@@ -52,3 +52,29 @@ function _write(data) {
     _memoryStore = data
   }
 }
+
+/**
+ * @param {Object} group
+ * @param {string} group.groupId
+ * @param {Array}  group.legs  — [{ platformId, orderId, market, side, size, timestamp }]
+ *   orderId  = oid retourné par l'exchange (HL → data.response.data.statuses[0].resting?.oid
+ *                                                ou .filled?.oid)
+ */
+export function saveOrderGroup({ groupId, legs }) {
+  const existing = _read()
+  existing.push({ groupId, legs, createdAt: Date.now() })
+  _write(existing)
+}
+
+export function loadOrderGroups() {
+  return _read()
+}
+
+export function clearOrderGroups() {
+  if (_memoryStore !== null) {
+    _memoryStore = []
+  } else {
+    try { localStorage.removeItem(STORAGE_KEY) }
+    catch { _memoryStore = [] }
+  }
+}
