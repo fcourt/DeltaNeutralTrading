@@ -201,13 +201,15 @@ export const PLATFORMS = [
     fetchSubAccounts: undefined,
     fetchStats: async (wallet, _accounts, _extras, _subs, start, end) => {
       const addr = wallet.nadoAddress?.trim()
-      if (!addr) return { nado: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      //if (!addr) return { nado: { pnlGross:0, fees:0, volume:0, trades:0 } }
+      if (!addr) return { nado: { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] } }
       try {
         const part = await nado.fetchStats(addr, wallet.nadoSubaccount, start, end)
         return { nado: part }
       } catch (e) {
         console.warn('[nado]', e.message)
-        return { nado: { pnlGross:0, fees:0, volume:0, trades:0 } }
+        //return { nado: { pnlGross:0, fees:0, volume:0, trades:0 } }
+        return { nado: { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] } }
       }
     },
   },
