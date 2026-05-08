@@ -941,7 +941,8 @@ export async function fetchStats(apiKey, startTime, endTime) {
     rawTrades.push({
       ...f,
       timestamp:  parseInt(f.createdTime ?? 0),
-      market:     f.market,
+      //market:     f.market,
+      market: EXT_KEY_TO_ID[f.market] ?? f.market?.replace(/-USD$/, '') ?? f.market,
       size:       Math.abs(parseFloat(f.qty || 0)),
       orderId:    f.id?.toString() ?? null,
       pnlGross:   0,                                    // vient de closedPositions, pas des trades
