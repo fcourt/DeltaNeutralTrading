@@ -1,4 +1,6 @@
 // src/hooks/usePlaceOrder.js
+/*
+//avant ajout du traking des ordes passés
 import { placeOrder as servicePlaceOrder, canTrade } from '../services/orderService.js'
 import { PLATFORMS } from '../platforms/index.js'
 
@@ -40,6 +42,68 @@ export function usePlaceOrder(markets = []) {
   //const canTradeNado = (creds) => canTradeOn('nado',        creds)
 
   // Map complète : { hyperliquid: fn, xyz: fn, nado: fn, … }
+  const canTradeMap = Object.fromEntries(
+    PLATFORMS.map(p => [p.id, (creds) => canTradeOn(p.id, creds)])
+  )
+
+  return { placeOrder, canTradeOn, canTradeMap }
+}
+*/
+
+// src/hooks/usePlaceOrder.js
+import { placeOrder as servicePlaceOrder, canTrade } from '../services/orderService.js'
+import { PLATFORMS } from '../platforms/index.js'
+import { saveOrderGroup } from '../services/orderTracker.js'
+
+export function usePlaceOrder(markets = []) {
+
+  const placeOrder = async (params, groupId = null) => {
+    const market = markets.find(m => m.id === params.marketId)
+    if (!market) throw new Error(`Marché inconnu : ${params.marketId}`)
+
+    const {
+      platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly,
+      hlAddress, hlVaultAddress, hlAgentPk,
+      extApiKey, extStarkPk, extL2Vault,
+      nadoAddress, nadoAgentPk, nadoSubaccount,
+      leverage,
+      tpSlConfig,
+    } = params
+
+    const credentials = {
+      hlAddress, hlVaultAddress, hlAgentPk,
+      extApiKey, extStarkPk, extL2Vault,
+      nadoAddress, nadoAgentPk, nadoSubaccount,
+    }
+
+    const result = await servicePlaceOrder(
+      { platformId, marketId, isBuy, size, limitPrice, orderType, reduceOnly,
+        market, leverage, tpSlConfig },
+      credentials
+    )
+
+    // Tracking — chaque plateforme expose normalizeTradeId pour extraire l'orderId
+    if (groupId) {
+      const plat = PLATFORMS.find(p => p.id === platformId)
+      const orderId = plat?.normalizeOrderId?.(result) ?? null
+      saveOrderGroup({
+        groupId,
+        legs: [{
+          platformId,
+          orderId,
+          market:    marketId,
+          side:      isBuy ? 'long' : 'short',
+          size,
+          timestamp: Date.now(),
+        }],
+      })
+    }
+
+    return result
+  }
+
+  const canTradeOn = (platformId, creds) => canTrade(platformId, creds)
+
   const canTradeMap = Object.fromEntries(
     PLATFORMS.map(p => [p.id, (creds) => canTradeOn(p.id, creds)])
   )
