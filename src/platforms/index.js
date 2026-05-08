@@ -20,6 +20,8 @@ export const PLATFORMS = [
     normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
                            ?? result?.response?.data?.statuses?.[0]?.filled?.oid
                            ?? null,
+    //
+    normalizeTradeId:  (trade)  => trade?.oid ?? null, 
     //fetch data comptes
     getAccounts: (wallet, subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
@@ -119,6 +121,7 @@ export const PLATFORMS = [
     normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
                            ?? result?.response?.data?.statuses?.[0]?.filled?.oid
                            ?? null,
+    normalizeTradeId:  (trade)  => trade?.oid ?? null, 
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
       const vault     = wallet.hlVaultAddress?.trim() || null
@@ -147,6 +150,7 @@ export const PLATFORMS = [
     normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
                            ?? result?.response?.data?.statuses?.[0]?.filled?.oid
                            ?? null,
+    normalizeTradeId:  (trade)  => trade?.oid ?? null,
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
       const vault     = wallet.hlVaultAddress?.trim() || null
@@ -173,6 +177,7 @@ export const PLATFORMS = [
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
     normalizeOrderId: (result) => result?.data?.id ?? null,
+    normalizeTradeId: (trade) => trade?.id?.toString() ?? trade?.orderId?.toString() ?? null,
     getAccounts: (wallet, _subAccounts, _extraAddresses) => {
       const list = []
       if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
@@ -224,6 +229,11 @@ export const PLATFORMS = [
     isAvailable: (values) => !!values.nadoAddress?.trim(),
     hasAddressField: true,
     normalizeOrderId: (result) => result?.data?.order?.nonce ?? null,
+    normalizeTradeId: (trade) => {
+      // Nado fills : l'identifiant unique est order.nonce
+      // Le champ orderId/digest n'existe PAS dans la réponse matches
+      return trade?.order?.nonce?.toString() ?? trade?.nonce?.toString() ?? null
+    },
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const addr = wallet.nadoAddress?.trim()
       const list = []
