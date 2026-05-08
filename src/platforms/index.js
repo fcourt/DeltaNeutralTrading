@@ -45,6 +45,35 @@ export const PLATFORMS = [
       const allAddrs = [
         wallet.hlAddress?.trim(),
         wallet.hlVaultAddress?.trim(),
+        ...(Array.isArray(subAccounts?.['hyperliquid']) ? subAccounts['hyperliquid'] : []).map(s => s.address),
+        ...extraAddresses.filter(e => ['hyperliquid','xyz','hyena'].includes(e.platformId)).map(e => e.address),
+      ].filter(Boolean)
+        const unique = [...new Set(allAddrs)].filter(a => accounts[a] !== false)
+          const res = {
+            hl:   { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] },
+            hip3: { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] },
+          }
+            for (const addr of unique) {
+              try {
+                const fills = await hyperliquid.fetchFills(addr, start)
+                const { hl, hip3 } = hyperliquid.aggregateFills(fills, start, end)
+                  ;['hl', 'hip3'].forEach(k => {
+                  const src = k === 'hl' ? hl : hip3
+                    res[k].pnlGross  += src.pnlGross
+                    res[k].fees      += src.fees
+                    res[k].volume    += src.volume
+                    res[k].trades    += src.trades
+                    res[k].rawTrades  = [...res[k].rawTrades, ...(src.rawTrades ?? [])]
+                  })
+            } catch (e) { console.warn(`[hyperliquid] ${addr}:`, e.message) }
+    }
+  return res
+},
+    /*
+    fetchStats: async (wallet, accounts, extraAddresses, subAccounts, start, end) => {
+      const allAddrs = [
+        wallet.hlAddress?.trim(),
+        wallet.hlVaultAddress?.trim(),
         //...subAccounts.map(s => s.address),
         ...(Array.isArray(subAccounts?.['hyperliquid']) ? subAccounts['hyperliquid'] : []).map(s => s.address),
         ...extraAddresses.filter(e => ['hyperliquid','xyz','hyena'].includes(e.platformId)).map(e => e.address),
@@ -72,6 +101,7 @@ export const PLATFORMS = [
       }
       return res  // retourne { hl: {...}, hip3: {...} } — plusieurs statsKey possibles
     },
+    */
   },
 
   {
