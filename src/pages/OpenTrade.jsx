@@ -13,6 +13,7 @@ import { loadFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
 import LeverageSlider   from '../components/ui/LeverageSlider'
 import LiqPriceEstimate from '../components/ui/LiqPriceEstimate'
 import TpSlPanel        from '../components/ui/TpSlPanel'
+import { saveOrderGroup } from '../services/orderTracker.js'
 import {
   estimateFillPrice, calcDeltaNeutral,
   deltaScoreColor, deltaScoreLabel,
@@ -462,6 +463,7 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
   }
 }
 
+  /*
   const handlePlaceLeg = async (legNum) => {
     const setter     = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
     const platformId = legNum === 1 ? platform1 : platform2
@@ -478,7 +480,47 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
       setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
     } finally { setter(false) }
   }
+  */
 
+  const handlePlaceLeg = async (legNum) => {
+  const setter     = legNum === 1 ? setPlacingLeg1 : setPlacingLeg2
+  const platformId = legNum === 1 ? platform1 : platform2
+  const side       = legNum === 1 ? side1 : side2
+  const sizeAsset  = legNum === 1 ? calc?.asset1 : calc?.asset2
+  const legLev     = legNum === 1 ? effLev1 : effLev2
+  const limitPx    = legNum === 1 ? calc?.limitP1 : calc?.limitP2
+  const orderType  = legNum === 1 ? orderType1 : orderType2
+
+  setter(true); setTradeStatus(null)
+  try {
+    const params = buildOrderParams(platformId, side, sizeAsset, limitPx, orderType, legLev)
+    const res    = await placeOrder(params)
+
+    // ── Tracking leg isolé ───────────────────────────────────────────────
+    saveOrderGroup({
+      groupId: crypto.randomUUID(),
+      legs: [{
+        platformId: params.platformId,
+        orderId:    res?.resolvedOid ?? null,
+        market:     params.marketId,
+        side:       params.isBuy ? 'long' : 'short',
+        size:       params.size,
+        timestamp:  Date.now(),
+      }],
+    })
+
+    setTradeStatus({
+      type: 'success',
+      msg: `✅ Ordre ${side} envoyé sur ${PLATFORMS.find(p => p.id === platformId)?.label}`,
+    })
+  } catch (e) {
+    setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
+  } finally {
+    setter(false)
+  }
+}
+
+  /*
   const handlePlaceBothLegs = async () => {
     setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
     try {
@@ -495,6 +537,49 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
       setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
     } finally { setPlacingLeg1(false); setPlacingLeg2(false) }
   }
+  */
+
+  const handlePlaceBothLegs = async () => {
+  setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
+  try {
+    const params1 = buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, effLev1)
+    const params2 = buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, effLev2)
+
+    const [res1, res2] = await Promise.all([
+      placeOrder(params1),
+      placeOrder(params2),
+    ])
+
+    // ── Tracking DN ─────────────────────────────────────────────────────
+    saveOrderGroup({
+      groupId: crypto.randomUUID(),
+      legs: [
+        {
+          platformId: params1.platformId,
+          orderId:    res1?.resolvedOid ?? null,
+          market:     params1.marketId,
+          side:       params1.isBuy ? 'long' : 'short',
+          size:       params1.size,
+          timestamp:  Date.now(),
+        },
+        {
+          platformId: params2.platformId,
+          orderId:    res2?.resolvedOid ?? null,
+          market:     params2.marketId,
+          side:       params2.isBuy ? 'long' : 'short',
+          size:       params2.size,
+          timestamp:  Date.now(),
+        },
+      ],
+    })
+
+    setTradeStatus({ type: 'success', msg: '✅ Les 2 legs envoyés simultanément !' })
+  } catch (e) {
+    setTradeStatus({ type: 'error', msg: `❌ ${e.message}` })
+  } finally {
+    setPlacingLeg1(false); setPlacingLeg2(false)
+  }
+}
 
   const fresh = lastUpdate && (Date.now() - lastUpdate.getTime()) < 6000
 
