@@ -482,6 +482,7 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
   const handlePlaceBothLegs = async () => {
     setPlacingLeg1(true); setPlacingLeg2(true); setTradeStatus(null)
     try {
+      const groupId = crypto.randomUUID() 
       await Promise.all([
         //placeOrder(buildOrderParams(platform1, side1, calc?.asset1, calc?.limitP1, orderType1, effLev1)),
         //placeOrder(buildOrderParams(platform2, side2, calc?.asset2, calc?.limitP2, orderType2, effLev2)),
