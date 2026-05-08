@@ -287,7 +287,7 @@ function matchDnGroups(groups, rawTradesByPlatform, start, end) {
         // ───────────────────────────────────────────────────────────────────
 
         const match = leg.orderId != null && plat?.normalizeTradeId
-          ? trades.find(t => plat.normalizeTradeId(t) === leg.orderId)
+          ? trades.find(t => String(plat.normalizeTradeId(t)) === String(leg.orderId))
           : null
 
         return { ...leg, trade: match ?? null, matched: !!match }
