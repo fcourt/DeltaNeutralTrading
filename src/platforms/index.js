@@ -146,6 +146,23 @@ export const PLATFORMS = [
     },
     fetchSubAccounts: undefined,
     fetchStats: async (wallet, accounts, _extras, _subs, start, end) => {
+      const res = { pnlGross: 0, fees: 0, volume: 0, trades: 0, rawTrades: [] }
+        for (const [key, addr] of [['ext-main', wallet.extMainApiKey], ['ext-sub', wallet.extApiKey]]) {
+          if (!addr?.trim() || accounts[key] === false) continue
+            try {
+              const part = await extended.fetchStats(addr.trim(), start, end)
+              // part = { pnlGross, fees, volume, trades, rawTrades }
+              res.pnlGross   += part.pnlGross
+              res.fees       += part.fees
+              res.volume     += part.volume
+              res.trades     += part.trades
+              res.rawTrades   = [...res.rawTrades, ...(part.rawTrades ?? [])]
+            } catch (e) { console.warn(`[extended] ${key}:`, e.message) }
+        }
+      return { ext: res }  // ← pas de changement sur la clé ext
+    },
+    /*
+    fetchStats: async (wallet, accounts, _extras, _subs, start, end) => {
       const res = { pnlGross:0, fees:0, volume:0, trades:0 }
       for (const [key, addr] of [['ext-main', wallet.extMainApiKey], ['ext-sub', wallet.extApiKey]]) {
         if (!addr?.trim() || accounts[key] === false) continue
@@ -157,6 +174,7 @@ export const PLATFORMS = [
       }
       return { ext: res }
     },
+    */
   },
   {
     id:          'nado',
