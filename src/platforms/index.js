@@ -16,6 +16,11 @@ export const PLATFORMS = [
     statsLabel:  'Hyperliquid Perps',
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
+    //traking
+    normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
+                           ?? result?.response?.data?.statuses?.[0]?.filled?.oid
+                           ?? null,
+    //fetch data comptes
     getAccounts: (wallet, subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
       const vault     = wallet.hlVaultAddress?.trim() || null
@@ -35,6 +40,7 @@ export const PLATFORMS = [
       const subs = await hyperliquid.fetchSubAccounts(addr)
       return subs.map(s => ({ address: s.subAccountUser || s.address, name: s.name || 'Sub-account' }))
     },
+    //fetch data ordres
     fetchStats: async (wallet, accounts, extraAddresses, subAccounts, start, end) => {
       const allAddrs = [
         wallet.hlAddress?.trim(),
@@ -75,6 +81,9 @@ export const PLATFORMS = [
     statsLabel:  'HIP-3 DEX (trade.xyz / HyENA)',
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
+    normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
+                           ?? result?.response?.data?.statuses?.[0]?.filled?.oid
+                           ?? null,
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
       const vault     = wallet.hlVaultAddress?.trim() || null
@@ -100,6 +109,9 @@ export const PLATFORMS = [
     statsLabel:  'HIP-3 DEX (trade.xyz / HyENA)',
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
+    normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
+                           ?? result?.response?.data?.statuses?.[0]?.filled?.oid
+                           ?? null,
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
       const vault     = wallet.hlVaultAddress?.trim() || null
@@ -125,6 +137,7 @@ export const PLATFORMS = [
     statsLabel:  'Extended',
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
+    normalizeOrderId: (result) => result?.data?.id ?? null,
     getAccounts: (wallet, _subAccounts, _extraAddresses) => {
       const list = []
       if (wallet.extMainApiKey?.trim()) list.push({ address: 'ext-main', name: 'Compte principal', badge: 'main', removable: false })
@@ -157,6 +170,7 @@ export const PLATFORMS = [
     statsLabel:  'Nado',
     isAvailable: (values) => !!values.nadoAddress?.trim(),
     hasAddressField: true,
+    normalizeOrderId: (result) => result?.data?.order?.nonce ?? null,
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const addr = wallet.nadoAddress?.trim()
       const list = []
