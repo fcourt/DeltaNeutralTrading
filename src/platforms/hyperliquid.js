@@ -464,6 +464,7 @@ export async function updateLeverageByName({ hlAgentPk, hlVaultAddress, coin, le
 }
 
 // passage d'ordre///////////////////////////////////////////////////////////////////////////////////
+/*
 export async function placeOrder(order, credentials) {
   const { isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig } = order  // ← tpSlConfig ajouté
   const { hlAgentPk, hlVaultAddress, hlAddress } = credentials
@@ -490,21 +491,6 @@ export async function placeOrder(order, credentials) {
     defaultVaultAddress: hlVaultAddress?.trim() || undefined,
   })
 
-  // ← await ajouté pour enchaîner le TP/SL
-  /*
-  const data = await client.order({
-    orders: [{
-      a: market.assetIndex,
-      b: isBuy,
-      p: roundedPrice.toFixed(market.pxDecimals ?? 2),
-      s: roundedSize.toFixed(market.szDecimals ?? 6),
-      r: reduceOnly ?? false,
-      t: { limit: { tif: isMaker ? 'Gtc' : 'Ioc' } },
-    }],
-    grouping: 'na',
-  })
-  */
-
   const data = await client.order({
   orders: [{
     a: market.assetIndex,
@@ -516,62 +502,6 @@ export async function placeOrder(order, credentials) {
   }],
   grouping: 'na',
 })
-
-  // ── TP/SL : requête séparée après l'ordre principal ← ajout depuis nouveau fichier
-  /*
-  if (tpSlConfig) {
-  try {
-    // 1. Variables indépendantes en premier
-    const isXyz   = market.hlKey?.startsWith('xyz:')
-    const szWire  = roundedSize.toFixed(market.szDecimals ?? 6)
-
-    // 2. Action (ne dépend que de variables déjà définies)
-    const tpSlAction = buildHlTpSlAction({
-      side:       isBuy ? 'long' : 'short',
-      prices:     tpSlConfig.prices,
-      assetIndex: market.assetIndex,
-      size:       szWire,
-    })
-
-    // 3. Target (doit être avant tpSlSig)
-    const tpSlTarget = (hlVaultAddress?.trim() && /^0x[0-9a-fA-F]{40}$/i.test(hlVaultAddress.trim()))
-      ? hlVaultAddress.trim()
-      : hlAddress?.trim()
-
-    if (!tpSlTarget) throw new Error('[HL] Adresse wallet manquante pour le TP/SL')
-
-    // 4. Nonce + signature (dépendent de tpSlAction ET tpSlTarget)
-    const tpSlNonce = Date.now()
-    const tpSlSig   = await signL1Action({
-      wallet,
-      action:       tpSlAction,
-      nonce:        tpSlNonce,
-      vaultAddress: tpSlTarget,
-    })
-
-    // 5. Fetch
-    console.log('[HL] TP/SL payload:', JSON.stringify({ action: tpSlAction, nonce: tpSlNonce }))
-    const tpSlRes  = await fetch('https://api.hyperliquid.xyz/exchange', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action:       tpSlAction,
-        nonce:        tpSlNonce,
-        signature:    tpSlSig,
-        vaultAddress: tpSlTarget,
-        ...(isXyz ? { dex: 'xyz' } : {}),
-      }),
-    })
-    const tpSlData = await tpSlRes.json()
-    console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
-    if (tpSlData?.status !== 'ok') {
-      console.warn('[HL] TP/SL placement échoué (ordre principal OK):', JSON.stringify(tpSlData))
-    }
-  } catch (e) {
-    console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
-  }
-}
-*/
 
 if (tpSlConfig) {
   try {
@@ -598,8 +528,71 @@ if (tpSlConfig) {
     console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
   }
 }
+
+  const hlOid =
+  data?.response?.data?.statuses?.[0]?.resting?.oid ??
+  data?.response?.data?.statuses?.[0]?.filled?.oid ??
+  null
   
-  return data
+  //return data
+  return { ...data, resolvedOid: hlOid }
+}
+*/
+
+export async function placeOrder(order, credentials) {
+  const { isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig } = order
+  const { hlAgentPk, hlVaultAddress } = credentials
+  if (!hlAgentPk) throw new Error('Clé agent HL manquante')
+  if (market.assetIndex === null) throw new Error(`Index non résolu pour ${market.label}`)
+
+  const roundedPrice    = roundToHLPrice(limitPrice)
+  const roundedSize     = parseFloat(size.toFixed(market.szDecimals ?? 6))
+  const wallet          = privateKeyToAccount(hlAgentPk)
+  const isMaker         = !orderType || orderType === 'maker'
+  const tif             = isMaker ? 'Gtc' : 'FrontendMarket'
+  const rawAggressive   = isMaker ? roundedPrice : isBuy ? roundedPrice * 1.05 : roundedPrice * 0.95
+  const aggressivePrice = roundToHLTick(rawAggressive, market.szDecimals ?? 0)
+
+  const client = new ExchangeClient({
+    wallet, transport: new HttpTransport(),
+    defaultVaultAddress: hlVaultAddress?.trim() || undefined,
+  })
+
+  const data = await client.order({
+    orders: [{
+      a: market.assetIndex,
+      b: isBuy,
+      p: aggressivePrice.toFixed(market.pxDecimals ?? 2),
+      s: roundedSize.toFixed(market.szDecimals ?? 6),
+      r: reduceOnly ?? false,
+      t: { limit: { tif } },
+    }],
+    grouping: 'na',
+  })
+
+  // ← Guard erreur HL avant d'extraire l'oid
+  const status0 = data?.response?.data?.statuses?.[0]
+  if (status0?.error) throw new Error(`[HL] Order rejected: ${status0.error}`)
+
+  if (tpSlConfig) {
+    try {
+      const szWire    = roundedSize.toFixed(market.szDecimals ?? 6)
+      const tpSlOrders = buildHlTpSlOrders({
+        side:       isBuy ? 'long' : 'short',
+        prices:     tpSlConfig.prices,
+        assetIndex: market.assetIndex,
+        size:       szWire,
+        szDecimals: market.szDecimals ?? 0,
+      })
+      const tpSlData = await client.order({ orders: tpSlOrders, grouping: 'positionTpsl' })
+      console.log('[HL] TP/SL response:', JSON.stringify(tpSlData))
+    } catch (e) {
+      console.warn('[HL] TP/SL exception (ordre principal OK):', e.message)
+    }
+  }
+
+  const hlOid = status0?.resting?.oid ?? status0?.filled?.oid ?? null
+  return { ...data, resolvedOid: hlOid }
 }
 
 export async function enableAgentDexAbstraction(agentPrivateKey, vaultAddress = null) {
