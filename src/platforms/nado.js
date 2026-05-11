@@ -383,48 +383,73 @@ export async function getPositions(credentials, markets = []) {
 
     const positions = []
 
-    // ── Positions CROSS ──────────────────────────────────────────────────────
-    if (crossData?.status === 'success' && crossData?.data?.exists) {
-      for (const p of (crossData.data.perp_balances || [])) {
-        if (parseFloat(p.balance.amount) === 0) continue
-        const szi    = parseFloat(p.balance.amount) / 1e18
-        const market = markets.find(m => m.nadoProductId === p.product_id)
-        const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
-        positions.push({
-          platform: 'nado',
-          coin:     market?.keys?.nado ?? `product_${p.product_id}`,
-          marketId: market?.id ?? null,
-          label:    market?.label ?? `product_${p.product_id}`,
-          side:     szi > 0 ? 'LONG' : 'SHORT',
-          szi:      Math.abs(szi),
-          entryPx:  szi !== 0 ? Math.abs(vQuote / szi) : 0,
-          unrealizedPnl: 0,
-        })
-      }
-    }
+   // ── Positions CROSS ──────────────────────────────────────────────────────
+if (crossData?.status === 'success' && crossData?.data?.exists) {
 
-    // ── Positions ISOLÉES ────────────────────────────────────────────────────
-    if (isoData?.status === 'success') {
-      for (const p of (isoData.data?.isolated_positions || [])) {
-        const baseBalance = p.base_balance?.balance
-        if (!baseBalance) continue
-        const szi    = parseFloat(baseBalance.amount) / 1e18
-        if (szi === 0) continue
-        const vQuote = parseFloat(baseBalance.v_quote_balance) / 1e18
-        const pid    = p.base_balance?.product_id ?? p.base_product?.product_id
-        const market = markets.find(m => m.nadoProductId === pid)
-        positions.push({
-          platform: 'nado',
-          coin:     market?.keys?.nado ?? `product_${pid}`,
-          marketId: market?.id ?? null,
-          label:    market?.label ?? `product_${pid}`,
-          side:     szi > 0 ? 'LONG' : 'SHORT',
-          szi:      Math.abs(szi),
-          entryPx:  szi !== 0 ? Math.abs(vQuote / szi) : 0,
-          unrealizedPnl: 0,
-        })
-      }
-    }
+  // ← COLLE ICI — map productId → oraclePrice
+  const priceMap = {}
+  for (const prod of (crossData.data.perp_products || [])) {
+    priceMap[prod.product_id] = parseFloat(prod.oracle_price_x18) / 1e18
+  }
+
+  for (const p of (crossData.data.perp_balances || [])) {
+    if (parseFloat(p.balance.amount) === 0) continue
+
+    const szi    = parseFloat(p.balance.amount) / 1e18
+    const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
+
+    // ← ET ICI — utilise le priceMap dans la boucle
+    const oraclePx      = priceMap[p.product_id] ?? 0
+    const unrealizedPnl = szi * oraclePx + vQuote
+
+    const market = markets.find(m => m.nadoProductId === p.product_id)
+    positions.push({
+      platform:      'nado',
+      coin:          market?.keys?.nado ?? `product_${p.product_id}`,
+      marketId:      market?.id ?? null,
+      label:         market?.label ?? `product_${p.product_id}`,
+      side:          szi > 0 ? 'LONG' : 'SHORT',
+      szi:           Math.abs(szi),
+      entryPx:       szi !== 0 ? Math.abs(vQuote) / Math.abs(szi) : 0,
+      unrealizedPnl, // ← plus hardcodé à 0
+    })
+  }
+}
+
+    // ── Positions ISOLÉES ─────────────────────────────────────────────────────
+if (isoData?.status === 'success') {
+  for (const p of (isoData.data?.isolated_positions || [])) {
+    const baseBalance = p.base_balance?.balance
+    if (!baseBalance) continue
+
+    const szi        = parseFloat(baseBalance.amount)     / 1e18
+    const vQuote     = parseFloat(baseBalance.v_quote_balance) / 1e18
+    const pid        = p.base_balance?.product_id ?? p.base_product?.product_id
+    const market     = markets.find(m => m.nadoProductId === pid)
+
+    // Oracle price depuis base_product (déjà dans la réponse isolated_positions)
+    const oraclePx   = parseFloat(p.base_product?.oracle_price_x18 ?? 0) / 1e18
+
+    // Formule doc Nado : unsettledQuote = amount × oraclePrice + vquoteBalance
+    const unrealizedPnl = szi !== 0 ? szi * oraclePx + vQuote : 0
+
+    // entryPx : |vquoteBalance| / |amount|  (average entry cost)
+    const entryPx    = szi !== 0 ? Math.abs(vQuote) / Math.abs(szi) : 0
+
+    if (Math.abs(szi) === 0) continue
+
+    positions.push({
+      platform:      'nado',
+      coin:          market?.keys?.nado ?? `product_${pid}`,
+      marketId:      market?.id ?? null,
+      label:         market?.label ?? `product_${pid}`,
+      side:          szi > 0 ? 'LONG' : 'SHORT',
+      szi:           Math.abs(szi),
+      entryPx,
+      unrealizedPnl, // ← maintenant calculé correctement
+    })
+  }
+}
 
     return positions
   } catch (e) {
