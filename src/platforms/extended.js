@@ -673,16 +673,42 @@ export async function placeOrder(order, credentials) {
     }
   )
 
-  const rawText = await res.text()
-  console.log('[Extended] status:', res.status, '| response:', rawText)
+  // À la fin de placeOrder(), après le fetch de soumission
+const rawText = await res.text()
+let data = {}
+try { data = JSON.parse(rawText) } catch {}
 
-  let data = {}
-  try { data = JSON.parse(rawText) } catch { /* non-JSON */ }
+if (!res.ok || data?.status === 'ERROR')
+  throw new Error(data?.error?.message || rawText || `Extended HTTP ${res.status}`)
 
-  if (!res.ok || data?.status === 'ERROR')
-    throw new Error(data?.error?.message || data?.message || rawText || `Extended HTTP ${res.status}`)
+// ── Vérification post-soumission ─────────────────────────────────────────
+const externalId = data?.data?.externalId  // ton UUID — pas d'ambiguïté BigInt
 
-  return data
+if (externalId) {
+  await new Promise(r => setTimeout(r, 500))
+  try {
+    const checkRes = await fetch(
+      `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${externalId}`)}`,
+      { headers: { 'X-Api-Key': extApiKey } }
+    )
+    const checkData = await checkRes.json()
+    const orderStatus   = checkData?.data?.status
+    const cancelReason  = checkData?.data?.cancelReason
+
+    if (orderStatus === 'CANCELLED' || orderStatus === 'REJECTED') {
+      const msg = cancelReason === 'POSTONLY_FAILED'
+        ? `Ordre rejeté : prix croise le carnet (POST_ONLY). Ajuste le prix limite.`
+        : `Ordre rejeté par Extended : ${cancelReason ?? orderStatus}`
+      throw new Error(msg)
+    }
+  } catch (e) {
+    if (e.message.includes('rejeté') || e.message.includes('POST_ONLY')) throw e
+    // Ignore les erreurs réseau du check secondaire — l'ordre a bien été soumis
+    console.warn('[Extended] vérification post-ordre échouée (non-bloquant):', e.message)
+  }
+}
+
+return data
 }
 
 // ─── Stats fetch ──────────────────────────────────────────────────────────────
