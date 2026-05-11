@@ -332,6 +332,10 @@ export async function getPositions(credentials, markets = []) {
         //const market = markets.find(m => m.nadoProductId === p.product_id)
         const market = markets.find(m => m.nadoProductId === p.product_id)
         const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
+
+        console.log('[Nado getPositions] sample market keys:', markets[0])
+        console.log('[Nado getPositions] product_id cherché:', p.product_id)
+        
         return {
           platform: 'nado', //coin: market?.keys?.nado ?? market?.nadoKey ?? `product_${p.product_id}`,
           //coin: market?.nadoKey ?? `product_${p.product_id}`,
