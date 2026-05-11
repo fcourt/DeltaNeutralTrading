@@ -318,6 +318,7 @@ export async function getMargin(credentials) {
   } catch (e) { console.warn('[Nado getMargin]', e.message); return null }
 }
 
+/*
 export async function getPositions(credentials, markets = []) {
   const { nadoAddress, nadoSubaccount } = credentials
   if (!nadoAddress || !/^0x[0-9a-fA-F]{40}$/i.test(nadoAddress.trim())) {
@@ -363,6 +364,69 @@ export async function getPositions(credentials, markets = []) {
           unrealizedPnl: 0,
         }
       })
+  } catch (e) {
+    console.warn('[Nado getPositions] erreur:', e.message)
+    return []
+  }
+}
+*/
+
+export async function getPositions(credentials, markets = []) {
+  const { nadoAddress, nadoSubaccount } = credentials
+  if (!nadoAddress || !/^0x[0-9a-fA-F]{40}$/i.test(nadoAddress.trim())) return []
+  try {
+    const sub  = buildSubaccount(nadoAddress.trim(), nadoSubaccount || 'default')
+    const [crossData, isoData] = await Promise.all([
+      gatewayPost({ type: 'subaccount_info', subaccount: sub }),
+      gatewayPost({ type: 'isolated_positions', subaccount: sub }),
+    ])
+
+    const positions = []
+
+    // ── Positions CROSS ──────────────────────────────────────────────────────
+    if (crossData?.status === 'success' && crossData?.data?.exists) {
+      for (const p of (crossData.data.perp_balances || [])) {
+        if (parseFloat(p.balance.amount) === 0) continue
+        const szi    = parseFloat(p.balance.amount) / 1e18
+        const market = markets.find(m => m.nadoProductId === p.product_id)
+        const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
+        positions.push({
+          platform: 'nado',
+          coin:     market?.keys?.nado ?? `product_${p.product_id}`,
+          marketId: market?.id ?? null,
+          label:    market?.label ?? `product_${p.product_id}`,
+          side:     szi > 0 ? 'LONG' : 'SHORT',
+          szi:      Math.abs(szi),
+          entryPx:  szi !== 0 ? Math.abs(vQuote / szi) : 0,
+          unrealizedPnl: 0,
+        })
+      }
+    }
+
+    // ── Positions ISOLÉES ────────────────────────────────────────────────────
+    if (isoData?.status === 'success') {
+      for (const p of (isoData.data?.isolated_positions || [])) {
+        const baseBalance = p.base_balance?.balance
+        if (!baseBalance) continue
+        const szi    = parseFloat(baseBalance.amount) / 1e18
+        if (szi === 0) continue
+        const vQuote = parseFloat(baseBalance.v_quote_balance) / 1e18
+        const pid    = p.base_balance?.product_id ?? p.base_product?.product_id
+        const market = markets.find(m => m.nadoProductId === pid)
+        positions.push({
+          platform: 'nado',
+          coin:     market?.keys?.nado ?? `product_${pid}`,
+          marketId: market?.id ?? null,
+          label:    market?.label ?? `product_${pid}`,
+          side:     szi > 0 ? 'LONG' : 'SHORT',
+          szi:      Math.abs(szi),
+          entryPx:  szi !== 0 ? Math.abs(vQuote / szi) : 0,
+          unrealizedPnl: 0,
+        })
+      }
+    }
+
+    return positions
   } catch (e) {
     console.warn('[Nado getPositions] erreur:', e.message)
     return []
