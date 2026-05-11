@@ -320,33 +320,53 @@ export async function getMargin(credentials) {
 
 export async function getPositions(credentials, markets = []) {
   const { nadoAddress, nadoSubaccount } = credentials
-  if (!nadoAddress || !/^0x[0-9a-fA-F]{40}$/i.test(nadoAddress.trim())) return []
+  if (!nadoAddress || !/^0x[0-9a-fA-F]{40}$/i.test(nadoAddress.trim())) {
+    console.log('[Nado getPositions] adresse invalide ou manquante:', nadoAddress)
+    return []
+  }
   try {
-    const sub  = buildSubaccount(nadoAddress.trim(), nadoSubaccount || 'default')
+    const sub = buildSubaccount(nadoAddress.trim(), nadoSubaccount || 'default')
+    console.log('[Nado getPositions] nadoAddress:', nadoAddress)
+    console.log('[Nado getPositions] sub:', sub)
+
     const data = await gatewayPost({ type: 'subaccount_info', subaccount: sub })
+    console.log('[Nado getPositions] data.status:', data?.status, '| exists:', data?.data?.exists)
+
     if (data?.status !== 'success' || !data?.data?.exists) return []
-    return (data.data.perp_balances || [])
-      .filter(p => parseFloat(p.balance.amount) !== 0)
+
+    const balances = data.data.perp_balances || []
+    console.log('[Nado getPositions] perp_balances count:', balances.length)
+    console.log('[Nado getPositions] raw balances:', JSON.stringify(balances.slice(0, 2)))
+
+    return balances
+      .filter(p => {
+        const keep = parseFloat(p.balance.amount) !== 0
+        if (!keep) console.log('[Nado] filtré (amount=0):', p.product_id)
+        return keep
+      })
       .map(p => {
         const szi    = parseFloat(p.balance.amount) / 1e18
-        //const market = markets.find(m => m.nadoProductId === p.product_id)
         const market = markets.find(m => m.nadoProductId === p.product_id)
         const vQuote = parseFloat(p.balance.v_quote_balance) / 1e18
 
-        console.log('[Nado getPositions] sample market keys:', markets[0])
-        console.log('[Nado getPositions] product_id cherché:', p.product_id)
-        
+        console.log('[Nado getPositions] product_id cherché:', p.product_id, '| market trouvé:', market?.id ?? 'NULL')
+        console.log('[Nado getPositions] markets[0]:', JSON.stringify(markets[0]))
+
         return {
-          platform: 'nado', //coin: market?.keys?.nado ?? market?.nadoKey ?? `product_${p.product_id}`,
-          //coin: market?.nadoKey ?? `product_${p.product_id}`,
+          platform: 'nado',
           coin: market?.keys?.nado ?? `product_${p.product_id}`,
-          marketId: market?.id ?? null, label: market?.label ?? `product_${p.product_id}`,
-          side: szi > 0 ? 'LONG' : 'SHORT', szi: Math.abs(szi),
+          marketId: market?.id ?? null,
+          label: market?.label ?? `product_${p.product_id}`,
+          side: szi > 0 ? 'LONG' : 'SHORT',
+          szi: Math.abs(szi),
           entryPx: szi !== 0 ? Math.abs(vQuote / szi) : 0,
           unrealizedPnl: 0,
         }
       })
-  } catch (e) { console.warn('[Nado getPositions]', e.message); return [] }
+  } catch (e) {
+    console.warn('[Nado getPositions] erreur:', e.message)
+    return []
+  }
 }
 
 export async function placeOrder(order, credentials) {
