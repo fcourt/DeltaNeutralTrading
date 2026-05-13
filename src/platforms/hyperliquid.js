@@ -542,6 +542,20 @@ if (tpSlConfig) {
 export async function placeOrder(order, credentials) {
   const { isBuy, size, limitPrice, orderType, reduceOnly, market, tpSlConfig } = order
   const { hlAgentPk, hlVaultAddress } = credentials
+
+  // ── Debug temporaire ──────────────────────────────────────────────────────
+  console.log('[placeOrder] in:', {
+    limitPrice,
+    size,
+    szDecimals:  market?.szDecimals,
+    pxDecimals:  market?.pxDecimals,
+    assetIndex:  market?.assetIndex,
+    hasAgentPk:  !!hlAgentPk,
+    orderType,
+  })
+  // ─────────────────────────────────────────────────────────────────────────
+
+  
   if (!hlAgentPk) throw new Error('Clé agent HL manquante')
   if (market.assetIndex === null) throw new Error(`Index non résolu pour ${market.label}`)
 
@@ -592,6 +606,7 @@ export async function placeOrder(order, credentials) {
   }
 
   const hlOid = status0?.resting?.oid ?? status0?.filled?.oid ?? null
+  
   return { ...data, resolvedOid: hlOid }
 }
 
