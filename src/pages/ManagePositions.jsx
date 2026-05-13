@@ -6,7 +6,6 @@ import { useOpenPositions }        from '../hooks/useOpenPositions'
 import { useDeltaNeutralPairs }    from '../hooks/useDeltaNeutralPairs'
 import { usePlaceOrder }           from '../hooks/usePlaceOrder'
 import { canTrade }                from '../services/orderService'
-import { useLimitPriceOptions }    from '../hooks/useLimitPriceOptions'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +34,36 @@ const PLATFORM_LABELS = {
 }
 const platLabel = id => PLATFORM_LABELS[id] ?? id
 const platClass = id => `mp-leg__platform mp-leg__platform--${id}`
+
+// ─── Hook : calcule MID / BEST pour un leg ────────────────────────────────────
+function useLimitPriceOptions(pos, markets, getPrice) {
+  const [bestBid, setBestBid] = useState(null)
+  const [bestAsk, setBestAsk] = useState(null)
+
+  const market = markets.find(m => m.id === pos?.marketId)
+  const mid    = pos ? (getPrice?.(pos.marketId) ?? pos.markPx ?? pos.entryPx) : null
+
+  useEffect(() => {
+    if (!market || !pos) return
+    let cancelled = false
+
+    const platformFile = ['xyz', 'hyena'].includes(pos.platform)
+      ? 'hyperliquid'
+      : pos.platform
+    
+    import('../platforms/' + platformFile + '.js')
+      .then(mod => mod.getFundingRate?.(market, {}))  // bid/ask publics, pas de credentials
+      .then(data => {
+        if (cancelled) return
+        setBestBid(data?.bid ?? null)
+        setBestAsk(data?.ask ?? null)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [pos?.marketId, pos?.platform])
+
+  return { mid, bestBid, bestAsk }
+}
 
 // ─── Calcul breakeven ─────────────────────────────────────────────────────────
 function computeBreakevenPrices({ long, short, includeFees, feePct = 0.0005 }) {
