@@ -82,6 +82,37 @@ function computeBreakevenPrices({ long, short, includeFees, feePct = 0.0005 }) {
   return { tpLong, slShort, pnlNet, pnlL, pnlS, totalFees }
 }
 
+// ─── LimitPriceButtons — composant réutilisable ───────────────────────────────
+function LimitPriceButtons({ pos, markets, getPrice, onSelect, disabled }) {
+  const { mid, bestBid, bestAsk } = useLimitPriceOptions(pos, markets, getPrice)
+  // LONG ferme en SELL → meilleur prix = BEST BID
+  // SHORT ferme en BUY  → meilleur prix = BEST ASK
+  const isLong   = pos.side === 'LONG'
+  const bestPrice = isLong ? bestBid : bestAsk
+  const bestLabel = isLong ? 'BEST BID' : 'BEST ASK'
+
+  return (
+    <div className="mp-limit-btns">
+      <button
+        className="mp-limit-btn mp-limit-btn--mid"
+        disabled={disabled || mid == null}
+        onClick={() => onSelect(mid, 'maker')}
+        title={mid ? `Mid : ${fmtPx(mid)}` : 'Prix indisponible'}
+      >
+        MID{mid ? ` ${fmtPx(mid)}` : ''}
+      </button>
+      <button
+        className="mp-limit-btn mp-limit-btn--best"
+        disabled={disabled || bestPrice == null}
+        onClick={() => onSelect(bestPrice, 'maker')}
+        title={bestPrice ? `${bestLabel} : ${fmtPx(bestPrice)}` : 'Prix indisponible'}
+      >
+        {bestLabel}{bestPrice ? ` ${fmtPx(bestPrice)}` : ''}
+      </button>
+    </div>
+  )
+}
+
 // ─── LegCard ─────────────────────────────────────────────────────────────────
 function LegCard({ pos }) {
   const notional = pos.szi * (pos.markPx ?? pos.entryPx ?? 0)
@@ -124,7 +155,7 @@ function LegCard({ pos }) {
 }
 
 // ─── PairRow ─────────────────────────────────────────────────────────────────
-function PairRow({ pair, credentials, markets, onFeedback }) {
+function PairRow({ pair, credentials, markets, getPrice, onFeedback }) {
   const [open,        setOpen]        = useState(false)
   const [includeFees, setIncludeFees] = useState(true)
   const [sending,     setSending]     = useState(false)
@@ -284,37 +315,6 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── LimitPriceButtons — composant réutilisable ───────────────────────────────
-function LimitPriceButtons({ pos, markets, getPrice, onSelect, disabled }) {
-  const { mid, bestBid, bestAsk } = useLimitPriceOptions(pos, markets, getPrice)
-  // LONG ferme en SELL → meilleur prix = BEST BID
-  // SHORT ferme en BUY  → meilleur prix = BEST ASK
-  const isLong   = pos.side === 'LONG'
-  const bestPrice = isLong ? bestBid : bestAsk
-  const bestLabel = isLong ? 'BEST BID' : 'BEST ASK'
-
-  return (
-    <div className="mp-limit-btns">
-      <button
-        className="mp-limit-btn mp-limit-btn--mid"
-        disabled={disabled || mid == null}
-        onClick={() => onSelect(mid, 'maker')}
-        title={mid ? `Mid : ${fmtPx(mid)}` : 'Prix indisponible'}
-      >
-        MID{mid ? ` ${fmtPx(mid)}` : ''}
-      </button>
-      <button
-        className="mp-limit-btn mp-limit-btn--best"
-        disabled={disabled || bestPrice == null}
-        onClick={() => onSelect(bestPrice, 'maker')}
-        title={bestPrice ? `${bestLabel} : ${fmtPx(bestPrice)}` : 'Prix indisponible'}
-      >
-        {bestLabel}{bestPrice ? ` ${fmtPx(bestPrice)}` : ''}
-      </button>
     </div>
   )
 }
