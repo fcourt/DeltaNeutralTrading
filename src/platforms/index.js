@@ -4,6 +4,8 @@ import * as extended    from './extended.js'
 import * as nado        from './nado.js'
 
 export const PLATFORMS = [
+
+    //HL-----------------------------------------------------------
   {
     id:          'hyperliquid',
     label:       'Hyperliquid',
@@ -14,15 +16,13 @@ export const PLATFORMS = [
     color:       '#93c5fd',
     statsKey:    'hl',
     statsLabel:  'Hyperliquid Perps',
-    cancelOrder: hlCancelOrder,
-    getOrderStatus: hlGetOrderStatus,
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
     //traking
-    normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
-                           ?? result?.response?.data?.statuses?.[0]?.filled?.oid
-                           ?? null,
-    //
+    //normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
+    //                       ?? result?.response?.data?.statuses?.[0]?.filled?.oid
+    //                       ?? null,
+    normalizeOrderId: (result) => result?.resolvedOid ?? null,
     normalizeTradeId:  (trade)  => trade?.oid ?? null, 
     //fetch data comptes
     getAccounts: (wallet, subAccounts, extraAddresses) => {
@@ -108,6 +108,7 @@ export const PLATFORMS = [
     */
   },
 
+    //XYZ-----------------------------------------------------------
   {
     id:          'xyz',
     label:       'trade.xyz',
@@ -120,9 +121,10 @@ export const PLATFORMS = [
     statsLabel:  'HIP-3 DEX (trade.xyz / HyENA)',
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
-    normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
-                           ?? result?.response?.data?.statuses?.[0]?.filled?.oid
-                           ?? null,
+    //normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
+    //                       ?? result?.response?.data?.statuses?.[0]?.filled?.oid
+    //                       ?? null,
+    normalizeOrderId: (result) => result?.resolvedOid ?? null,
     normalizeTradeId:  (trade)  => trade?.oid ?? null, 
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
@@ -137,6 +139,8 @@ export const PLATFORMS = [
     fetchSubAccounts: undefined,
     fetchStats: undefined,  // xyz et hyena sont couverts par hyperliquid.fetchStats ci-dessus
   },
+
+    //Hyena-----------------------------------------------------------
   {
     id:          'hyena',
     label:       'HyENA',
@@ -149,9 +153,10 @@ export const PLATFORMS = [
     statsLabel:  'HIP-3 DEX (trade.xyz / HyENA)',
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
-    normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
-                           ?? result?.response?.data?.statuses?.[0]?.filled?.oid
-                           ?? null,
+    //normalizeOrderId: (result) => result?.response?.data?.statuses?.[0]?.resting?.oid
+    //                       ?? result?.response?.data?.statuses?.[0]?.filled?.oid
+    //                       ?? null,
+    normalizeOrderId: (result) => result?.resolvedOid ?? null,
     normalizeTradeId:  (trade)  => trade?.oid ?? null,
     getAccounts: (wallet, _subAccounts, extraAddresses) => {
       const principal = wallet.hlAddress?.trim()      || null
@@ -166,6 +171,8 @@ export const PLATFORMS = [
     fetchSubAccounts: undefined,
     fetchStats: undefined,  // xyz et hyena sont couverts par hyperliquid.fetchStats ci-dessus
   },
+
+  //Extended-----------------------------------------------------------
   {
     id:          'extended',
     label:       'Extended',
@@ -176,8 +183,6 @@ export const PLATFORMS = [
     color:       '#6cdfa9',
     statsKey:    'ext',
     statsLabel:  'Extended',
-    getOrderStatus: extGetOrderStatus,
-    cancelOrder: extCancelOrder,
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
     // Extended — utilise externalOrderId (string UUID) ou id string
@@ -225,6 +230,8 @@ export const PLATFORMS = [
     },
     */
   },
+
+    //Nado-----------------------------------------------------------
   {
     id:          'nado',
     label:       'Nado',
@@ -235,8 +242,6 @@ export const PLATFORMS = [
     color:       '#e1ac83',
     statsKey:    'nado',
     statsLabel:  'Nado',
-    getOrderStatus: nadoGetOrderStatus,
-    cancelOrder: nadoCancelOrder,
     isAvailable: (values) => !!values.nadoAddress?.trim(),
     hasAddressField: true,
     normalizeOrderId: (result) => result?.data?.order?.nonce ?? null,
