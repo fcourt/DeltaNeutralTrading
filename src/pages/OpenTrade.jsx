@@ -644,7 +644,7 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
     maxRetries:     chunkedConfig.maxRetries,
     onErrorMode:    chunkedConfig.onErrorMode,
     getMarkPrice,
-    placeOrderFn:   (params, creds) => placeOrder({ ...params, ...creds }),
+    placeOrderFn:   (params, creds) => placeOrder(params, creds),
   })
 }
 
