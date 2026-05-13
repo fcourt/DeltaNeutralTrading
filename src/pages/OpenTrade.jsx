@@ -597,15 +597,20 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
 
   // ── getMarkPrice — adapte à ta façon de fetcher les prix ─────────────────────
   const getMarkPrice = async (marketId, platformId) => {
-    const market = markets.find(m => m.id === marketId)
-    if (!market) throw new Error(`Marché inconnu: ${marketId}`)
-    const plat = PLATFORMS.find(p => p.id === platformId)
-    const { priceMap } = await plat.getPrices()
-    const key = market.keys?.[platformId] ?? marketId
-    const price = priceMap[key]
-    if (!price) throw new Error(`Prix indisponible: ${key}`)
-    return price
-  }
+  const market = markets.find(m => m.id === marketId)
+  if (!market) throw new Error(`Marché inconnu: ${marketId}`)
+
+  const plat = PLATFORMS.find(p => p.id === platformId)
+  const { prices, priceMap } = await plat.getPrices()
+
+  // HL retourne prices[hlKey], Extended retourne priceMap[extKey]
+  const key       = market.keys?.[platformId]
+  const priceData = prices ?? priceMap  // selon l'adapter
+  const price     = parseFloat(priceData?.[key] ?? 0)
+
+  if (!price) throw new Error(`Prix indisponible: ${key} sur ${platformId}`)
+  return price
+}
 
   // ── handleStartChunked ────────────────────────────────────────────────────────
   const handleStartChunked = () => {
