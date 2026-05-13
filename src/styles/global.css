@@ -2904,3 +2904,463 @@ Position individuelle (SingleRow)
   min-width: 200px;
 }
 
+/* ════════════════════════════════════
+MANAGE POSITIONS — nouvelles classes
+AutoClosePanel + LimitPriceSelector
+════════════════════════════════════ */
+
+/* ── LimitPriceSelector ───────────────────────────────────────────────────── */
+
+.mp-limit-selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.mp-limit-preset-btns {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.mp-limit-preset {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-interactive);
+  white-space: nowrap;
+}
+
+.mp-limit-preset:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-surface-dynamic);
+}
+
+.mp-limit-preset--active {
+  background: var(--color-primary-highlight);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.mp-limit-preset:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.mp-limit-send-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.mp-limit-input {
+  flex: 1;
+  min-width: 80px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-interactive);
+  -moz-appearance: textfield;
+}
+.mp-limit-input::-webkit-outer-spin-button,
+.mp-limit-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.mp-limit-input:focus { border-color: var(--color-primary); }
+.mp-limit-input::placeholder { color: var(--color-text-faint); }
+
+.mp-limit-send-btn {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-interactive), opacity var(--transition-interactive);
+}
+.mp-limit-send-btn:hover:not(:disabled) { background: #1e40af; }
+.mp-limit-send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Section "fermeture individuelle en limite" dans PairRow ─────────────── */
+
+.mp-leg-limit-block__title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: var(--space-1);
+}
+
+/* ── Bouton fermer 2 legs variante "limite" ──────────────────────────────── */
+
+.mp-close-both-btn--market {
+  background: rgba(185, 28, 28, 0.85);
+}
+.mp-close-both-btn--market:hover:not(:disabled) { background: #b91c1c; }
+
+.mp-close-both-btn--limit {
+  background: #1d4ed8;
+}
+.mp-close-both-btn--limit:hover:not(:disabled) { background: #1e40af; }
+
+/* ── Fermeture simultanée manuelle (bloc double limite) ──────────────────── */
+
+.mp-close-both-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-divider);
+}
+
+.mp-close-both-limit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+.mp-close-both-limit__title {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mp-close-both-limit__inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+@media (max-width: 600px) {
+  .mp-close-both-limit__inputs { grid-template-columns: 1fr; }
+}
+
+.mp-close-both-limit__leg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mp-close-both-limit__leg-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* ── AutoClosePanel ──────────────────────────────────────────────────────── */
+
+.mp-auto-close {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: color-mix(in oklch, var(--color-primary) 5%, var(--color-surface-2));
+  border: 1px solid rgba(180, 176, 240, 0.3);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.mp-auto-close__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mp-auto-close__title {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-primary);
+  letter-spacing: -0.01em;
+}
+
+/* Options checkboxes */
+.mp-auto-close__options {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.mp-auto-close__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.mp-auto-close__checkbox input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* Objectif PnL */
+.mp-auto-close__pnl-target {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mp-auto-close__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.mp-auto-close__presets {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.mp-auto-preset {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-interactive);
+  white-space: nowrap;
+}
+
+.mp-auto-preset:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mp-auto-preset--active {
+  background: var(--color-primary-highlight);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.mp-auto-custom-input {
+  width: 72px;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-interactive);
+  -moz-appearance: textfield;
+}
+.mp-auto-custom-input::-webkit-outer-spin-button,
+.mp-auto-custom-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.mp-auto-custom-input:focus { border-color: var(--color-primary); }
+.mp-auto-custom-input::placeholder { color: var(--color-text-faint); }
+
+/* Distance max du mid */
+.mp-auto-close__dist {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mp-auto-close__dist-presets {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.mp-auto-close__dist-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+/* Résultat du calcul */
+.mp-auto-close__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+}
+
+/* Leg result */
+.mp-auto-close__leg-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.mp-auto-close__leg-result--long {
+  background: rgba(52, 211, 153, 0.06);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+}
+
+.mp-auto-close__leg-result--short {
+  background: rgba(248, 113, 113, 0.06);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+
+.mp-auto-close__leg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Badge distance OK / warn */
+.mp-auto-close__range-badge {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+}
+
+.mp-auto-close__range-badge--ok {
+  background: rgba(52, 211, 153, 0.12);
+  color: #6cdfa9;
+}
+
+.mp-auto-close__range-badge--warn {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+/* Prix BE exact vs prix ordre */
+.mp-auto-close__prices {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr;
+  gap: var(--space-1) var(--space-3);
+  align-items: baseline;
+  font-size: var(--text-xs);
+}
+
+.mp-auto-close__price-label {
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}
+
+.mp-auto-close__price-value {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.mp-auto-close__price-value--order {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* PnL summary */
+.mp-auto-close__pnl-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-divider);
+  align-items: center;
+}
+
+.mp-auto-close__clamp-warn {
+  width: 100%;
+  font-size: var(--text-xs);
+  color: var(--color-warning);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* Bouton envoi auto */
+.mp-auto-close__send-btn {
+  width: 100%;
+  background: var(--gradient-primary);
+  color: #fff;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-xl);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-shadow: var(--shadow-glow);
+  transition: opacity var(--transition-interactive), box-shadow var(--transition-interactive);
+  letter-spacing: 0.01em;
+}
+
+.mp-auto-close__send-btn:hover:not(:disabled) {
+  opacity: 0.88;
+  box-shadow: 0 0 28px rgba(180, 176, 240, 0.4);
+}
+
+.mp-auto-close__send-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── SingleRow — section limite (réorganisé) ─────────────────────────────── */
+
+.mp-single__limit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.mp-single__limit-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Responsive ajustements ─────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .mp-auto-close__prices {
+    grid-template-columns: auto 1fr;
+  }
+  .mp-auto-close__pnl-summary {
+    gap: var(--space-1) var(--space-3);
+  }
+  .mp-single__actions {
+    flex-direction: column;
+  }
+}
