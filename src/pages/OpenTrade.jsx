@@ -596,6 +596,7 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
   const isChunkDone    = ['completed', 'aborted', 'error'].includes(chunkState.status)
 
   // ── getMarkPrice — adapte à ta façon de fetcher les prix ─────────────────────
+  /*
   const getMarkPrice = async (marketId, platformId) => {
   const market = markets.find(m => m.id === marketId)
   if (!market) throw new Error(`Marché inconnu: ${marketId}`)
@@ -610,36 +611,42 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
 
   if (!price) throw new Error(`Prix indisponible: ${key} sur ${platformId}`)
   return price
-}
+}*/
+
+  const getMarkPrice = useCallback(async (mktId, platformId) => {
+  const price = getPrice(mktId, platformId)
+  if (!price) throw new Error(`Prix indisponible: ${mktId} sur ${platformId}`)
+  return price
+}, [getPrice])
 
   // ── handleStartChunked ────────────────────────────────────────────────────────
   const handleStartChunked = () => {
-    if (!selectedMarket || !tradeParams) return
-    reset()
-    start({
-      legA: {
-        marketId:   selectedMarket.id,
-        platformId: platformA,          // ex: 'hl'
-        isBuy:      isBuy,
-        market:     selectedMarket,
-      },
-      legB: {
-        marketId:   selectedMarket.id,
-        platformId: platformB,          // ex: 'extended'
-        isBuy:      !isBuy,             // leg opposée
-        market:     selectedMarket,
-      },
-      credentials,
-      totalUsd:       tradeParams.totalUsd,
-      sliceUsd:       chunkedConfig.sliceUsd,
-      delayBetweenMs: chunkedConfig.delayBetweenMs,
-      makerTimeoutMs: chunkedConfig.makerTimeoutMs,
-      maxRetries:     chunkedConfig.maxRetries,
-      onErrorMode:    chunkedConfig.onErrorMode,
-      getMarkPrice,
-      placeOrderFn:   (params, creds) => servicePlaceOrder(params, creds),
-    })
-  }
+  if (!market || !marketId || !calc) return   // market, marketId, calc existent bien
+  reset()
+  start({
+    legA: {
+      marketId:   marketId,
+      platformId: platform1,
+      isBuy:      side1 === 'LONG',
+      market,
+    },
+    legB: {
+      marketId:   marketId,
+      platformId: platform2,
+      isBuy:      side2 === 'LONG',
+      market,
+    },
+    credentials,
+    totalUsd:       parseFloat(sizeUSD) || 0,
+    sliceUsd:       chunkedConfig.sliceUsd,
+    delayBetweenMs: chunkedConfig.delayBetweenMs,
+    makerTimeoutMs: chunkedConfig.makerTimeoutMs,
+    maxRetries:     chunkedConfig.maxRetries,
+    onErrorMode:    chunkedConfig.onErrorMode,
+    getMarkPrice,
+    placeOrderFn:   (params, creds) => placeOrder({ ...params, ...creds }),
+  })
+}
 
   return (
     <div className="page-header">
