@@ -793,11 +793,13 @@ export async function cancelOrder({ orderId, market, credentials }) {
   return data
 }
 
+/*
 // hyperliquid.js
 export function normalizeOrderId(result) {
   // placeOrder retourne { ...data, resolvedOid: hlOid }
   return result?.resolvedOid ?? null
 }
+*/
 /*
 Les champs hlKey, extKey, nadoKey sont conservés en rétrocompat pendant la migration.
 Une fois tous les consommateurs migrés vers market.keys?.hl etc.,
