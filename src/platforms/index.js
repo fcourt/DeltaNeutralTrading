@@ -14,6 +14,7 @@ export const PLATFORMS = [
     color:       '#93c5fd',
     statsKey:    'hl',
     statsLabel:  'Hyperliquid Perps',
+    getOrderStatus: hlGetOrderStatus,
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
     //traking
@@ -174,6 +175,7 @@ export const PLATFORMS = [
     color:       '#6cdfa9',
     statsKey:    'ext',
     statsLabel:  'Extended',
+    getOrderStatus: extGetOrderStatus,
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
     // Extended — utilise externalOrderId (string UUID) ou id string
@@ -231,6 +233,7 @@ export const PLATFORMS = [
     color:       '#e1ac83',
     statsKey:    'nado',
     statsLabel:  'Nado',
+    getOrderStatus: nadoGetOrderStatus,
     isAvailable: (values) => !!values.nadoAddress?.trim(),
     hasAddressField: true,
     normalizeOrderId: (result) => result?.data?.order?.nonce ?? null,
