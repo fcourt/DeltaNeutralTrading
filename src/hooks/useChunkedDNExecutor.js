@@ -1,0 +1,359 @@
+// src/hooks/useChunkedDNExecutor.js
+
+import { useState, useRef, useCallback } from 'react'
+import { PLATFORMS } from '../config/platforms.js'
+
+// ─── Statuts internes d'une slice ────────────────────────────────────────────
+// 'pending' | 'placing' | 'waiting_fill' | 'filled' | 'switching_taker' | 'failed'
+
+const SLICE_STATUS = {
+  PENDING:         'pending',
+  PLACING:         'placing',
+  WAITING_FILL:    'waiting_fill',
+  FILLED:          'filled',
+  SWITCHING_TAKER: 'switching_taker',
+  FAILED:          'failed',
+}
+
+// ─── État global de l'exécution ───────────────────────────────────────────────
+// 'idle' | 'running' | 'paused' | 'completed' | 'aborted' | 'error'
+
+function buildInitialState() {
+  return {
+    status:        'idle',
+    currentSlice:  0,
+    totalSlices:   0,
+    slices:        [],      // tableau de SliceResult
+    totalFilledA:  0,       // total rempli leg A (en asset)
+    totalFilledB:  0,       // total rempli leg B (en asset)
+    deltaAsset:    0,       // totalFilledA - totalFilledB
+    errorMsg:      null,
+    log:           [],      // messages horodatés pour l'UI
+  }
+}
+
+function buildSlice(index, targetSizeA, targetSizeB) {
+  return {
+    index,
+    targetSizeA,  // size visée pour la leg A (en asset)
+    targetSizeB,  // size visée pour la leg B (en asset, peut ≠ A si compensation delta)
+    filledA:   0,
+    filledB:   0,
+    orderIdA:  null,
+    orderIdB:  null,
+    statusA:   SLICE_STATUS.PENDING,
+    statusB:   SLICE_STATUS.PENDING,
+    priceA:    null,
+    priceB:    null,
+    attempts:  0,
+  }
+}
+
+// ─── Helper : sleep ───────────────────────────────────────────────────────────
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+
+// ─── Helper : poll order status jusqu'à fill ou timeout ──────────────────────
+async function pollUntilFilled({
+  orderId,
+  platformId,
+  credentials,
+  pollIntervalMs = 2000,
+  makerTimeoutMs = 10000,  // après ce délai → signal pour passer taker
+  abortSignal,
+}) {
+  if (!orderId) return { status: 'failed', filled: 0, remaining: 0 }
+
+  const plat = PLATFORMS.find(p => p.id === platformId)
+  if (!plat?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
+
+  const deadline = Date.now() + makerTimeoutMs
+  while (true) {
+    if (abortSignal?.aborted) return { status: 'aborted', filled: 0, remaining: 0 }
+
+    const result = await plat.getOrderStatus(orderId, credentials)
+    if (!result) {
+      await sleep(pollIntervalMs)
+      continue
+    }
+
+    if (result.status === 'filled')   return { status: 'filled',   filled: result.filled, remaining: 0 }
+    if (result.status === 'canceled') return { status: 'canceled', filled: result.filled, remaining: result.remaining }
+    if (result.status === 'rejected') return { status: 'rejected', filled: 0, remaining: 0 }
+
+    // Toujours open
+    if (Date.now() >= deadline) return { status: 'timeout', filled: result.filled, remaining: result.remaining }
+
+    await sleep(pollIntervalMs)
+  }
+}
+
+// ─── Helper : annuler un ordre ────────────────────────────────────────────────
+async function cancelOrder({ orderId, market, platformId, credentials }) {
+  if (!orderId) return
+  const plat = PLATFORMS.find(p => p.id === platformId)
+  try {
+    await plat?.cancelOrder?.({ orderId, market, credentials })
+  } catch (e) {
+    console.warn(`[Chunk] cancelOrder ${platformId} ${orderId}:`, e.message)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hook principal
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function useChunkedDNExecutor() {
+  const [state, setState] = useState(buildInitialState)
+  const abortRef   = useRef(null)   // AbortController
+  const pauseRef   = useRef(false)  // flag pause — lu à chaque itération
+  const runningRef = useRef(false)  // évite double-start
+
+  // ── Log helper ───────────────────────────────────────────────────────────
+  const addLog = useCallback((msg, type = 'info') => {
+    const entry = { ts: Date.now(), msg, type }  // type: 'info'|'warn'|'error'|'success'
+    setState(s => ({ ...s, log: [...s.log, entry] }))
+  }, [])
+
+  // ── Patch une slice dans le state ─────────────────────────────────────────
+  const patchSlice = useCallback((index, patch) => {
+    setState(s => {
+      const slices = s.slices.map((sl, i) => i === index ? { ...sl, ...patch } : sl)
+      return { ...s, slices }
+    })
+  }, [])
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // start — point d'entrée public
+  // ─────────────────────────────────────────────────────────────────────────
+  const start = useCallback(async ({
+    // Legs
+    legA,             // { marketId, platformId, isBuy, market }
+    legB,             // { marketId, platformId, isBuy, market }
+    credentials,
+
+    // Paramètres d'exécution
+    totalUsd,         // montant total à ouvrir en USD
+    sliceUsd,         // taille par slice en USD
+    delayBetweenMs,   // délai inter-slice en ms (ex: 2000)
+    makerTimeoutMs,   // délai avant passage taker (ex: 8000)
+    maxRetries,       // tentatives max par slice (ex: 3)
+    onErrorMode,      // 'continue' | 'pause' | 'abort'
+
+    // Fonctions externes
+    getMarkPrice,     // async (marketId, platformId) => number
+    placeOrderFn,     // async (params, credentials) => result avec orderId
+  }) => {
+    if (runningRef.current) return
+    runningRef.current = true
+    pauseRef.current   = false
+
+    const abort = new AbortController()
+    abortRef.current = abort
+
+    const totalSlices = Math.ceil(totalUsd / sliceUsd)
+    const baseSliceA  = sliceUsd  // en USD — converti en asset via markPrice au moment du place
+
+    // Init state
+    const initialSlices = Array.from({ length: totalSlices }, (_, i) =>
+      buildSlice(i, 0, 0)  // sizes calculées dynamiquement à chaque slice
+    )
+    setState({
+      status:       'running',
+      currentSlice: 0,
+      totalSlices,
+      slices:       initialSlices,
+      totalFilledA: 0,
+      totalFilledB: 0,
+      deltaAsset:   0,
+      errorMsg:     null,
+      log:          [],
+    })
+
+    addLog(`🚀 Démarrage — ${totalSlices} slices de $${sliceUsd}`, 'info')
+
+    let totalFilledA = 0
+    let totalFilledB = 0
+
+    // ── Boucle principale ─────────────────────────────────────────────────
+    for (let i = 0; i < totalSlices; i++) {
+      if (abort.signal.aborted) break
+
+      // ── Pause ────────────────────────────────────────────────────────────
+      while (pauseRef.current && !abort.signal.aborted) {
+        await sleep(500)
+      }
+      if (abort.signal.aborted) break
+
+      setState(s => ({ ...s, currentSlice: i }))
+      addLog(`— Slice ${i + 1}/${totalSlices}`, 'info')
+
+      // ── Prix mark pour cette slice ────────────────────────────────────────
+      let markPriceA, markPriceB
+      try {
+        ;[markPriceA, markPriceB] = await Promise.all([
+          getMarkPrice(legA.marketId, legA.platformId),
+          getMarkPrice(legB.marketId, legB.platformId),
+        ])
+      } catch (e) {
+        addLog(`⚠️ Impossible de fetcher le prix : ${e.message}`, 'warn')
+        if (onErrorMode === 'abort') { setState(s => ({ ...s, status: 'error', errorMsg: e.message })); break }
+        if (onErrorMode === 'pause') { pauseRef.current = true; i--; continue }
+        continue  // 'continue' → skip cette slice
+      }
+
+      // ── Calcul des sizes avec compensation delta ───────────────────────────
+      // Taille de base pour cette slice (en asset)
+      const baseSizeA = sliceUsd / markPriceA
+      const deltaAsset = totalFilledA - totalFilledB
+
+      // Leg B compensée : si on a plus de A que de B, cette slice B est augmentée
+      // Si c'est la dernière slice, on cible exactement totalTarget - totalFilled
+      const remainingSlices = totalSlices - i
+      const isLast = remainingSlices === 1
+
+      const targetTotalA = totalUsd / markPriceA  // total visé en asset au prix actuel
+      const sizeA = isLast
+        ? Math.max(0, targetTotalA - totalFilledA)
+        : baseSizeA
+
+      // Size B = size A + compensation du delta accumulé
+      const sizeB = Math.max(0, sizeA + deltaAsset)
+
+      if (sizeA <= 0 && sizeB <= 0) {
+        addLog(`✅ Slice ${i + 1} ignorée — target atteint`, 'success')
+        continue
+      }
+
+      patchSlice(i, {
+        targetSizeA: sizeA,
+        targetSizeB: sizeB,
+        statusA: SLICE_STATUS.PLACING,
+        statusB: SLICE_STATUS.PLACING,
+      })
+
+      // ── Place les deux ordres en parallèle ────────────────────────────────
+      let orderIdA = null, orderIdB = null
+      let errA = null,     errB = null
+
+      const placeA = placeOrderFn(
+        { ...legA, size: sizeA, orderType: 'maker', limitPrice: markPriceA },
+        credentials
+      ).then(res => {
+        orderIdA = PLATFORMS.find(p => p.id === legA.platformId)?.normalizeOrderId?.(res) ?? null
+        patchSlice(i, { orderIdA, statusA: SLICE_STATUS.WAITING_FILL })
+        addLog(`  Leg A placée — orderId: ${orderIdA}`, 'info')
+      }).catch(e => { errA = e.message; patchSlice(i, { statusA: SLICE_STATUS.FAILED }) })
+
+      const placeB = placeOrderFn(
+        { ...legB, size: sizeB, orderType: 'maker', limitPrice: markPriceB },
+        credentials
+      ).then(res => {
+        orderIdB = PLATFORMS.find(p => p.id === legB.platformId)?.normalizeOrderId?.(res) ?? null
+        patchSlice(i, { orderIdB, statusB: SLICE_STATUS.WAITING_FILL })
+        addLog(`  Leg B placée — orderId: ${orderIdB}`, 'info')
+      }).catch(e => { errB = e.message; patchSlice(i, { statusB: SLICE_STATUS.FAILED }) })
+
+      await Promise.all([placeA, placeB])
+
+      if (errA || errB) {
+        addLog(`⚠️ Erreur placement slice ${i + 1} — A: ${errA ?? 'ok'} | B: ${errB ?? 'ok'}`, 'warn')
+        if (onErrorMode === 'abort') { setState(s => ({ ...s, status: 'error', errorMsg: errA ?? errB })); break }
+        if (onErrorMode === 'pause') { pauseRef.current = true }
+        continue
+      }
+
+      // ── Poll fill des deux ordres ─────────────────────────────────────────
+      let attempt = 0
+      let filledA = 0, filledB = 0
+      let currentOrderIdA = orderIdA
+      let currentOrderIdB = orderIdB
+
+      while (attempt < maxRetries) {
+        if (abort.signal.aborted) break
+
+        const [resA, resB] = await Promise.all([
+          pollUntilFilled({
+            orderId:      currentOrderIdA,
+            platformId:   legA.platformId,
+            credentials,
+            makerTimeoutMs,
+            abortSignal:  abort.signal,
+          }),
+          pollUntilFilled({
+            orderId:      currentOrderIdB,
+            platformId:   legB.platformId,
+            credentials,
+            makerTimeoutMs,
+            abortSignal:  abort.signal,
+          }),
+        ])
+
+        filledA = resA.filled ?? sizeA
+        filledB = resB.filled ?? sizeB
+
+        const aOk = resA.status === 'filled'
+        const bOk = resB.status === 'filled'
+
+        if (aOk && bOk) {
+          patchSlice(i, { filledA, filledB, statusA: SLICE_STATUS.FILLED, statusB: SLICE_STATUS.FILLED })
+          addLog(`  ✅ Slice ${i + 1} remplie — A: ${filledA.toFixed(5)} | B: ${filledB.toFixed(5)}`, 'success')
+          break
+        }
+
+        // Timeout → switch taker
+        attempt++
+        addLog(`  🔄 Timeout slice ${i + 1} tentative ${attempt}/${maxRetries} — switch taker`, 'warn')
+
+        const switchToTaker = async (leg, orderId, size, currentFilled, patchKey) => {
+          if (orderId) await cancelOrder({ orderId, market: leg.market, platformId: leg.platformId, credentials })
+          const remaining = Math.max(0, size - (currentFilled ?? 0))
+          if (remaining <= 0) return { orderId: null, status: 'filled' }
+
+          patchSlice(i, { [patchKey]: SLICE_STATUS.SWITCHING_TAKER })
+          try {
+            const price = await getMarkPrice(leg.marketId, leg.platformId)
+            const res   = await placeOrderFn(
+              { ...leg, size: remaining, orderType: 'taker', limitPrice: price },
+              credentials
+            )
+            const newId = PLATFORMS.find(p => p.id === leg.platformId)?.normalizeOrderId?.(res) ?? null
+            patchSlice(i, { [patchKey]: SLICE_STATUS.WAITING_FILL })
+            return { orderId: newId, status: 'open' }
+          } catch (e) {
+            addLog(`  ❌ Switch taker échoué (${leg.platformId}): ${e.message}`, 'error')
+            patchSlice(i, { [patchKey]: SLICE_STATUS.FAILED })
+            return { orderId: null, status: 'failed' }
+          }
+        }
+
+        const [newA, newB] = await Promise.all([
+          !aOk ? switchToTaker(legA, currentOrderIdA, sizeA, resA.filled, 'statusA') : Promise.resolve({ status: 'filled' }),
+          !bOk ? switchToTaker(legB, currentOrderIdB, sizeB, resB.filled, 'statusB') : Promise.resolve({ status: 'filled' }),
+        ])
+
+        if (newA.orderId) currentOrderIdA = newA.orderId
+        if (newB.orderId) currentOrderIdB = newB.orderId
+
+        if (attempt >= maxRetries) {
+          addLog(`  ❌ Slice ${i + 1} abandonnée après ${maxRetries} tentatives`, 'error')
+          patchSlice(i, { statusA: SLICE_STATUS.FAILED, statusB: SLICE_STATUS.FAILED })
+          if (onErrorMode === 'abort') { setState(s => ({ ...s, status: 'error' })); break }
+          if (onErrorMode === 'pause') { pauseRef.current = true }
+          break
+        }
+      }
+
+      // ── Mise à jour des totaux accumulés ──────────────────────────────────
+      totalFilledA += filledA
+      totalFilledB += filledB
+      const newDelta = totalFilledA - totalFilledB
+
+      setState(s => ({
+        ...s,
+        totalFilledA,
+        totalFilledB,
+        deltaAsset: newDelta,
+      }))
+
+      addLog(
+        `  Δ 
