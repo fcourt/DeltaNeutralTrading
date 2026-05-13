@@ -1070,3 +1070,42 @@ export async function getOrderStatus(orderId, credentials) {
     return null
   }
 }
+
+// nado.js
+// Signature unifiée : { orderId, market, credentials }
+export async function cancelOrder({ orderId, market, credentials }) {
+  const { nadoApiKey } = credentials
+  if (!orderId || !nadoApiKey) return
+
+  const res = await fetch(
+    `/api/nado?endpoint=${encodeURIComponent(`/order/${orderId}`)}`,
+    {
+      method:  'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key':    nadoApiKey,
+      },
+    }
+  )
+
+  const rawText = await res.text()
+  console.log('[Nado] cancelOrder:', orderId, '| status:', res.status, '| response:', rawText.slice(0, 200))
+
+  let data = {}
+  try { data = JSON.parse(rawText) } catch { /* non-JSON */ }
+
+  if (res.status === 404) {
+    console.warn('[Nado] cancelOrder 404 — ordre déjà rempli ou inexistant:', orderId)
+    return null
+  }
+
+  if (!res.ok)
+    throw new Error(data?.message || rawText || `Nado cancelOrder HTTP ${res.status}`)
+
+  return data
+}
+
+// nado.js
+export function normalizeOrderId(result) {
+  return result?.data?.orderId ?? result?.orderId ?? null
+}
