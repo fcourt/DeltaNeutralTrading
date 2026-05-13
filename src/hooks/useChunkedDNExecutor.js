@@ -64,17 +64,17 @@ async function pollUntilFilled({
   if (!orderId) return { status: 'failed', filled: 0, remaining: 0 }
 
   const plat = PLATFORMS.find(p => p.id === platformId)
-  if (!plat?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
+if (!plat?.adapter?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
 
-  const deadline = Date.now() + makerTimeoutMs
-  while (true) {
-    if (abortSignal?.aborted) return { status: 'aborted', filled: 0, remaining: 0 }
+const deadline = Date.now() + makerTimeoutMs
+while (true) {
+  if (abortSignal?.aborted) return { status: 'aborted', filled: 0, remaining: 0 }
 
-    const result = await plat.getOrderStatus(orderId, credentials)
-    if (!result) {
-      await sleep(pollIntervalMs)
-      continue
-    }
+  const result = await plat.adapter.getOrderStatus(orderId, credentials)
+  if (!result) {
+    await sleep(pollIntervalMs)
+    continue
+  }
 
     if (result.status === 'filled')   return { status: 'filled',   filled: result.filled, remaining: 0 }
     if (result.status === 'canceled') return { status: 'canceled', filled: result.filled, remaining: result.remaining }
@@ -92,7 +92,7 @@ async function cancelOrder({ orderId, market, platformId, credentials }) {
   if (!orderId) return
   const plat = PLATFORMS.find(p => p.id === platformId)
   try {
-    await plat?.cancelOrder?.({ orderId, market, credentials })
+    await plat?.adapter?.cancelOrder?.({ orderId, market, credentials })
   } catch (e) {
     console.warn(`[Chunk] cancelOrder ${platformId} ${orderId}:`, e.message)
   }
