@@ -1,7 +1,7 @@
 // src/hooks/useChunkedDNExecutor.js
 
 import { useState, useRef, useCallback } from 'react'
-import { PLATFORMS } from '../config/platforms.js'
+import { PLATFORMS } from '../platforms/index.js'
 
 // ─── Statuts internes d'une slice ────────────────────────────────────────────
 // 'pending' | 'placing' | 'waiting_fill' | 'filled' | 'switching_taker' | 'failed'
