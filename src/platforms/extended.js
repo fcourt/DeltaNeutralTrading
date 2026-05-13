@@ -1004,3 +1004,45 @@ async function fetchClosedPositions(apiKey) {
   }
   return all
 }
+
+//ajout Mode Chunked
+// extended.js
+// GET order status via /user/order/:orderId
+export async function getOrderStatus(orderId, credentials) {
+  const { extApiKey } = credentials
+  if (!orderId || !extApiKey) return null
+
+  try {
+    const res = await fetch(
+      `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
+      { headers: { 'X-Api-Key': extApiKey } }
+    )
+    const data = await res.json()
+    if (data?.status === 'ERROR') return null
+
+    const o = data?.data
+    // Extended statuses : "OPEN" | "FILLED" | "CANCELLED" | "PARTIALLY_FILLED"
+    const rawStatus = (o?.status ?? '').toUpperCase()
+
+    const statusMap = {
+      OPEN:             'open',
+      FILLED:           'filled',
+      CANCELLED:        'canceled',
+      PARTIALLY_FILLED: 'open',   // toujours actif → traité comme open
+      REJECTED:         'rejected',
+    }
+
+    const filled    = parseFloat(o?.filledQty ?? o?.executedQty ?? 0)
+    const remaining = parseFloat(o?.qty ?? 0) - filled
+
+    return {
+      status:    statusMap[rawStatus] ?? 'open',
+      filled,
+      remaining: Math.max(0, remaining),
+      avgPx:     parseFloat(o?.avgPrice ?? o?.price ?? 0),
+    }
+  } catch (e) {
+    console.warn('[Extended] getOrderStatus error:', e.message)
+    return null
+  }
+}
