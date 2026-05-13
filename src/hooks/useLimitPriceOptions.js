@@ -9,7 +9,12 @@ function useLimitPriceOptions(pos, markets, getPrice) {
   useEffect(() => {
     if (!market || !pos) return
     let cancelled = false
-    import('../platforms/' + pos.platform + '.js')
+
+    const platformFile = ['xyz', 'hyena'].includes(pos.platform)
+      ? 'hyperliquid'
+      : pos.platform
+    
+    import('../platforms/' + platformFile + '.js')
       .then(mod => mod.getFundingRate?.(market, {}))  // bid/ask publics, pas de credentials
       .then(data => {
         if (cancelled) return
@@ -18,7 +23,7 @@ function useLimitPriceOptions(pos, markets, getPrice) {
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [pos?.marketId, pos?.platform, market])
+  }, [pos?.marketId, pos?.platform])
 
   return { mid, bestBid, bestAsk }
 }
