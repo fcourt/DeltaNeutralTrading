@@ -1026,3 +1026,47 @@ export async function fetchStats(address, subaccountName, startTime, endTime) {
     })),
   }
 }
+
+//ajout Mode Chunked
+// nado.js
+// Adapte selon ton proxy Nado — structure similaire à Extended
+export async function getOrderStatus(orderId, credentials) {
+  const { nadoApiKey } = credentials
+  if (!orderId || !nadoApiKey) return null
+
+  try {
+    const res = await fetch(
+      `/api/nado?endpoint=${encodeURIComponent(`/order/${orderId}`)}`,
+      { headers: { 'X-Api-Key': nadoApiKey } }
+    )
+    const data = await res.json()
+    if (!res.ok) return null
+
+    const o         = data?.data ?? data
+    const rawStatus = (o?.status ?? '').toUpperCase()
+
+    const statusMap = {
+      OPEN:             'open',
+      NEW:              'open',
+      FILLED:           'filled',
+      FULLY_FILLED:     'filled',
+      CANCELLED:        'canceled',
+      CANCELED:         'canceled',
+      PARTIALLY_FILLED: 'open',
+      REJECTED:         'rejected',
+    }
+
+    const origQty   = parseFloat(o?.origQty ?? o?.qty ?? 0)
+    const filled    = parseFloat(o?.filledQty ?? o?.executedQty ?? 0)
+
+    return {
+      status:    statusMap[rawStatus] ?? 'open',
+      filled,
+      remaining: Math.max(0, origQty - filled),
+      avgPx:     parseFloat(o?.avgPrice ?? o?.price ?? 0),
+    }
+  } catch (e) {
+    console.warn('[Nado] getOrderStatus error:', e.message)
+    return null
+  }
+}
