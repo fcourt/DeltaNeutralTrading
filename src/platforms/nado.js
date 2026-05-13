@@ -1105,7 +1105,9 @@ export async function cancelOrder({ orderId, market, credentials }) {
   return data
 }
 
+/*
 // nado.js
 export function normalizeOrderId(result) {
   return result?.data?.orderId ?? result?.orderId ?? null
 }
+*/
