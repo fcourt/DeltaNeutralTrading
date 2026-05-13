@@ -878,7 +878,7 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
 )}
 
     {/* Progression */}
-    {{chunkedMode && chunkState.status !== 'idle' && (
+    {chunkedMode && chunkState.status !== 'idle' && (
   <ChunkedProgress
     state={chunkState}
     onPause={pause}
