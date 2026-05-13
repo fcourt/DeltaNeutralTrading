@@ -14,6 +14,7 @@ export const PLATFORMS = [
     color:       '#93c5fd',
     statsKey:    'hl',
     statsLabel:  'Hyperliquid Perps',
+    cancelOrder: hlCancelOrder,
     getOrderStatus: hlGetOrderStatus,
     isAvailable: (values) => !!(values.hlAddress?.trim() || values.hlVaultAddress?.trim()),
     hasAddressField: true,
@@ -176,6 +177,7 @@ export const PLATFORMS = [
     statsKey:    'ext',
     statsLabel:  'Extended',
     getOrderStatus: extGetOrderStatus,
+    cancelOrder: extCancelOrder,
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
     // Extended — utilise externalOrderId (string UUID) ou id string
@@ -234,6 +236,7 @@ export const PLATFORMS = [
     statsKey:    'nado',
     statsLabel:  'Nado',
     getOrderStatus: nadoGetOrderStatus,
+    cancelOrder: nadoCancelOrder,
     isAvailable: (values) => !!values.nadoAddress?.trim(),
     hasAddressField: true,
     normalizeOrderId: (result) => result?.data?.order?.nonce ?? null,
