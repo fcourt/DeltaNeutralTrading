@@ -1083,7 +1083,9 @@ export async function cancelOrder({ orderId, market, credentials }) {
   return data
 }
 
+/*
 // extended.js
 export function normalizeOrderId(result) {
   return result?.data?.id ?? result?.data?.orderId ?? null
 }
+*/
