@@ -1046,3 +1046,44 @@ export async function getOrderStatus(orderId, credentials) {
     return null
   }
 }
+
+// extended.js
+// Signature unifiée : { orderId, market, credentials }
+export async function cancelOrder({ orderId, market, credentials }) {
+  const { extApiKey } = credentials
+  if (!orderId || !extApiKey) return
+
+  const res = await fetch(
+    `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
+    {
+      method:  'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key':    extApiKey,
+        'User-Agent':   'TrekApp/1.0',
+      },
+    }
+  )
+
+  const rawText = await res.text()
+  console.log('[Extended] cancelOrder:', orderId, '| status:', res.status, '| response:', rawText.slice(0, 200))
+
+  let data = {}
+  try { data = JSON.parse(rawText) } catch { /* non-JSON */ }
+
+  // 404 = ordre déjà rempli ou inexistant → pas une erreur critique
+  if (res.status === 404) {
+    console.warn('[Extended] cancelOrder 404 — ordre déjà rempli ou inexistant:', orderId)
+    return null
+  }
+
+  if (!res.ok || data?.status === 'ERROR')
+    throw new Error(data?.error?.message || rawText || `Extended cancelOrder HTTP ${res.status}`)
+
+  return data
+}
+
+// extended.js
+export function normalizeOrderId(result) {
+  return result?.data?.id ?? result?.data?.orderId ?? null
+}
