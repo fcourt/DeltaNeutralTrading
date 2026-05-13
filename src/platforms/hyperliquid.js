@@ -723,6 +723,7 @@ export async function getOrderStatus(orderId, credentials) {
 
 // hyperliquid.js
 // Signature unifiée : { orderId, market, credentials }
+/*
 export async function cancelOrder({ orderId, market, credentials }) {
   const { hlAddress, hlPrivateKey } = credentials
   if (!orderId || !hlAddress || !hlPrivateKey) return
@@ -760,7 +761,7 @@ export async function cancelOrder({ orderId, market, credentials }) {
 
   console.log('[HL] cancelOrder:', orderId, '→', data?.response?.data?.statuses?.[0])
   return data
-}
+}*/
 
 // hyperliquid.js — remplace le cancelOrder précédent
 
