@@ -721,6 +721,83 @@ export async function getOrderStatus(orderId, credentials) {
   }
 }
 
+// hyperliquid.js
+// Signature unifiée : { orderId, market, credentials }
+export async function cancelOrder({ orderId, market, credentials }) {
+  const { hlAddress, hlPrivateKey } = credentials
+  if (!orderId || !hlAddress || !hlPrivateKey) return
+
+  const assetIndex = market?.hlIndex ?? market?.index  // index dans universe HL
+  if (assetIndex == null) throw new Error(`[HL] cancelOrder — index asset manquant pour ${market?.id}`)
+
+  // Le cancel HL nécessite une signature EIP-712 comme un ordre normal
+  // Structure : action { type: "cancel", cancels: [{ a: assetIndex, o: oid }] }
+  const action = {
+    type:    'cancel',
+    cancels: [{ a: assetIndex, o: Number(orderId) }],
+  }
+
+  const nonce = Date.now()
+
+  // Signature via ton helper existant (même pattern que placeOrder HL)
+  const { signL1Action } = await import('../utils/hlSigning.js')
+  const signature = await signL1Action(action, nonce, hlPrivateKey)
+
+  const res = await fetch('/api/hyperliquid', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action,
+      nonce,
+      signature,
+      vaultAddress: credentials.hlVaultAddress ?? null,
+    }),
+  })
+
+  const data = await res.json()
+  if (!res.ok || data?.status === 'err')
+    throw new Error(data?.response ?? `HL cancelOrder HTTP ${res.status}`)
+
+  console.log('[HL] cancelOrder:', orderId, '→', data?.response?.data?.statuses?.[0])
+  return data
+}
+
+// hyperliquid.js — remplace le cancelOrder précédent
+
+export async function cancelOrder({ orderId, market, credentials }) {
+  const { hlAgentPk, hlVaultAddress } = credentials
+  if (!orderId || !hlAgentPk) return
+
+  // Récupère l'assetIndex depuis market (déjà résolu dans getMarkets)
+  const assetIndex = market?.assetIndex
+  if (assetIndex == null)
+    throw new Error(`[HL] cancelOrder — assetIndex manquant pour ${market?.id}`)
+
+  const wallet = privateKeyToAccount(hlAgentPk)
+  const client = new ExchangeClient({
+    wallet,
+    transport: new HttpTransport(),
+    defaultVaultAddress: hlVaultAddress?.trim() || undefined,
+  })
+
+  const data = await client.cancel({
+    cancels: [{ a: assetIndex, o: Number(orderId) }],
+  })
+
+  // Vérifie le statut de la réponse
+  const status0 = data?.response?.data?.statuses?.[0]
+  if (status0?.error)
+    throw new Error(`[HL] cancelOrder rejected: ${status0.error}`)
+
+  console.log('[HL] cancelOrder:', orderId, '→', status0)
+  return data
+}
+
+// hyperliquid.js
+export function normalizeOrderId(result) {
+  // placeOrder retourne { ...data, resolvedOid: hlOid }
+  return result?.resolvedOid ?? null
+}
 /*
 Les champs hlKey, extKey, nadoKey sont conservés en rétrocompat pendant la migration.
 Une fois tous les consommateurs migrés vers market.keys?.hl etc.,
