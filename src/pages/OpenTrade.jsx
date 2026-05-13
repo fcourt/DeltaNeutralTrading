@@ -8,11 +8,14 @@ import { useMarketFilter }          from '../hooks/useMarketFilter'
 import { useFundingRates }          from '../hooks/useFundingRates'
 import { usePlaceOrder }            from '../hooks/usePlaceOrder'
 import { useMargins }               from '../hooks/useMargins'
+import { useChunkedDNExecutor }       from '../hooks/useChunkedDNExecutor'
 import { fmt, fmtUSD, fmtPct }     from '../utils/format'
 import { loadFees, minLeverageFor, roundToHLPrice } from '../utils/trading'
 import LeverageSlider   from '../components/ui/LeverageSlider'
 import LiqPriceEstimate from '../components/ui/LiqPriceEstimate'
 import TpSlPanel        from '../components/ui/TpSlPanel'
+import { ChunkedConfig, DEFAULT_CHUNKED_CONFIG } from '../components/ui/ChunkedConfig'
+import { ChunkedProgress }            from '../components/ui/ChunkedProgress'
 import { saveOrderGroup } from '../services/orderTracker.js'
 import {
   estimateFillPrice, calcDeltaNeutral,
@@ -583,6 +586,56 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
 
   const fresh = lastUpdate && (Date.now() - lastUpdate.getTime()) < 6000
 
+  //Ajout Mode Chunked
+  // ── Dans le composant OpenTrade ───────────────────────────────────────────────
+  const { state: chunkState, start, pause, resume, abort, reset } = useChunkedDNExecutor()
+  const [chunkedMode,   setChunkedMode]   = useState(false)
+  const [chunkedConfig, setChunkedConfig] = useState(DEFAULT_CHUNKED_CONFIG)
+
+  const isChunkRunning = ['running', 'paused'].includes(chunkState.status)
+  const isChunkDone    = ['completed', 'aborted', 'error'].includes(chunkState.status)
+
+  // ── getMarkPrice — adapte à ta façon de fetcher les prix ─────────────────────
+  const getMarkPrice = async (marketId, platformId) => {
+    const market = markets.find(m => m.id === marketId)
+    if (!market) throw new Error(`Marché inconnu: ${marketId}`)
+    const plat = PLATFORMS.find(p => p.id === platformId)
+    const { priceMap } = await plat.getPrices()
+    const key = market.keys?.[platformId] ?? marketId
+    const price = priceMap[key]
+    if (!price) throw new Error(`Prix indisponible: ${key}`)
+    return price
+  }
+
+  // ── handleStartChunked ────────────────────────────────────────────────────────
+  const handleStartChunked = () => {
+    if (!selectedMarket || !tradeParams) return
+    reset()
+    start({
+      legA: {
+        marketId:   selectedMarket.id,
+        platformId: platformA,          // ex: 'hl'
+        isBuy:      isBuy,
+        market:     selectedMarket,
+      },
+      legB: {
+        marketId:   selectedMarket.id,
+        platformId: platformB,          // ex: 'extended'
+        isBuy:      !isBuy,             // leg opposée
+        market:     selectedMarket,
+      },
+      credentials,
+      totalUsd:       tradeParams.totalUsd,
+      sliceUsd:       chunkedConfig.sliceUsd,
+      delayBetweenMs: chunkedConfig.delayBetweenMs,
+      makerTimeoutMs: chunkedConfig.makerTimeoutMs,
+      maxRetries:     chunkedConfig.maxRetries,
+      onErrorMode:    chunkedConfig.onErrorMode,
+      getMarkPrice,
+      placeOrderFn:   (params, creds) => servicePlaceOrder(params, creds),
+    })
+  }
+
   return (
     <div className="page-header">
 
@@ -787,19 +840,73 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
         </div>
       )}
 
-      {/* Bouton 2 legs */}
-      {calc && !loadedPosition1 && !loadedPosition2 && (
-        <button
-          onClick={handlePlaceBothLegs}
-          disabled={placingLeg1 || placingLeg2 || !calc.limitP1 || !calc.limitP2}
-          className="ot-both-legs-btn"
-        >
-          {(placingLeg1 || placingLeg2)
-            ? <><span className="leg-spin">⟳</span> Envoi des 2 legs…</>
-            : <>🚀 Ouvrir les 2 legs — {plat1?.label} + {plat2?.label}</>}
-        </button>
-      )}
+      {/*Zone Mode Chunked*/}
+      {/* Toggle Mode Chunked */}
+    <div className="open-trade__chunked-toggle">
+  <label className="toggle-label">
+    <input
+      type="checkbox"
+      checked={chunkedMode}
+      disabled={isChunkRunning}
+      onChange={e => {
+        setChunkedMode(e.target.checked)
+        if (!e.target.checked) reset()
+      }}
+    />
+    <span>Mode Chunked</span>
+  </label>
+  {chunkedMode && (
+    <span className="open-trade__chunked-hint">
+      Exécution fragmentée — exposition max : ${chunkedConfig.sliceUsd}
+    </span>
+  )}
+</div>
 
+    {/* Config Chunked */}
+    {chunkedMode && !isChunkRunning && !isChunkDone && (
+  <ChunkedConfig
+    totalUsd={parseFloat(sizeUSD) || 0}
+    config={chunkedConfig}
+    onChange={setChunkedConfig}
+    disabled={false}
+  />
+)}
+
+    {/* Progression */}
+    {{chunkedMode && chunkState.status !== 'idle' && (
+  <ChunkedProgress
+    state={chunkState}
+    onPause={pause}
+    onResume={resume}
+    onAbort={abort}
+  />
+)}
+
+      {/* Bouton Mode Chunked //disabled={isChunkRunning || !selectedMarket}
+*/}
+{chunkedMode && (
+  <button
+    className="btn btn-primary open-trade__submit"
+    onClick={isChunkDone ? reset : handleStartChunked}
+    disabled={isChunkRunning || !market || !marketId}
+  >
+    {isChunkDone ? '🔄 Réinitialiser' : '🚀 Lancer Chunked'}
+  </button>
+)}
+
+{/* Bouton 2 legs — masqué en mode chunked */}
+{!chunkedMode && calc && !loadedPosition1 && !loadedPosition2 && (
+  <button
+    onClick={handlePlaceBothLegs}
+    disabled={placingLeg1 || placingLeg2 || !calc.limitP1 || !calc.limitP2}
+    className="ot-both-legs-btn"
+  >
+    {(placingLeg1 || placingLeg2)
+      ? <><span className="leg-spin">⟳</span> Envoi des 2 legs…</>
+      : <>🚀 Ouvrir les 2 legs — {plat1?.label} + {plat2?.label}</>}
+  </button>
+)}
+      
       {/* 1 leg manquant */}
       {calc && (loadedPosition1 || loadedPosition2) && !(loadedPosition1 && loadedPosition2) && (
         <div className="ot-missing-leg">
