@@ -6,6 +6,7 @@ import { useOpenPositions }        from '../hooks/useOpenPositions'
 import { useDeltaNeutralPairs }    from '../hooks/useDeltaNeutralPairs'
 import { usePlaceOrder }           from '../hooks/usePlaceOrder'
 import { canTrade }                from '../services/orderService'
+import { useLimitPriceOptions }    from '../hooks/useLimitPriceOptions'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -102,16 +103,27 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
 
   const be     = computeBreakevenPrices({ long: pair.long, short: pair.short, includeFees })
   const market = markets.find(m => m.id === pair.marketId)
-
-  const doCloseLeg = useCallback(async (leg) => {
+    
+  const doCloseLeg = useCallback(async (leg, orderType = 'taker', limitPrice = null) => {
     if (!market) throw new Error(`Marché ${pair.marketId} introuvable`)
-    return placeOrder({
-      platformId: leg.platform, marketId: pair.marketId,
-      isBuy: leg.side === 'SHORT', size: leg.szi,
-      limitPrice: leg.markPx ?? leg.entryPx,
-      orderType: 'taker', reduceOnly: true, ...credentials,
-    })
+      return placeOrder({
+        platformId: leg.platform, marketId: pair.marketId,
+        isBuy: leg.side === 'SHORT', size: leg.szi,
+        limitPrice: limitPrice ?? leg.markPx ?? leg.entryPx,
+        orderType, reduceOnly: true, ...credentials,
+      })
   }, [market, pair.marketId, placeOrder, credentials])
+  
+  // ↓ Nouveau handler pour fermeture limit d'un seul leg
+  const doCloseLegLimit = useCallback(async (leg, price, orderType) => {
+    setSending(true); onFeedback?.(null)
+      try {
+        await doCloseLeg(leg, orderType, price)
+          onFeedback?.({ ok: true, msg: `✅ Leg ${leg.side} fermé en limite (${fmtPx(price)})` })
+      } catch (e) {
+        onFeedback?.({ ok: false, msg: `❌ ${e.message}` })
+      } finally { setSending(false) }
+  }, [doCloseLeg, onFeedback])
 
   const doCloseBoth = useCallback(async () => {
     setSending(true); onFeedback?.(null)
@@ -204,6 +216,34 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
               <span><strong className={pnlClass(be.pnlNet)}>PnL net estimé : {fmtUSD(be.pnlNet)}</strong></span>
             </div>
 
+            {/* ↓↓ NOUVEAU — fermeture limit par leg ↓↓ */}
+<div className="mp-leg-limit-block">
+  <div className="mp-leg-limit-row">
+    <span className="mp-leg-limit-label">
+      Fermer LONG <span className={platClass(pair.long.platform)}>({platLabel(pair.long.platform)})</span> :
+    </span>
+    <LimitPriceButtons
+      pos={pair.long}
+      markets={markets}
+      getPrice={getPrice}
+      disabled={!canCloseL || sending}
+      onSelect={(price, type) => doCloseLegLimit(pair.long, price, type)}
+    />
+  </div>
+  <div className="mp-leg-limit-row">
+    <span className="mp-leg-limit-label">
+      Fermer SHORT <span className={platClass(pair.short.platform)}>({platLabel(pair.short.platform)})</span> :
+    </span>
+    <LimitPriceButtons
+      pos={pair.short}
+      markets={markets}
+      getPrice={getPrice}
+      disabled={!canCloseS || sending}
+      onSelect={(price, type) => doCloseLegLimit(pair.short, price, type)}
+    />
+  </div>
+</div>
+
             <button className="mp-close-both-btn" disabled={!canCloseBoth || sending} onClick={doCloseBoth}>
               {sending ? <><span className="mp-spin">⟳</span> Envoi en cours…</> : '⚡ Fermer les 2 legs au prix de marché'}
             </button>
@@ -219,8 +259,39 @@ function PairRow({ pair, credentials, markets, onFeedback }) {
   )
 }
 
-// ─── SingleRow ────────────────────────────────────────────────────────────────
-function SingleRow({ pos, credentials, markets, onFeedback }) {
+// ─── LimitPriceButtons — composant réutilisable ───────────────────────────────
+function LimitPriceButtons({ pos, markets, getPrice, onSelect, disabled }) {
+  const { mid, bestBid, bestAsk } = useLimitPriceOptions(pos, markets, getPrice)
+  // LONG ferme en SELL → meilleur prix = BEST BID
+  // SHORT ferme en BUY  → meilleur prix = BEST ASK
+  const isLong   = pos.side === 'LONG'
+  const bestPrice = isLong ? bestBid : bestAsk
+  const bestLabel = isLong ? 'BEST BID' : 'BEST ASK'
+
+  return (
+    <div className="mp-limit-btns">
+      <button
+        className="mp-limit-btn mp-limit-btn--mid"
+        disabled={disabled || mid == null}
+        onClick={() => onSelect(mid, 'maker')}
+        title={mid ? `Mid : ${fmtPx(mid)}` : 'Prix indisponible'}
+      >
+        MID{mid ? ` ${fmtPx(mid)}` : ''}
+      </button>
+      <button
+        className="mp-limit-btn mp-limit-btn--best"
+        disabled={disabled || bestPrice == null}
+        onClick={() => onSelect(bestPrice, 'maker')}
+        title={bestPrice ? `${bestLabel} : ${fmtPx(bestPrice)}` : 'Prix indisponible'}
+      >
+        {bestLabel}{bestPrice ? ` ${fmtPx(bestPrice)}` : ''}
+      </button>
+    </div>
+  )
+}
+
+// ─── SingleRow — modifié ──────────────────────────────────────────────────────
+function SingleRow({ pos, credentials, markets, getPrice, onFeedback }) {
   const [open,    setOpen]    = useState(false)
   const [sending, setSending] = useState(false)
   const { placeOrder } = usePlaceOrder(markets)
@@ -229,14 +300,14 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
   const canClose = canTrade(pos.platform, credentials)
   const notional = pos.szi * (pos.markPx ?? pos.entryPx ?? 0)
 
-  const doClose = useCallback(async (orderType = 'taker') => {
+  const doClose = useCallback(async (orderType = 'taker', limitPrice = null) => {
     if (!market) throw new Error(`Marché ${pos.marketId} introuvable`)
     setSending(true); onFeedback?.(null)
     try {
       await placeOrder({
         platformId: pos.platform, marketId: pos.marketId,
         isBuy: pos.side === 'SHORT', size: pos.szi,
-        limitPrice: pos.markPx ?? pos.entryPx,
+        limitPrice: limitPrice ?? pos.markPx ?? pos.entryPx,
         orderType, reduceOnly: true, ...credentials,
       })
       onFeedback?.({ ok: true, msg: `✅ Ordre de fermeture envoyé (${pos.label})` })
@@ -247,6 +318,7 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
 
   return (
     <div className="mp-single">
+      {/* toggle inchangé */}
       <button className="mp-single__toggle" onClick={() => setOpen(o => !o)}>
         <div className="mp-single__toggle-left">
           <span className={platClass(pos.platform)}>{platLabel(pos.platform)}</span>
@@ -264,6 +336,7 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
 
       {open && (
         <div className="mp-single__body">
+          {/* stats inchangées */}
           <div className="mp-single__stats">
             <div className="mp-single__stat">
               <span className="mp-single__stat-label">Entry</span>
@@ -284,16 +357,27 @@ function SingleRow({ pos, credentials, markets, onFeedback }) {
               </span>
             </div>
           </div>
+
           <div className="mp-single__actions">
+            {/* Bouton marché existant */}
             <button className="mp-single__close-market"
               disabled={!canClose || sending} onClick={() => doClose('taker')}>
               {sending ? <><span className="mp-spin">⟳</span> Envoi…</> : '✕ Fermer au marché'}
             </button>
-            <button className="mp-single__close-limit"
-              disabled={!canClose || sending} onClick={() => doClose('maker')}>
-              Fermer en limite
-            </button>
+
+            {/* ↓↓ NOUVEAU — fermeture limit avec prix auto ↓↓ */}
+            <div className="mp-single__limit-section">
+              <span className="mp-single__limit-label">Fermer en limite :</span>
+              <LimitPriceButtons
+                pos={pos}
+                markets={markets}
+                getPrice={getPrice}
+                disabled={!canClose || sending}
+                onSelect={(price, type) => doClose(type, price)}
+              />
+            </div>
           </div>
+
           {!canClose && (
             <p className="mp-keys-warning">Clés manquantes pour {platLabel(pos.platform)}</p>
           )}
@@ -367,7 +451,7 @@ export default function ManagePositions() {
           <p className="mp-section-label mp-section-label--dn">Paires delta-neutral détectées</p>
           {pairs.map(pair => (
             <PairRow key={pair.id} pair={pair}
-              credentials={credentials} markets={markets} onFeedback={setFeedback} />
+              credentials={credentials} markets={markets} getPrice={getPrice} onFeedback={setFeedback} />
           ))}
         </div>
       )}
@@ -381,7 +465,7 @@ export default function ManagePositions() {
           )}
           {singles.map(pos => (
             <SingleRow key={pos._id} pos={pos}
-              credentials={credentials} markets={markets} onFeedback={setFeedback} />
+              credentials={credentials} markets={markets} getPrice={getPrice} onFeedback={setFeedback} />
           ))}
         </div>
       )}
