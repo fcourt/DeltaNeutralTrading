@@ -684,6 +684,43 @@ export function aggregateFills(fills, startTs, endTs) {
   return { hl, hip3 }
 }
 
+//ajout Mode Chunked
+// hyperliquid.js
+// GET order status via /info endpoint
+export async function getOrderStatus(orderId, credentials) {
+  const { hlAddress } = credentials
+  if (!orderId || !hlAddress) return null
+
+  try {
+    const res = await fetch('/api/hyperliquid', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'orderStatus',
+        user: hlAddress,
+        oid: Number(orderId),
+      }),
+    })
+    const data = await res.json()
+    // Réponse : { status: "ok", order: { order: {...}, status: "open"|"filled"|"canceled"|"rejected" } }
+    if (data?.status !== 'ok') return null
+
+    const raw    = data.order
+    const status = raw?.status  // "open" | "filled" | "canceled" | "rejected"
+    const filled = parseFloat(raw?.order?.origSz ?? 0) - parseFloat(raw?.order?.sz ?? 0)
+
+    return {
+      status,                                     // "open" | "filled" | "canceled" | "rejected"
+      filled,                                     // quantité remplie en asset
+      remaining: parseFloat(raw?.order?.sz ?? 0), // quantité restante
+      avgPx: parseFloat(raw?.order?.limitPx ?? 0),
+    }
+  } catch (e) {
+    console.warn('[HL] getOrderStatus error:', e.message)
+    return null
+  }
+}
+
 /*
 Les champs hlKey, extKey, nadoKey sont conservés en rétrocompat pendant la migration.
 Une fois tous les consommateurs migrés vers market.keys?.hl etc.,
