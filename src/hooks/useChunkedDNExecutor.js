@@ -64,17 +64,17 @@ async function pollUntilFilled({
   if (!orderId) return { status: 'failed', filled: 0, remaining: 0 }
 
   const plat = PLATFORMS.find(p => p.id === platformId)
-if (!plat?.adapter?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
+  if (!plat?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
 
-const deadline = Date.now() + makerTimeoutMs
-while (true) {
-  if (abortSignal?.aborted) return { status: 'aborted', filled: 0, remaining: 0 }
+  const deadline = Date.now() + makerTimeoutMs
+  while (true) {
+    if (abortSignal?.aborted) return { status: 'aborted', filled: 0, remaining: 0 }
 
-  const result = await plat.adapter.getOrderStatus(orderId, credentials)
-  if (!result) {
-    await sleep(pollIntervalMs)
-    continue
-  }
+    const result = await plat.getOrderStatus(orderId, credentials)
+    if (!result) {
+      await sleep(pollIntervalMs)
+      continue
+    }
 
     if (result.status === 'filled')   return { status: 'filled',   filled: result.filled, remaining: 0 }
     if (result.status === 'canceled') return { status: 'canceled', filled: result.filled, remaining: result.remaining }
@@ -92,7 +92,7 @@ async function cancelOrder({ orderId, market, platformId, credentials }) {
   if (!orderId) return
   const plat = PLATFORMS.find(p => p.id === platformId)
   try {
-    await plat?.adapter?.cancelOrder?.({ orderId, market, credentials })
+    await plat?.cancelOrder?.({ orderId, market, credentials })
   } catch (e) {
     console.warn(`[Chunk] cancelOrder ${platformId} ${orderId}:`, e.message)
   }
@@ -356,4 +356,52 @@ export function useChunkedDNExecutor() {
       }))
 
       addLog(
-        `  Δ 
+        `  \u0394 accumulé : ${newDelta >= 0 ? '+' : ''}${newDelta.toFixed(5)} asset` +
+        ` | A: ${totalFilledA.toFixed(5)} | B: ${totalFilledB.toFixed(5)}`,
+        Math.abs(newDelta) > 0.001 ? 'warn' : 'info'
+      )
+
+      // ── Délai inter-slice ─────────────────────────────────────────────────
+      if (i < totalSlices - 1 && !abort.signal.aborted) {
+        await sleep(delayBetweenMs)
+      }
+    }
+
+    // ── Fin d'exécution ───────────────────────────────────────────────────
+    runningRef.current = false
+    if (!abort.signal.aborted) {
+      setState(s => ({
+        ...s,
+        status: s.status === 'error' ? 'error' : 'completed',
+      }))
+      addLog('🏁 Exécution terminée', 'success')
+    }
+  }, [addLog, patchSlice])
+
+  // ── Contrôles publics ─────────────────────────────────────────────────────
+  const pause  = useCallback(() => {
+    pauseRef.current = true
+    setState(s => ({ ...s, status: 'paused' }))
+    }, [])
+
+  const resume = useCallback(() => {
+    pauseRef.current = false
+    setState(s => ({ ...s, status: 'running' }))
+  }, [])
+
+  const abort  = useCallback(() => {
+    abortRef.current?.abort()
+    runningRef.current = false
+    pauseRef.current   = false
+    setState(s => ({ ...s, status: 'aborted' }))
+  }, [])
+
+  const reset  = useCallback(() => {
+    abortRef.current?.abort()
+    runningRef.current = false
+    pauseRef.current   = false
+    setState(buildInitialState)
+  }, [])
+
+  return { state, start, pause, resume, abort, reset }
+}
