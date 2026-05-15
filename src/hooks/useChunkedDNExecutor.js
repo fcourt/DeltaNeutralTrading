@@ -301,6 +301,8 @@ export function useChunkedDNExecutor() {
 
       await Promise.all([placeA, placeB])
 
+      if (abort.signal.aborted) break
+      
       if (errA || errB) {
         addLog(`⚠️ Erreur placement slice ${i + 1} — A: ${errA ?? 'ok'} | B: ${errB ?? 'ok'}`, 'warn')
         if (onErrorMode === 'abort') { setState(s => ({ ...s, status: 'error', errorMsg: errA ?? errB })); break }
@@ -391,6 +393,8 @@ export function useChunkedDNExecutor() {
           !bOk ? switchToTaker(legB, getLimitPriceFnB, currentOrderIdB, rawSizeB, resB.filled, 'statusB') : Promise.resolve({ status: 'filled' }),
         ])
 
+        if (abort.signal.aborted) break
+
         if (newA.orderId) currentOrderIdA = newA.orderId
         if (newB.orderId) currentOrderIdB = newB.orderId
 
@@ -425,6 +429,7 @@ export function useChunkedDNExecutor() {
       if (i < totalSlices - 1 && !abort.signal.aborted) {
         await sleep(delayBetweenMs)
       }
+      if (abort.signal.aborted) break
     }
 
     // ── Fin d'exécution ───────────────────────────────────────────────────
