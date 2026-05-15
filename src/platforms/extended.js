@@ -1017,7 +1017,8 @@ export async function getOrderStatus(orderId, credentials) {
 
   try {
     const res = await fetch(
-      `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
+      //`${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
+      `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${orderId}`)}`,
       { headers: { 'X-Api-Key': extApiKey } }
     )
     const data = await res.json()
@@ -1064,7 +1065,8 @@ export async function cancelOrder({ orderId, market, credentials }) {
   if (!orderId || !extApiKey) return
 
   const res = await fetch(
-    `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
+    //`${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
+    `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${orderId}`)}`,
     {
       method:  'DELETE',
       headers: {
