@@ -1,7 +1,7 @@
 // src/hooks/useChunkedDNExecutor.js
 
 import { useState, useRef, useCallback } from 'react'
-import { PLATFORMS } from '../platforms/index.js'
+import { PLATFORMS, getPlatform } from '../platforms/index.js'
 
 // ─── Statuts internes d'une slice ────────────────────────────────────────────
 // 'pending' | 'placing' | 'waiting_fill' | 'filled' | 'switching_taker' | 'failed'
@@ -52,6 +52,13 @@ function buildSlice(index, targetSizeA, targetSizeB) {
 // ─── Helper : sleep ───────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
+// ─── Helper : arrondi step size ───────────────────────────────────────────────
+// FIX #4 — applique le step size comme buildOrderParams dans OpenTrade
+function applyStep(size, stepSize, useStepSize) {
+  if (!useStepSize || !stepSize) return size
+  return Math.floor(size / stepSize) * stepSize
+}
+
 // ─── Helper : poll order status jusqu'à fill ou timeout ──────────────────────
 async function pollUntilFilled({
   orderId,
@@ -63,14 +70,15 @@ async function pollUntilFilled({
 }) {
   if (!orderId) return { status: 'failed', filled: 0, remaining: 0 }
 
-  const plat = PLATFORMS.find(p => p.id === platformId)
-  if (!plat?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
+  // FIX : getOrderStatus via adapter (plat.adapter.getOrderStatus) et non plat.getOrderStatus
+  const plat = getPlatform(platformId)
+  if (!plat?.adapter?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
 
   const deadline = Date.now() + makerTimeoutMs
   while (true) {
     if (abortSignal?.aborted) return { status: 'aborted', filled: 0, remaining: 0 }
 
-    const result = await plat.getOrderStatus(orderId, credentials)
+    const result = await plat.adapter.getOrderStatus(orderId, credentials)
     if (!result) {
       await sleep(pollIntervalMs)
       continue
@@ -90,9 +98,9 @@ async function pollUntilFilled({
 // ─── Helper : annuler un ordre ────────────────────────────────────────────────
 async function cancelOrder({ orderId, market, platformId, credentials }) {
   if (!orderId) return
-  const plat = PLATFORMS.find(p => p.id === platformId)
+  const plat = getPlatform(platformId)
   try {
-    await plat?.cancelOrder?.({ orderId, market, credentials })
+    await plat?.adapter?.cancelOrder?.({ orderId, market, credentials })
   } catch (e) {
     console.warn(`[Chunk] cancelOrder ${platformId} ${orderId}:`, e.message)
   }
@@ -127,8 +135,9 @@ export function useChunkedDNExecutor() {
   // ─────────────────────────────────────────────────────────────────────────
   const start = useCallback(async ({
     // Legs
-    legA,             // { marketId, platformId, isBuy, market }
-    legB,             // { marketId, platformId, isBuy, market }
+    // FIX #3 : legA/legB contiennent maintenant orderType et leverage
+    legA,             // { marketId, platformId, isBuy, market, orderType, leverage }
+    legB,             // { marketId, platformId, isBuy, market, orderType, leverage }
     credentials,
 
     // Paramètres d'exécution
@@ -139,9 +148,15 @@ export function useChunkedDNExecutor() {
     maxRetries,       // tentatives max par slice (ex: 3)
     onErrorMode,      // 'continue' | 'pause' | 'abort'
 
+    // FIX #4 : step size transmis depuis handleStartChunked
+    stepSize,         // valeur du step size du marché (ex: 0.001)
+    useStepSize,      // boolean — arrondi step size activé
+
     // Fonctions externes
     getMarkPrice,     // async (marketId, platformId) => number
-    placeOrderFn,     // async (params, credentials) => result avec orderId
+    placeOrderFn,     // async (params) => result avec resolvedOid
+    // NOTE FIX #1 : placeOrderFn ne prend plus qu'un seul argument.
+    // Les credentials sont spreadés dans params directement par le hook.
   }) => {
     if (runningRef.current) return
     runningRef.current = true
@@ -151,7 +166,6 @@ export function useChunkedDNExecutor() {
     abortRef.current = abort
 
     const totalSlices = Math.ceil(totalUsd / sliceUsd)
-    const baseSliceA  = sliceUsd  // en USD — converti en asset via markPrice au moment du place
 
     // Init state
     const initialSlices = Array.from({ length: totalSlices }, (_, i) =>
@@ -202,16 +216,12 @@ export function useChunkedDNExecutor() {
       }
 
       // ── Calcul des sizes avec compensation delta ───────────────────────────
-      // Taille de base pour cette slice (en asset)
-      const baseSizeA = sliceUsd / markPriceA
-      const deltaAsset = totalFilledA - totalFilledB
-
-      // Leg B compensée : si on a plus de A que de B, cette slice B est augmentée
-      // Si c'est la dernière slice, on cible exactement totalTarget - totalFilled
+      const baseSizeA      = sliceUsd / markPriceA
+      const deltaAsset     = totalFilledA - totalFilledB
       const remainingSlices = totalSlices - i
-      const isLast = remainingSlices === 1
+      const isLast          = remainingSlices === 1
+      const targetTotalA    = totalUsd / markPriceA
 
-      const targetTotalA = totalUsd / markPriceA  // total visé en asset au prix actuel
       const sizeA = isLast
         ? Math.max(0, targetTotalA - totalFilledA)
         : baseSizeA
@@ -219,39 +229,74 @@ export function useChunkedDNExecutor() {
       // Size B = size A + compensation du delta accumulé
       const sizeB = Math.max(0, sizeA + deltaAsset)
 
-      if (sizeA <= 0 && sizeB <= 0) {
+      // ── FIX #4 : appliquer le step size comme buildOrderParams ────────────
+      const rawSizeA = applyStep(sizeA, stepSize, useStepSize)
+      const rawSizeB = applyStep(sizeB, stepSize, useStepSize)
+
+      if (rawSizeA <= 0 && rawSizeB <= 0) {
         addLog(`✅ Slice ${i + 1} ignorée — target atteint`, 'success')
         continue
       }
 
       patchSlice(i, {
-        targetSizeA: sizeA,
-        targetSizeB: sizeB,
+        targetSizeA: rawSizeA,
+        targetSizeB: rawSizeB,
         statusA: SLICE_STATUS.PLACING,
         statusB: SLICE_STATUS.PLACING,
       })
 
       // ── Place les deux ordres en parallèle ────────────────────────────────
+      // FIX #1 : credentials spreadés dans params (comme buildOrderParams dans OpenTrade)
+      //          placeOrderFn n'accepte plus qu'un seul argument
+      // FIX #3 : orderType et leverage lus depuis legA/legB
       let orderIdA = null, orderIdB = null
       let errA = null,     errB = null
 
-      const placeA = placeOrderFn(
-        { ...legA, size: sizeA, orderType: 'maker', limitPrice: markPriceA },
-        credentials
-      ).then(res => {
-        orderIdA = PLATFORMS.find(p => p.id === legA.platformId)?.normalizeOrderId?.(res) ?? null
+      const placeA = placeOrderFn({
+        platformId:  legA.platformId,
+        marketId:    legA.marketId,
+        isBuy:       legA.isBuy,
+        market:      legA.market,
+        size:        rawSizeA,
+        orderType:   legA.orderType ?? 'maker',   // FIX #3
+        leverage:    legA.leverage  ?? null,       // FIX #3
+        limitPrice:  markPriceA,
+        reduceOnly:  false,
+        tpSlConfig:  null,
+        ...credentials,                            // FIX #1
+      }).then(res => {
+        const plat = PLATFORMS.find(p => p.id === legA.platformId)
+        orderIdA = plat?.normalizeOrderId?.(res) ?? null
         patchSlice(i, { orderIdA, statusA: SLICE_STATUS.WAITING_FILL })
         addLog(`  Leg A placée — orderId: ${orderIdA}`, 'info')
-      }).catch(e => { errA = e.message; patchSlice(i, { statusA: SLICE_STATUS.FAILED }) })
+      }).catch(e => {
+        errA = e.message
+        patchSlice(i, { statusA: SLICE_STATUS.FAILED })
+        addLog(`  ❌ Leg A erreur : ${e.message}`, 'error')
+      })
 
-      const placeB = placeOrderFn(
-        { ...legB, size: sizeB, orderType: 'maker', limitPrice: markPriceB },
-        credentials
-      ).then(res => {
-        orderIdB = PLATFORMS.find(p => p.id === legB.platformId)?.normalizeOrderId?.(res) ?? null
+      const placeB = placeOrderFn({
+        platformId:  legB.platformId,
+        marketId:    legB.marketId,
+        isBuy:       legB.isBuy,
+        market:      legB.market,
+        size:        rawSizeB,
+        orderType:   legB.orderType ?? 'maker',   // FIX #3
+        leverage:    legB.leverage  ?? null,       // FIX #3
+        limitPrice:  markPriceB,
+        reduceOnly:  false,
+        tpSlConfig:  null,
+        ...credentials,                            // FIX #1
+      }).then(res => {
+        const plat = PLATFORMS.find(p => p.id === legB.platformId)
+        orderIdB = plat?.normalizeOrderId?.(res) ?? null
         patchSlice(i, { orderIdB, statusB: SLICE_STATUS.WAITING_FILL })
         addLog(`  Leg B placée — orderId: ${orderIdB}`, 'info')
-      }).catch(e => { errB = e.message; patchSlice(i, { statusB: SLICE_STATUS.FAILED }) })
+      }).catch(e => {
+        errB = e.message
+        patchSlice(i, { statusB: SLICE_STATUS.FAILED })
+        addLog(`  ❌ Leg B erreur : ${e.message}`, 'error')
+      })
 
       await Promise.all([placeA, placeB])
 
@@ -288,8 +333,8 @@ export function useChunkedDNExecutor() {
           }),
         ])
 
-        filledA = resA.filled ?? sizeA
-        filledB = resB.filled ?? sizeB
+        filledA = resA.filled ?? rawSizeA
+        filledB = resB.filled ?? rawSizeB
 
         const aOk = resA.status === 'filled'
         const bOk = resB.status === 'filled'
@@ -304,6 +349,8 @@ export function useChunkedDNExecutor() {
         attempt++
         addLog(`  🔄 Timeout slice ${i + 1} tentative ${attempt}/${maxRetries} — switch taker`, 'warn')
 
+        // FIX #1 : credentials spreadés dans params ici aussi
+        // FIX #3 : leverage depuis leg
         const switchToTaker = async (leg, orderId, size, currentFilled, patchKey) => {
           if (orderId) await cancelOrder({ orderId, market: leg.market, platformId: leg.platformId, credentials })
           const remaining = Math.max(0, size - (currentFilled ?? 0))
@@ -312,11 +359,21 @@ export function useChunkedDNExecutor() {
           patchSlice(i, { [patchKey]: SLICE_STATUS.SWITCHING_TAKER })
           try {
             const price = await getMarkPrice(leg.marketId, leg.platformId)
-            const res   = await placeOrderFn(
-              { ...leg, size: remaining, orderType: 'taker', limitPrice: price },
-              credentials
-            )
-            const newId = PLATFORMS.find(p => p.id === leg.platformId)?.normalizeOrderId?.(res) ?? null
+            const res   = await placeOrderFn({
+              platformId:  leg.platformId,
+              marketId:    leg.marketId,
+              isBuy:       leg.isBuy,
+              market:      leg.market,
+              size:        remaining,
+              orderType:   'taker',
+              leverage:    leg.leverage ?? null,   // FIX #3
+              limitPrice:  price,
+              reduceOnly:  false,
+              tpSlConfig:  null,
+              ...credentials,                      // FIX #1
+            })
+            const plat  = PLATFORMS.find(p => p.id === leg.platformId)
+            const newId = plat?.normalizeOrderId?.(res) ?? null
             patchSlice(i, { [patchKey]: SLICE_STATUS.WAITING_FILL })
             return { orderId: newId, status: 'open' }
           } catch (e) {
@@ -327,8 +384,8 @@ export function useChunkedDNExecutor() {
         }
 
         const [newA, newB] = await Promise.all([
-          !aOk ? switchToTaker(legA, currentOrderIdA, sizeA, resA.filled, 'statusA') : Promise.resolve({ status: 'filled' }),
-          !bOk ? switchToTaker(legB, currentOrderIdB, sizeB, resB.filled, 'statusB') : Promise.resolve({ status: 'filled' }),
+          !aOk ? switchToTaker(legA, currentOrderIdA, rawSizeA, resA.filled, 'statusA') : Promise.resolve({ status: 'filled' }),
+          !bOk ? switchToTaker(legB, currentOrderIdB, rawSizeB, resB.filled, 'statusB') : Promise.resolve({ status: 'filled' }),
         ])
 
         if (newA.orderId) currentOrderIdA = newA.orderId
@@ -382,7 +439,7 @@ export function useChunkedDNExecutor() {
   const pause  = useCallback(() => {
     pauseRef.current = true
     setState(s => ({ ...s, status: 'paused' }))
-    }, [])
+  }, [])
 
   const resume = useCallback(() => {
     pauseRef.current = false
