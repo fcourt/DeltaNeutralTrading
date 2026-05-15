@@ -623,7 +623,7 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
    const handleStartChunked = () => {
     if (!market || !marketId || !calc) return
 
-    // FIX #2 — enrichir market avec szDecimals / pxDecimals depuis assetMeta
+    // Enrichir market avec szDecimals / pxDecimals depuis assetMeta
     const meta = getAssetMeta(market.keys?.hl)
     const enrichedMarket = {
       ...market,
@@ -633,27 +633,21 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
 
     reset()
     start({
-      // FIX #2 : enrichedMarket
-      // FIX #3 : orderType et leverage par leg
       legA: {
         marketId:   marketId,
         platformId: platform1,
         isBuy:      side1 === 'LONG',
         market:     enrichedMarket,
-        orderType:  orderType1,   // FIX #3
-        leverage:   effLev1,      // FIX #3
-        getLimitPriceFn: (platformId, side, markPrice) =>
-          getLimitPrice(platformId, side, markPrice, priceMode1, customPrice1, p1Bid, p1Ask),
+        orderType:  orderType1,
+        leverage:   effLev1,
       },
       legB: {
         marketId:   marketId,
         platformId: platform2,
         isBuy:      side2 === 'LONG',
         market:     enrichedMarket,
-        orderType:  orderType2,   // FIX #3
-        leverage:   effLev2,      // FIX #3
-        getLimitPriceFnB: (platformId, side, markPrice) =>
-          getLimitPrice(platformId, side, markPrice, priceMode2, customPrice2, p2Bid, p2Ask),
+        orderType:  orderType2,
+        leverage:   effLev2,
       },
       credentials,
       totalUsd:        parseFloat(sizeUSD) || 0,
@@ -662,13 +656,21 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
       makerTimeoutMs:  chunkedConfig.makerTimeoutMs,
       maxRetries:      chunkedConfig.maxRetries,
       onErrorMode:     chunkedConfig.onErrorMode,
-      // FIX #4 — step size transmis au hook
       stepSize:        getStepSize(marketId),
       useStepSize:     useStepSize,
       getMarkPrice,
-      placeOrderFn:    (params) => placeOrder(params),
-      // NOTE : placeOrderFn ne prend plus qu'un seul argument (params).
-      // Les credentials sont désormais spreadés dans params par le hook (FIX #1).
+
+      // getLimitPriceFn / getLimitPriceFnB :
+      // Transmettent la logique de prix d'OpenTrade au hook.
+      // Le hook recalcule le bon prix limit à chaque slice (priceMode, bid/ask, offset)
+      // au lieu d'utiliser le prix mark brut — ce qui causait le rejet post-only sur Extended.
+      getLimitPriceFn:  (platformId, side, markPrice) =>
+        getLimitPrice(platformId, side, markPrice, priceMode1, customPrice1, p1Bid, p1Ask),
+      getLimitPriceFnB: (platformId, side, markPrice) =>
+        getLimitPrice(platformId, side, markPrice, priceMode2, customPrice2, p2Bid, p2Ask),
+
+      // placeOrderFn à 1 seul argument : credentials sont spreadés dans params par le hook
+      placeOrderFn: (params) => placeOrder(params),
     })
   }
 
