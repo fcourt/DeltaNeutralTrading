@@ -63,7 +63,7 @@ async function pollUntilFilled({
   orderId,
   platformId,
   credentials,
-  pollIntervalMs = 2000,
+  pollIntervalMs = 3000,
   makerTimeoutMs = 10000,
   abortSignal,
 }) {
@@ -79,7 +79,8 @@ async function pollUntilFilled({
 
     const result = await plat.adapter.getOrderStatus(orderId, credentials)
     if (!result) {
-      await sleep(pollIntervalMs)
+      await sleep(pollIntervalMs * 2)
+      //await sleep(pollIntervalMs)
       continue
     }
 
