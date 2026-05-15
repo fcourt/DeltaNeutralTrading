@@ -707,7 +707,7 @@ export async function getOrderStatus(orderId, credentials) {
   if (!orderId || !hlAddress) return null
 
   try {
-    const res = await fetch('/api/hyperliquid', {
+    const res = await fetch('https://api.hyperliquid.xyz/info', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
