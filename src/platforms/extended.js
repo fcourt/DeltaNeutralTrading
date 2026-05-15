@@ -1031,7 +1031,9 @@ export async function getOrderStatus(orderId, credentials) {
     
     if (data?.status === 'ERROR') return null
 
-    const o = data?.data
+    //const o = data?.data
+    const o = Array.isArray(data?.data) ? data.data[0] : data?.data
+    
     // Extended statuses : "OPEN" | "FILLED" | "CANCELLED" | "PARTIALLY_FILLED"
     const rawStatus = (o?.status ?? '').toUpperCase()
 
