@@ -260,7 +260,8 @@ export function useChunkedDNExecutor() {
         size:        rawSizeA,
         orderType:   legA.orderType ?? 'maker',   // FIX #3
         leverage:    legA.leverage  ?? null,       // FIX #3
-        limitPrice:  markPriceA,
+        //limitPrice:  markPriceA,
+        limitPrice: getLimitPriceFn(legA.platformId, legA.isBuy ? 'LONG' : 'SHORT', markPriceA),
         reduceOnly:  false,
         tpSlConfig:  null,
         ...credentials,                            // FIX #1
@@ -283,7 +284,8 @@ export function useChunkedDNExecutor() {
         size:        rawSizeB,
         orderType:   legB.orderType ?? 'maker',   // FIX #3
         leverage:    legB.leverage  ?? null,       // FIX #3
-        limitPrice:  markPriceB,
+        //limitPrice:  markPriceB,
+        limitPrice: getLimitPriceFnB(legB.platformId, legB.isBuy ? 'LONG' : 'SHORT', markPriceB),
         reduceOnly:  false,
         tpSlConfig:  null,
         ...credentials,                            // FIX #1
