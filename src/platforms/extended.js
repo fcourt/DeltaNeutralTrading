@@ -581,10 +581,6 @@ export async function placeOrder(order, credentials) {
     vaultIdBig: vaultIdBig.toString(), starkKey, syntheticId,
     baseAmount, quoteAmount, feeAmount, expirationSecs, nonce, orderHash, msgHash,
   })
-  console.log('[Extended] placeOrder response:', JSON.stringify(data, null, 2))
-  console.log('[Extended] externalId extrait:', data?.data?.externalId)
-  console.log('[Extended] id extrait:', data?.data?.id)
-
   /*
   const payload = {
     id:                       generateOrderId(),
@@ -680,6 +676,10 @@ export async function placeOrder(order, credentials) {
 const rawText = await res.text()
 let data = {}
 try { data = JSON.parse(rawText) } catch {}
+
+  console.log('[Extended] placeOrder response:', JSON.stringify(data, null, 2))
+  console.log('[Extended] externalId extrait:', data?.data?.externalId)
+  console.log('[Extended] id extrait:', data?.data?.id)
 
 if (!res.ok || data?.status === 'ERROR')
   throw new Error(data?.error?.message || rawText || `Extended HTTP ${res.status}`)
