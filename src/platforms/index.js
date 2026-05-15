@@ -186,8 +186,9 @@ export const PLATFORMS = [
     isAvailable: (values) => !!(values.extMainApiKey?.trim() || values.extApiKey?.trim()),
     hasAddressField: false,
     // Extended — utilise externalOrderId (string UUID) ou id string
-    normalizeOrderId: (result) =>
-      result?.data?.externalOrderId?.toString() ?? result?.data?.id?.toString() ?? null,
+    //normalizeOrderId: (result) =>
+    //  result?.data?.externalOrderId?.toString() ?? result?.data?.id?.toString() ?? null,
+    normalizeOrderId: (result) => result?.data?.externalId ?? null,
     normalizeTradeId: (trade) =>
       trade?.externalOrderId?.toString()
       ?? trade?.orderId?.toString()
