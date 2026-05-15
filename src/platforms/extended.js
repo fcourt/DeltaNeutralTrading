@@ -581,6 +581,9 @@ export async function placeOrder(order, credentials) {
     vaultIdBig: vaultIdBig.toString(), starkKey, syntheticId,
     baseAmount, quoteAmount, feeAmount, expirationSecs, nonce, orderHash, msgHash,
   })
+  console.log('[Extended] placeOrder response:', JSON.stringify(data, null, 2))
+  console.log('[Extended] externalId extrait:', data?.data?.externalId)
+  console.log('[Extended] id extrait:', data?.data?.id)
 
   /*
   const payload = {
@@ -1018,6 +1021,13 @@ export async function getOrderStatus(orderId, credentials) {
       { headers: { 'X-Api-Key': extApiKey } }
     )
     const data = await res.json()
+
+    // extended.js — dans getOrderStatus(), après const data = await res.json()
+    console.log('[Extended] getOrderStatus raw response:', JSON.stringify(data, null, 2))
+    console.log('[Extended] orderId cherché:', orderId)
+    console.log('[Extended] status reçu:', data?.data?.status)
+    console.log('[Extended] filledQty:', data?.data?.filledQty, '| qty:', data?.data?.qty)
+    
     if (data?.status === 'ERROR') return null
 
     const o = data?.data
