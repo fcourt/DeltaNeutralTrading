@@ -67,7 +67,8 @@ async function pollUntilFilled({
   makerTimeoutMs = 10000,
   abortSignal,
 }) {
-  if (!orderId) return { status: 'failed', filled: 0, remaining: 0 }
+  //if (!orderId) return { status: 'failed', filled: 0, remaining: 0 }
+  if (!orderId) return { status: 'filled', filled: null, remaining: 0 }
 
   const plat = getPlatform(platformId)
   if (!plat?.adapter?.getOrderStatus) return { status: 'filled', filled: null, remaining: 0 }
@@ -305,6 +306,7 @@ export function useChunkedDNExecutor() {
 
       if (abort.signal.aborted) break
       
+      /*
       if (errA || errB) {
         addLog(`⚠️ Erreur placement slice ${i + 1} — A: ${errA ?? 'ok'} | B: ${errB ?? 'ok'}`, 'warn')
         if (onErrorMode === 'abort') { setState(s => ({ ...s, status: 'error', errorMsg: errA ?? errB })); break }
@@ -312,6 +314,17 @@ export function useChunkedDNExecutor() {
         // 'continue' ou après pause : on passe à la slice suivante sans bloquer
         continue
       }
+      */
+      // Remplace le bloc errA || errB actuel
+      if (errA && errB) {
+        // Les deux ont échoué → selon onErrorMode
+        addLog(`⚠️ Les deux legs ont échoué slice ${i + 1}`, 'warn')
+          if (onErrorMode === 'abort') { setState(s => ({ ...s, status: 'error', errorMsg: errA ?? errB })); break }
+        if (onErrorMode === 'pause') { pauseRef.current = true }
+        continue
+      }
+      // Si une seule leg a échoué, on continue le poll sur celle qui a réussi
+      // (l'autre a orderId null → pollUntilFilled retourne filled immédiat via Fix 2)
 
       // ── Poll fill des deux ordres ─────────────────────────────────────────
       let attempt = 0
