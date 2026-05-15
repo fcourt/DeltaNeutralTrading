@@ -1015,10 +1015,14 @@ export async function getOrderStatus(orderId, credentials) {
   const { extApiKey } = credentials
   if (!orderId || !extApiKey) return null
 
+  const uuid = orderId?.externalId ?? orderId   // compat string et objet
+  // endpoint avec UUID
+  
   try {
     const res = await fetch(
       //`${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
-      `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${orderId}`)}`,
+      //`${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${orderId}`)}`,
+      `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${uuid}`)}`,
       { headers: { 'X-Api-Key': extApiKey } }
     )
     const data = await res.json()
@@ -1066,9 +1070,10 @@ export async function cancelOrder({ orderId, market, credentials }) {
   const { extApiKey } = credentials
   if (!orderId || !extApiKey) return
 
+  const numericId = orderId?.numericId ?? orderId
+
   const res = await fetch(
-    //`${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${orderId}`)}`,
-    `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/orders/external/${orderId}`)}`,
+    `${EXT_PROXY}?endpoint=${encodeURIComponent(`/user/order/${numericId}`)}`,
     {
       method:  'DELETE',
       headers: {
