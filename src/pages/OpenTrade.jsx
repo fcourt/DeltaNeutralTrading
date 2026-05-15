@@ -642,6 +642,8 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
         market:     enrichedMarket,
         orderType:  orderType1,   // FIX #3
         leverage:   effLev1,      // FIX #3
+        getLimitPriceFn: (platformId, side, markPrice) =>
+          getLimitPrice(platformId, side, markPrice, priceMode1, customPrice1, p1Bid, p1Ask),
       },
       legB: {
         marketId:   marketId,
@@ -650,6 +652,8 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
         market:     enrichedMarket,
         orderType:  orderType2,   // FIX #3
         leverage:   effLev2,      // FIX #3
+        getLimitPriceFnB: (platformId, side, markPrice) =>
+          getLimitPrice(platformId, side, markPrice, priceMode2, customPrice2, p2Bid, p2Ask),
       },
       credentials,
       totalUsd:        parseFloat(sizeUSD) || 0,
