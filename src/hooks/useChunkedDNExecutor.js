@@ -157,6 +157,8 @@ export function useChunkedDNExecutor() {
     placeOrderFn,     // async (params) => result avec resolvedOid
     // NOTE FIX #1 : placeOrderFn ne prend plus qu'un seul argument.
     // Les credentials sont spreadés dans params directement par le hook.
+    getLimitPriceFn,    // (platformId, side, markPrice) => limitPrice leg A
+    getLimitPriceFnB,   // (platformId, side, markPrice) => limitPrice leg B
   }) => {
     if (runningRef.current) return
     runningRef.current = true
