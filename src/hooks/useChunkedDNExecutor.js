@@ -301,6 +301,8 @@ export function useChunkedDNExecutor() {
 
       await Promise.all([placeA, placeB])
 
+      console.log('[Chunk] orderIdA résolu:', orderIdA, '| orderIdB résolu:', orderIdB)
+
       if (abort.signal.aborted) break
       
       if (errA || errB) {
