@@ -620,34 +620,55 @@ const buildOrderParams = (platformId, side, sizeAsset, limitPrice, orderType, le
 }, [getPrice])
 
   // ── handleStartChunked ────────────────────────────────────────────────────────
-  const handleStartChunked = () => {
-  if (!market || !marketId || !calc) return   // market, marketId, calc existent bien
-  reset()
-  start({
-    legA: {
-      marketId:   marketId,
-      platformId: platform1,
-      isBuy:      side1 === 'LONG',
-      market,
-    },
-    legB: {
-      marketId:   marketId,
-      platformId: platform2,
-      isBuy:      side2 === 'LONG',
-      market,
-    },
-    credentials,
-    totalUsd:       parseFloat(sizeUSD) || 0,
-    sliceUsd:       chunkedConfig.sliceUsd,
-    delayBetweenMs: chunkedConfig.delayBetweenMs,
-    makerTimeoutMs: chunkedConfig.makerTimeoutMs,
-    maxRetries:     chunkedConfig.maxRetries,
-    onErrorMode:    chunkedConfig.onErrorMode,
-    getMarkPrice,
-    placeOrderFn:   (params, creds) => placeOrder(params, creds),
-  })
-}
+   const handleStartChunked = () => {
+    if (!market || !marketId || !calc) return
 
+    // FIX #2 — enrichir market avec szDecimals / pxDecimals depuis assetMeta
+    const meta = getAssetMeta(market.keys?.hl)
+    const enrichedMarket = {
+      ...market,
+      szDecimals: meta?.szDecimals ?? market.szDecimals,
+      pxDecimals: meta?.pxDecimals ?? market.pxDecimals,
+    }
+
+    reset()
+    start({
+      // FIX #2 : enrichedMarket
+      // FIX #3 : orderType et leverage par leg
+      legA: {
+        marketId:   marketId,
+        platformId: platform1,
+        isBuy:      side1 === 'LONG',
+        market:     enrichedMarket,
+        orderType:  orderType1,   // FIX #3
+        leverage:   effLev1,      // FIX #3
+      },
+      legB: {
+        marketId:   marketId,
+        platformId: platform2,
+        isBuy:      side2 === 'LONG',
+        market:     enrichedMarket,
+        orderType:  orderType2,   // FIX #3
+        leverage:   effLev2,      // FIX #3
+      },
+      credentials,
+      totalUsd:        parseFloat(sizeUSD) || 0,
+      sliceUsd:        chunkedConfig.sliceUsd,
+      delayBetweenMs:  chunkedConfig.delayBetweenMs,
+      makerTimeoutMs:  chunkedConfig.makerTimeoutMs,
+      maxRetries:      chunkedConfig.maxRetries,
+      onErrorMode:     chunkedConfig.onErrorMode,
+      // FIX #4 — step size transmis au hook
+      stepSize:        getStepSize(marketId),
+      useStepSize:     useStepSize,
+      getMarkPrice,
+      placeOrderFn:    (params) => placeOrder(params),
+      // NOTE : placeOrderFn ne prend plus qu'un seul argument (params).
+      // Les credentials sont désormais spreadés dans params par le hook (FIX #1).
+    })
+  }
+
+  
   return (
     <div className="page-header">
 
