@@ -606,6 +606,10 @@ export async function placeOrder(order, credentials) {
   }
 
   const hlOid = status0?.resting?.oid ?? status0?.filled?.oid ?? null
+
+  // hyperliquid.js — juste avant le return final
+  console.log('[HL] status0 complet:', JSON.stringify(status0))
+  console.log('[HL] resolvedOid:', hlOid)
   
   return { ...data, resolvedOid: hlOid }
 }
