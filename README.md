@@ -169,54 +169,10 @@ OpenTrade.jsx
 
 ## Marchés supportés
 
-### Marchés cross-plateformes
 
-Marchés disponibles sur plusieurs plateformes simultanément (delta-neutre possible) :
+> Les clés par plateforme sont résolues dynamiquemet via appel API dans chaque adpater selon plateforme puis l'ensemble des marchés disponible est construit dans `src/services/marketService.js` 
+> Certaines clés par plateforme sont résolues via `KEY_OVERRIDES` dans `src/config/markets.js` pour les marchés ne portant pas le même ticker
 
-| ID | Label | HL | Extended | Nado | Catégorie |
-|----|-------|:--:|:--------:|:----:|-----------|
-| `GOLD` | Gold | ✅ | XAU-USD | ✅ | Commodités |
-| `SILVER` | Silver | ✅ | XAG-USD | XAG | Commodités |
-| `OIL` | WTI Oil | ✅ | WTI-USD | WTI | Commodités |
-| `BRENT` | Brent | ✅ | XBR-USD | — | Commodités |
-| `COPPER` | Copper | ✅ | XCU-USD | — | Commodités |
-| `PLAT` | Platinum | ✅ | XPT-USD | — | Commodités |
-| `NGAS` | Nat. Gas | ✅ | XNG-USD | — | Commodités |
-| `SP500` | S&P 500 | ✅ | SPX500m-USD | SPY | Indices |
-| `NASDAQ` | Nasdaq | xyz:XYZ100 | TECH100m-USD | — | Indices |
-
-> Les clés par plateforme sont résolues via `KEY_OVERRIDES` dans `src/config/markets.js`.
-
-### Marchés HIP-3 (trade.xyz / HyENA)
-
-Marchés accessibles via le DEX HIP-3 sur l'infrastructure Hyperliquid, avec des symboles préfixés `xyz:` :
-
-| Clé HL | Label | Résolution |
-|--------|-------|-----------|
-| `xyz:XYZ100` | Nasdaq | `HL_KEY_OVERRIDES` → `NASDAQ` |
-| `xyz:CL` | WTI Oil | `HL_KEY_OVERRIDES` → `OIL` |
-| `xyz:BRENTOIL` | Brent | `HL_KEY_OVERRIDES` → `BRENT` |
-| `xyz:PLATINUM` | Platinum | `HL_KEY_OVERRIDES` → `PLAT` |
-| `xyz:NATGAS` | Nat. Gas | `HL_KEY_OVERRIDES` → `NGAS` |
-
-### Marchés Nado uniquement
-
-Marchés disponibles exclusivement sur Nado (crypto, FX, ETFs) :
-
-| ID | Label | Clé Nado | Catégorie |
-|----|-------|----------|-----------|
-| `XRP` | XRP | `XRP` | Crypto |
-| `BNB` | BNB | `BNB` | Crypto |
-| `HYPE` | HYPE | `HYPE` | Crypto |
-| `SUI` | SUI | `SUI` | Crypto |
-| `DOGE` | DOGE | `DOGE` | Crypto |
-| `AAVE` | AAVE | `AAVE` | Crypto |
-| `LINK` | LINK | `LINK` | Crypto |
-| `EURUSD` | EUR/USD | `EURUSD` | FX |
-| `GBPUSD` | GBP/USD | `GBPUSD` | FX |
-| `USDJPY` | USD/JPY | `USDJPY` | FX |
-| `SPY` | SPY ETF | `SPY` | Indices |
-| `QQQ` | QQQ ETF | `QQQ` | Indices |
 
 ---
 
